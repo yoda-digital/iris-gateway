@@ -1,0 +1,23 @@
+services:
+  iris:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "19876:19876"
+      - "19877:19877"
+      - "19878:19878"
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - iris-state:/home/iris/.iris
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:19876/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  iris-state:

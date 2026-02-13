@@ -1,0 +1,28 @@
+{
+  "gateway": {
+    "port": 19876,
+    "hostname": "127.0.0.1"
+  },
+  "opencode": {
+    "port": 4096,
+    "hostname": "127.0.0.1",
+    "autoSpawn": false
+  },
+  "security": {
+    "defaultDmPolicy": "open",
+    "pairingCodeTtlMs": 3600000,
+    "pairingCodeLength": 8,
+    "rateLimitPerMinute": 30,
+    "rateLimitPerHour": 300
+  },
+  "channels": {
+    "telegram": {
+      "type": "telegram",
+      "enabled": true,
+      "token": "7730298758:AAEO9W9XAWiXQlIcFlzsoEOPuun-ibqr64M"
+    }
+  },
+  "logging": {
+    "level": "debug"
+  }
+}

@@ -1,0 +1,165 @@
+import {
+  createOpencode,
+  createOpencodeClient,
+  type OpencodeClient,
+  type Event as OpenCodeEvent,
+  type Part,
+  type TextPart,
+} from "@opencode-ai/sdk";
+import type { OpenCodeConfig } from "../config/types.js";
+import type { Logger } from "../logging/logger.js";
+
+export type { OpenCodeEvent, Part, TextPart };
+
+export interface SessionInfo {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: number;
+}
+
+export class OpenCodeBridge {
+  private client: OpencodeClient | null = null;
+  private serverHandle: { url: string; close(): void } | null = null;
+
+  constructor(
+    private readonly config: OpenCodeConfig,
+    private readonly logger: Logger,
+  ) {}
+
+  async start(): Promise<void> {
+    if (this.config.autoSpawn) {
+      this.logger.info("Spawning OpenCode server...");
+      const { client, server } = await createOpencode({
+        port: this.config.port,
+        hostname: this.config.hostname,
+      });
+      this.client = client;
+      this.serverHandle = server;
+      this.logger.info({ url: server.url }, "OpenCode server started");
+    } else {
+      this.logger.info("Connecting to existing OpenCode server...");
+      this.client = createOpencodeClient({
+        baseUrl: `http://${this.config.hostname}:${this.config.port}`,
+      });
+      this.logger.info("Connected to OpenCode server");
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.serverHandle) {
+      this.serverHandle.close();
+      this.serverHandle = null;
+      this.logger.info("OpenCode server stopped");
+    }
+    this.client = null;
+  }
+
+  private getClient(): OpencodeClient {
+    if (!this.client) throw new Error("OpenCode bridge not started");
+    return this.client;
+  }
+
+  async createSession(title?: string): Promise<SessionInfo> {
+    const response = await this.getClient().session.create({
+      body: { title: title ?? "Iris Chat" },
+      throwOnError: true,
+    });
+    const session = response.data;
+    return {
+      id: session.id,
+      title: session.title ?? title ?? "Iris Chat",
+      createdAt: session.time.created,
+    };
+  }
+
+  async sendMessage(sessionId: string, text: string): Promise<string> {
+    const response = await this.getClient().session.prompt({
+      path: { id: sessionId },
+      body: { parts: [{ type: "text", text }] },
+      throwOnError: true,
+    });
+    const parts = response.data.parts ?? [];
+    // Prefer text parts; fall back to reasoning if model only produced reasoning
+    const textParts = parts.filter((p: Part) => p.type === "text") as TextPart[];
+    if (textParts.length > 0) {
+      return textParts.map((p) => p.text).join("");
+    }
+    const reasoningParts = parts.filter((p: Part) => p.type === "reasoning") as Array<{ text: string }>;
+    return reasoningParts.map((p) => p.text).join("");
+  }
+
+  async sendMessageAsync(sessionId: string, text: string): Promise<void> {
+    await this.getClient().session.promptAsync({
+      path: { id: sessionId },
+      body: { parts: [{ type: "text", text }] },
+      throwOnError: true,
+    });
+  }
+
+  async subscribeEvents(
+    onEvent: (event: OpenCodeEvent) => void,
+  ): Promise<void> {
+    const result = await this.getClient().event.subscribe({
+      onSseEvent: (streamEvent) => {
+        if (streamEvent.data && typeof streamEvent.data === "object") {
+          onEvent(streamEvent.data as OpenCodeEvent);
+        }
+      },
+    });
+    // Consume the stream to keep the connection alive
+    const stream = result.stream as AsyncIterable<unknown> | undefined;
+    if (stream) {
+      for await (const _ of stream) {
+        // Events are delivered via onSseEvent callback
+      }
+    }
+  }
+
+  async abortSession(sessionId: string): Promise<void> {
+    await this.getClient().session.abort({
+      path: { id: sessionId },
+      throwOnError: true,
+    });
+  }
+
+  async checkHealth(): Promise<boolean> {
+    try {
+      await this.getClient().session.list();
+      return true;
+    } catch (err) {
+      this.logger.warn({ err }, "OpenCode health check failed");
+      return false;
+    }
+  }
+
+  async listSessions(): Promise<SessionInfo[]> {
+    const response = await this.getClient().session.list({ throwOnError: true });
+    return Object.values(response.data).map((s) => ({
+      id: s.id,
+      title: s.title ?? "",
+      createdAt: s.time.created,
+    }));
+  }
+
+  async listMessages(sessionId: string): Promise<Array<{ role: string; text: string }>> {
+    const response = await this.getClient().session.messages({
+      path: { id: sessionId },
+      throwOnError: true,
+    });
+    return (response.data ?? []).map((msg) => {
+      const role = msg.info.role;
+      const textParts = (msg.parts ?? []).filter((p: Part) => p.type === "text") as TextPart[];
+      return {
+        role,
+        text: textParts.map((p) => p.text).join(""),
+      };
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.getClient().session.delete({
+      path: { id: sessionId },
+      throwOnError: true,
+    });
+  }
+}

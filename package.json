@@ -1,60 +1,46 @@
 {
-  "name": "iris-messenger",
+  "name": "iris",
   "version": "0.1.0",
-  "description": "Multi-channel AI messenger powered by OpenCode CLI",
-  "keywords": ["ai", "messenger", "telegram", "whatsapp", "discord", "slack", "opencode"],
-  "license": "MIT",
-  "author": "",
+  "description": "Multi-channel AI messaging gateway powered by OpenCode CLI",
   "type": "module",
-  "bin": {
-    "iris": "dist/entry.js"
+  "engines": {
+    "node": ">=22"
   },
-  "main": "dist/entry.js",
+  "bin": {
+    "iris": "./dist/index.js"
+  },
   "scripts": {
-    "dev": "tsx src/entry.ts",
+    "dev": "tsx --env-file=.env src/index.ts gateway run",
     "build": "tsc",
-    "start": "node dist/entry.js",
+    "start": "node --env-file=.env dist/index.js gateway run",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit",
-    "iris": "tsx src/entry.ts"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "latest",
-    "grammy": "^1.40.0",
-    "@whiskeysockets/baileys": "7.0.0-rc.9",
-    "discord.js": "^14.18.0",
+    "@hono/node-server": "^1.13.0",
+    "@opencode-ai/sdk": "^1.1.59",
     "@slack/bolt": "^4.6.0",
-    "commander": "^13.1.0",
-    "zod": "^3.24.0",
-    "express": "^5.1.0",
-    "tslog": "^4.10.0",
-    "proper-lockfile": "^4.1.2",
-    "@clack/prompts": "^0.10.0",
-    "cron-parser": "^4.9.0",
-    "sharp": "^0.33.0",
-    "dotenv": "^16.5.0"
+    "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "clipanion": "^4.0.0-rc.4",
+    "croner": "^9.0.0",
+    "discord.js": "^14.25.0",
+    "grammy": "^1.40.0",
+    "hono": "^4.0.0",
+    "pino": "^9.0.0",
+    "proper-lockfile": "^4.1.0",
+    "sharp": "^0.34.0",
+    "typanion": "^3.14.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
+    "@clack/prompts": "^0.10.0",
+    "@types/node": "^22.0.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "pino-pretty": "^12.0.0",
     "tsx": "^4.19.0",
-    "@types/node": "^22.12.0",
-    "@types/express": "^5.0.0",
-    "@vitest/coverage-v8": "^3.0.0",
-    "@types/proper-lockfile": "^4.1.4"
-  },
-  "engines": {
-    "node": ">=22.0.0"
-  },
-  "packageManager": "pnpm@10.4.1",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@whiskeysockets/baileys",
-      "esbuild",
-      "protobufjs",
-      "sharp"
-    ]
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

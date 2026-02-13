@@ -3,6 +3,7 @@ import { TypedEventEmitter } from "../utils/typed-emitter.js";
 
 export interface EventHandlerEvents {
   response: (sessionId: string, text: string) => void;
+  partial: (sessionId: string, delta: string) => void;
   error: (sessionId: string, error: unknown) => void;
   toolCall: (sessionId: string, toolName: string, input: unknown) => void;
 }
@@ -79,6 +80,7 @@ export class EventHandler {
           const entry = this.accumulator.get(part.sessionID) ?? { textChunks: [], reasoningChunks: [], updatedAt: now };
           if (delta) {
             entry.textChunks.push(delta);
+            this.events.emit("partial", part.sessionID, delta);
           } else {
             entry.textChunks.length = 0;
             entry.textChunks.push(part.text);

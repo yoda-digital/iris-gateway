@@ -27,6 +27,16 @@ export interface ChannelAccountConfig {
   readonly groupPolicy?: GroupPolicyConfig;
   readonly mentionPattern?: string;
   readonly maxTextLength?: number;
+  readonly streaming?: StreamingConfig;
+}
+
+export interface StreamingConfig {
+  readonly enabled: boolean;
+  readonly minChars?: number;
+  readonly maxChars?: number;
+  readonly idleMs?: number;
+  readonly breakOn?: "paragraph" | "sentence" | "word";
+  readonly editInPlace?: boolean;
 }
 
 export interface SecurityConfig {

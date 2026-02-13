@@ -9,6 +9,7 @@ import type { OpenCodeBridge } from "./opencode-client.js";
 import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
+import { StreamCoalescer } from "./stream-coalescer.js";
 
 const PENDING_TTL_MS = 5 * 60_000; // 5 minutes
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
@@ -23,6 +24,7 @@ interface PendingResponse {
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
   private readonly pendingResponses = new Map<string, PendingResponse>();
+  private readonly activeCoalescers = new Map<string, StreamCoalescer>();
   private readonly outboundQueue: MessageQueue;
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -35,11 +37,28 @@ export class MessageRouter {
     private readonly channelConfigs: Record<string, ChannelAccountConfig> = {},
   ) {
     this.eventHandler = new EventHandler();
+    this.eventHandler.events.on("partial", (sessionId, delta) => {
+      const coalescer = this.activeCoalescers.get(sessionId);
+      if (coalescer) coalescer.append(delta);
+    });
     this.eventHandler.events.on("response", (sessionId, text) => {
-      this.handleResponse(sessionId, text);
+      const coalescer = this.activeCoalescers.get(sessionId);
+      if (coalescer) {
+        coalescer.end();
+        coalescer.dispose();
+        this.activeCoalescers.delete(sessionId);
+        this.pendingResponses.delete(sessionId);
+      } else {
+        this.handleResponse(sessionId, text);
+      }
     });
     this.eventHandler.events.on("error", (sessionId, error) => {
       this.logger.error({ sessionId, error }, "Session error");
+      const coalescer = this.activeCoalescers.get(sessionId);
+      if (coalescer) {
+        coalescer.dispose();
+        this.activeCoalescers.delete(sessionId);
+      }
       this.pendingResponses.delete(sessionId);
     });
 
@@ -141,6 +160,36 @@ export class MessageRouter {
       const mentionPattern = channelConfig.mentionPattern;
       const botId = adapter?.id ?? msg.channelId;
       messageText = stripBotMention(messageText, botId, mentionPattern);
+    }
+
+    // Set up streaming coalescer if enabled for this channel
+    const streamConfig = channelConfig?.streaming;
+    if (streamConfig?.enabled && adapter) {
+      const maxLen = PLATFORM_LIMITS[msg.channelId] ?? adapter.capabilities.maxTextLength ?? 4096;
+      const coalescer = new StreamCoalescer(
+        {
+          enabled: true,
+          minChars: streamConfig.minChars ?? 300,
+          maxChars: streamConfig.maxChars ?? maxLen,
+          idleMs: streamConfig.idleMs ?? 800,
+          breakOn: streamConfig.breakOn ?? "paragraph",
+          editInPlace: streamConfig.editInPlace ?? false,
+        },
+        (text, isEdit) => {
+          if (isEdit && adapter.editMessage) {
+            // Edit-in-place: edit the last sent message
+            adapter.editMessage({ messageId: "", text, chatId: msg.chatId }).catch(() => {});
+          } else {
+            this.outboundQueue.enqueue({
+              channelId: msg.channelId,
+              chatId: msg.chatId,
+              text,
+              replyToId: msg.id,
+            });
+          }
+        },
+      );
+      this.activeCoalescers.set(entry.openCodeSessionId, coalescer);
     }
 
     // Send message to OpenCode (async, response comes via SSE events)

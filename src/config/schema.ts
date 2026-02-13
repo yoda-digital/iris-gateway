@@ -9,6 +9,15 @@ const groupPolicySchema = z.object({
   allowedCommands: z.array(z.string()).optional(),
 });
 
+const streamingSchema = z.object({
+  enabled: z.boolean().default(false),
+  minChars: z.number().positive().optional(),
+  maxChars: z.number().positive().optional(),
+  idleMs: z.number().positive().optional(),
+  breakOn: z.enum(["paragraph", "sentence", "word"]).optional(),
+  editInPlace: z.boolean().optional(),
+});
+
 const channelAccountSchema = z.object({
   type: z.enum(["telegram", "whatsapp", "discord", "slack"]),
   enabled: z.boolean().default(false),
@@ -19,6 +28,7 @@ const channelAccountSchema = z.object({
   groupPolicy: groupPolicySchema.optional(),
   mentionPattern: z.string().optional(),
   maxTextLength: z.number().positive().optional(),
+  streaming: streamingSchema.optional(),
 });
 
 const gatewaySchema = z.object({

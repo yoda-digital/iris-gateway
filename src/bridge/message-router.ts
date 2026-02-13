@@ -10,6 +10,7 @@ import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
 import { StreamCoalescer } from "./stream-coalescer.js";
+import type { TemplateEngine } from "../auto-reply/engine.js";
 
 const PENDING_TTL_MS = 5 * 60_000; // 5 minutes
 const CLEANUP_INTERVAL_MS = 60_000; // 1 minute
@@ -35,6 +36,7 @@ export class MessageRouter {
     private readonly registry: ChannelRegistry,
     private readonly logger: Logger,
     private readonly channelConfigs: Record<string, ChannelAccountConfig> = {},
+    private readonly templateEngine?: TemplateEngine | null,
   ) {
     this.eventHandler = new EventHandler();
     this.eventHandler.events.on("partial", (sessionId, delta) => {
@@ -126,6 +128,22 @@ export class MessageRouter {
       if (!shouldProcessGroupMessage(msg, botId, mentionPattern)) {
         log.debug("Group message filtered (no bot mention)");
         return;
+      }
+    }
+
+    // Auto-reply check
+    if (this.templateEngine) {
+      const match = this.templateEngine.match(msg);
+      if (match) {
+        log.info({ templateId: match.template.id }, "Auto-reply matched");
+        if (adapter) {
+          await adapter.sendText({
+            to: msg.chatId,
+            text: match.response,
+            replyToId: msg.id,
+          });
+        }
+        if (!match.template.forwardToAi) return;
       }
     }
 

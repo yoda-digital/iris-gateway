@@ -10,6 +10,30 @@ export interface IrisConfig {
   readonly governance?: GovernanceConfig;
   readonly mcp?: McpConfig;
   readonly plugins?: string[];
+  readonly autoReply?: AutoReplyConfig;
+}
+
+export interface AutoReplyConfig {
+  readonly enabled: boolean;
+  readonly templates: AutoReplyTemplateConfig[];
+}
+
+export interface AutoReplyTemplateConfig {
+  readonly id: string;
+  readonly trigger: {
+    readonly type: "exact" | "regex" | "keyword" | "command" | "schedule";
+    readonly pattern?: string;
+    readonly words?: string[];
+    readonly name?: string;
+    readonly when?: { hours?: [number, number]; days?: number[] };
+  };
+  readonly response: string;
+  readonly priority?: number;
+  readonly cooldown?: number;
+  readonly once?: boolean;
+  readonly channels?: string[];
+  readonly chatTypes?: ("dm" | "group")[];
+  readonly forwardToAi?: boolean;
 }
 
 export interface GatewayConfig {

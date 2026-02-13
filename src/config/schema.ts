@@ -98,6 +98,29 @@ export const irisConfigSchema = z.object({
   governance: governanceSchema.default({}),
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
+  autoReply: z.object({
+    enabled: z.boolean().default(false),
+    templates: z.array(z.object({
+      id: z.string().min(1),
+      trigger: z.object({
+        type: z.enum(["exact", "regex", "keyword", "command", "schedule"]),
+        pattern: z.string().optional(),
+        words: z.array(z.string()).optional(),
+        name: z.string().optional(),
+        when: z.object({
+          hours: z.tuple([z.number(), z.number()]).optional(),
+          days: z.array(z.number()).optional(),
+        }).optional(),
+      }),
+      response: z.string().min(1),
+      priority: z.number().optional(),
+      cooldown: z.number().positive().optional(),
+      once: z.boolean().optional(),
+      channels: z.array(z.string()).optional(),
+      chatTypes: z.array(z.enum(["dm", "group"])).optional(),
+      forwardToAi: z.boolean().optional(),
+    })).default([]),
+  }).optional(),
 });
 
 export function parseConfig(raw: unknown): IrisConfig {

@@ -17,6 +17,8 @@ import { VaultStore } from "../vault/store.js";
 import { VaultSearch } from "../vault/search.js";
 import { GovernanceEngine } from "../governance/engine.js";
 import { PluginLoader } from "../plugins/loader.js";
+import { TemplateEngine } from "../auto-reply/engine.js";
+import type { AutoReplyTemplate } from "../auto-reply/types.js";
 import { UsageTracker } from "../usage/tracker.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { HealthServer } from "./health.js";
@@ -113,6 +115,24 @@ export async function startGateway(
   const registry = new ChannelRegistry();
   const messageCache = new MessageCache();
 
+  // 7.5 Create auto-reply template engine
+  let templateEngine: TemplateEngine | null = null;
+  if (config.autoReply?.enabled && config.autoReply.templates.length > 0) {
+    const templates: AutoReplyTemplate[] = config.autoReply.templates.map((t) => ({
+      id: t.id,
+      trigger: t.trigger as AutoReplyTemplate["trigger"],
+      response: t.response,
+      priority: t.priority,
+      cooldown: t.cooldown,
+      once: t.once,
+      channels: t.channels,
+      chatTypes: t.chatTypes,
+      forwardToAi: t.forwardToAi,
+    }));
+    templateEngine = new TemplateEngine(templates);
+    logger.info({ count: templates.length }, "Auto-reply templates loaded");
+  }
+
   // 8. Create message router
   const router = new MessageRouter(
     bridge,
@@ -121,6 +141,7 @@ export async function startGateway(
     registry,
     logger,
     config.channels,
+    templateEngine,
   );
 
   // 9. Start tool server

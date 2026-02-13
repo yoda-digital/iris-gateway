@@ -1,7 +1,12 @@
 {
-  "name": "iris",
+  "name": "@yoda-digital/iris-gateway",
   "version": "0.1.0",
   "description": "Multi-channel AI messaging gateway powered by OpenCode CLI",
+  "homepage": "https://github.com/yoda-digital/iris-gateway",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yoda-digital/iris-gateway.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"

@@ -115,7 +115,7 @@ node --version  # Should print v22.x.x
 
 ```bash
 cd /opt
-git clone <repo-url> iris
+git clone https://github.com/yoda-digital/iris-gateway.git iris
 cd iris
 npm ci
 npm run build

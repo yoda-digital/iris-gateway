@@ -7,6 +7,7 @@ import type { VaultStore } from "../vault/store.js";
 import type { VaultSearch } from "../vault/search.js";
 import type { GovernanceEngine } from "../governance/engine.js";
 import type { SessionMap } from "./session-map.js";
+import type { PluginToolDef } from "../plugins/types.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -47,6 +48,7 @@ export interface ToolServerDeps {
   vaultSearch?: VaultSearch | null;
   governanceEngine?: GovernanceEngine | null;
   sessionMap?: SessionMap | null;
+  pluginTools?: Map<string, PluginToolDef> | null;
 }
 
 export class ToolServer {
@@ -59,6 +61,7 @@ export class ToolServer {
   private readonly vaultSearch: VaultSearch | null;
   private readonly governanceEngine: GovernanceEngine | null;
   private readonly sessionMap: SessionMap | null;
+  private readonly pluginTools: Map<string, PluginToolDef> | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -76,6 +79,7 @@ export class ToolServer {
       this.vaultSearch = null;
       this.governanceEngine = null;
       this.sessionMap = null;
+      this.pluginTools = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -85,6 +89,7 @@ export class ToolServer {
       this.vaultSearch = deps.vaultSearch ?? null;
       this.governanceEngine = deps.governanceEngine ?? null;
       this.sessionMap = deps.sessionMap ?? null;
+      this.pluginTools = deps.pluginTools ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -220,6 +225,38 @@ export class ToolServer {
         capabilities: a.capabilities,
       }));
       return c.json({ channels });
+    });
+
+    // ── Plugin tool endpoints ──
+
+    this.app.post("/tool/plugin/:name", async (c) => {
+      const name = c.req.param("name");
+      const toolDef = this.pluginTools?.get(name);
+      if (!toolDef) return c.json({ error: `Plugin tool not found: ${name}` }, 404);
+      const body = await c.req.json();
+      try {
+        const result = await toolDef.execute(body, {
+          sessionId: body.sessionId ?? null,
+          senderId: body.senderId ?? null,
+          channelId: body.channelId ?? null,
+          logger: this.logger,
+        });
+        return c.json(result ?? { ok: true });
+      } catch (err) {
+        this.logger.error({ err, tool: name }, "Plugin tool execution failed");
+        return c.json({ error: String(err) }, 500);
+      }
+    });
+
+    this.app.get("/tool/plugin-manifest", (c) => {
+      if (!this.pluginTools || this.pluginTools.size === 0) {
+        return c.json({ tools: {} });
+      }
+      const tools: Record<string, { description: string }> = {};
+      for (const [name, def] of this.pluginTools) {
+        tools[name] = { description: def.description };
+      }
+      return c.json({ tools });
     });
 
     // ── Vault endpoints ──

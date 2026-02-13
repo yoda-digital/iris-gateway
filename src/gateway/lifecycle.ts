@@ -16,6 +16,8 @@ import { VaultDB } from "../vault/db.js";
 import { VaultStore } from "../vault/store.js";
 import { VaultSearch } from "../vault/search.js";
 import { GovernanceEngine } from "../governance/engine.js";
+import { PluginLoader } from "../plugins/loader.js";
+import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { HealthServer } from "./health.js";
 import { TelegramAdapter } from "../channels/telegram/index.js";
 import { WhatsAppAdapter } from "../channels/whatsapp/index.js";
@@ -38,6 +40,7 @@ export interface GatewayContext {
   vaultStore: VaultStore;
   vaultSearch: VaultSearch;
   governanceEngine: GovernanceEngine;
+  pluginRegistry: IrisPluginRegistry;
 }
 
 const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
@@ -95,6 +98,9 @@ export async function startGateway(
     config.governance ?? { enabled: false, rules: [], directives: [] },
   );
 
+  // 5.7 Load plugins
+  const pluginRegistry = await new PluginLoader(logger).loadAll(config, stateDir);
+
   // 6. Create session map
   const sessionMap = new SessionMap(stateDir);
 
@@ -120,6 +126,7 @@ export async function startGateway(
     vaultSearch,
     governanceEngine,
     sessionMap,
+    pluginTools: pluginRegistry.tools,
   });
   await toolServer.start();
 
@@ -146,8 +153,9 @@ export async function startGateway(
       continue;
     }
 
-    const factory = ADAPTER_FACTORIES[channelConfig.type];
-    if (!factory) {
+    const builtInFactory = ADAPTER_FACTORIES[channelConfig.type];
+    const pluginFactory = pluginRegistry.channels.get(channelConfig.type);
+    if (!builtInFactory && !pluginFactory) {
       logger.warn(
         { channel: id, type: channelConfig.type },
         "Unknown channel type",
@@ -155,7 +163,9 @@ export async function startGateway(
       continue;
     }
 
-    const adapter = factory();
+    const adapter = pluginFactory
+      ? pluginFactory(channelConfig, abortController.signal)
+      : builtInFactory!();
 
     // Inject message cache into adapters that support it
     if ("setMessageCache" in adapter && typeof adapter.setMessageCache === "function") {
@@ -198,6 +208,19 @@ export async function startGateway(
     }
   }
 
+  // 12.5 Start plugin services
+  for (const [name, service] of pluginRegistry.services) {
+    try {
+      await service.start({ config, logger, stateDir, signal: abortController.signal });
+      logger.info({ service: name }, "Plugin service started");
+    } catch (err) {
+      logger.error({ err, service: name }, "Failed to start plugin service");
+    }
+  }
+
+  // Emit gateway.ready hook
+  await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
+
   // 13. Subscribe to OpenCode events with reconnection
   startEventSubscription(bridge, router, logger, abortController.signal);
 
@@ -225,6 +248,14 @@ export async function startGateway(
         await adapter.stop();
       } catch (err) {
         logger.error({ err, channel: adapter.id }, "Error stopping channel");
+      }
+    }
+
+    // Emit shutdown hook and stop plugin services
+    await pluginRegistry.hookBus.emit("gateway.shutdown", undefined as never);
+    for (const [name, service] of pluginRegistry.services) {
+      try { await service.stop(); } catch (err) {
+        logger.error({ err, service: name }, "Error stopping plugin service");
       }
     }
 
@@ -261,6 +292,7 @@ export async function startGateway(
     vaultStore,
     vaultSearch,
     governanceEngine,
+    pluginRegistry,
   };
 }
 

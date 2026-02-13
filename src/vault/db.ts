@@ -87,6 +87,50 @@ CREATE TABLE IF NOT EXISTS usage_log (
 );
 CREATE INDEX IF NOT EXISTS idx_usage_sender ON usage_log(sender_id);
 CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_log(timestamp);
+
+CREATE TABLE IF NOT EXISTS proactive_intents (
+  id          TEXT PRIMARY KEY,
+  session_id  TEXT NOT NULL,
+  channel_id  TEXT NOT NULL,
+  chat_id     TEXT NOT NULL,
+  sender_id   TEXT NOT NULL,
+  what        TEXT NOT NULL,
+  why         TEXT,
+  confidence  REAL DEFAULT 0.8,
+  execute_at  INTEGER NOT NULL,
+  executed_at INTEGER,
+  result      TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_proactive_intents_pending
+  ON proactive_intents(execute_at) WHERE executed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS proactive_triggers (
+  id          TEXT PRIMARY KEY,
+  type        TEXT NOT NULL CHECK(type IN ('dormant_user','unanswered','engagement_drop','external')),
+  channel_id  TEXT NOT NULL,
+  chat_id     TEXT NOT NULL,
+  sender_id   TEXT NOT NULL,
+  context     TEXT NOT NULL,
+  execute_at  INTEGER NOT NULL,
+  executed_at INTEGER,
+  result      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_proactive_triggers_pending
+  ON proactive_triggers(execute_at) WHERE executed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS proactive_log (
+  id          TEXT PRIMARY KEY,
+  sender_id   TEXT NOT NULL,
+  channel_id  TEXT NOT NULL,
+  type        TEXT NOT NULL CHECK(type IN ('intent','trigger')),
+  source_id   TEXT NOT NULL,
+  sent_at     INTEGER NOT NULL,
+  engaged     INTEGER DEFAULT 0,
+  engagement_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_proactive_log_sender
+  ON proactive_log(sender_id, channel_id, sent_at);
 `;
 
 export class VaultDB {

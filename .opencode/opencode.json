@@ -33,8 +33,8 @@
   },
   "mcp": {
     "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-sequential-thinking"]
+      "type": "local",
+      "command": ["npx", "-y", "@anthropic/mcp-sequential-thinking"]
     }
   }
 }

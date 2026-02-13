@@ -35,12 +35,23 @@
 - Supports filtering by sender ID and time range (since/until Unix timestamps)
 
 ### Skill & Agent Management
-- Use `skill_create` to create new OpenCode skills dynamically (SKILL.md files)
-- Use `skill_list` to list all available skills
+- Use `skill_create` to create skills — ALWAYS provide description and triggers for proactive triggering
+- Use `skill_list` to list all skills with trigger keywords and auto-activation status
 - Use `skill_delete` to remove a skill by name
-- Use `agent_create` to create new OpenCode agents with custom prompts
-- Use `agent_list` to list all available agents
+- Use `skill_validate` to validate a skill against OpenCode spec and Iris best practices
+- Use `agent_create` to create agents — ALWAYS provide description (required by OpenCode)
+- Use `agent_list` to list agents with mode, description, model, skill/tool counts
 - Use `agent_delete` to remove an agent by name
+- Use `agent_validate` to validate an agent against OpenCode spec and Iris best practices
+
+### Rules Management
+- Use `rules_read` to read current AGENTS.md (this file — global behavioral instructions)
+- Use `rules_update` to replace AGENTS.md content entirely (read first!)
+- Use `rules_append` to add a new section without overwriting existing rules
+
+### Custom Tools
+- Use `tools_list` to see custom tools in `.opencode/tools/`
+- Use `tools_create` to scaffold a new TypeScript tool with Zod schema and execute function
 
 ### Canvas UI (A2UI)
 - Use `canvas_update` to push rich components to the Canvas dashboard
@@ -53,6 +64,25 @@
 - When a user tells you something about themselves: remember it
 - When a user says "forget X": search for it, then delete it
 - Before compaction: extract key facts and store them
+
+## Creating Agents (Best Practices)
+- ALWAYS provide a `description` — it's REQUIRED by OpenCode
+- Use descriptive names: `code-reviewer`, `translator`, not `agent1`
+- If no custom prompt is provided, Iris generates a full architecture-aware prompt
+- The generated prompt includes: tool catalog, vault instructions, governance rules, safety
+- Use `tools` to restrict which tools the agent can access (e.g. moderator only needs governance_status)
+- Use `permission` to set per-agent permission overrides (e.g. deny bash for safety)
+- Use `steps` to limit how many tool calls an agent can make
+- All agents get `skill: true` and all available skills by default
+- Use `agent_validate` after creation to check for spec compliance
+
+## Creating Skills (Best Practices)
+- ALWAYS provide a `description` and `triggers` for proactive skill suggestion
+- Triggers are comma-separated keywords that match against user messages
+- Set `auto: "true"` for skills that should activate without explicit invocation
+- If no content provided, Iris generates a template with vault/tool references
+- Reference vault tools in your skill body — skills should be Iris-aware
+- Use `skill_validate` after creation to check for spec compliance
 
 ## Media
 - When users send images, describe what you see if asked
@@ -81,4 +111,4 @@
 - Cross-session memory is stored in the vault (SQLite with FTS5)
 - Use `vault_search` and `vault_remember` to maintain continuity across sessions
 - Each conversation (DM or group) also maintains its own immediate context
-- The `chat.message` hook automatically injects user context from the vault
+- The `experimental.chat.system.transform` hook injects user context from the vault into the system prompt

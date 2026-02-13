@@ -208,6 +208,83 @@ Denies all file and bash operations. The AI cannot read/write files or run shell
 
 ## Agent Customization
 
+### Creating agents via the AI
+
+The `agent_create` tool produces fully spec-compliant OpenCode agents with Iris architecture awareness. If no custom prompt is provided, the generator injects:
+
+- Full tool catalog (19 Iris tools with descriptions)
+- Vault usage instructions (search, remember, forget patterns)
+- Governance awareness (hooks, directives, safety)
+- Available skills list (auto-discovered from `.opencode/skills/`)
+- Safety rules and platform-specific formatting guidance
+
+```
+agent_create({
+  name: "translator",
+  description: "Real-time message translator between languages",
+  tools: ["send_message", "vault_search", "vault_remember"],
+  triggers: ["translate", "language"]
+})
+```
+
+This generates `.opencode/agents/translator.md` with full frontmatter and an Iris-aware prompt.
+
+### Full OpenCode agent frontmatter support
+
+The agent creator supports every OpenCode spec field:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | string | **REQUIRED** — shown in agent list |
+| `mode` | string | `primary`, `subagent`, or `all` (default: subagent) |
+| `model` | string | Model override (e.g. `openrouter/google/gemini-2.0-flash-exp`) |
+| `temperature` | number | Temperature 0-2 |
+| `top_p` | number | Top-p sampling 0-1 |
+| `steps` | number | Max tool call steps |
+| `tools` | map | YAML map of tool names (`tool_name: true`) |
+| `skills` | list | Skill names to enable (default: all available) |
+| `disable` | boolean | Disable without deleting |
+| `hidden` | boolean | Hide from UI |
+| `color` | string | Agent color in UI |
+| `permission` | object | Per-agent permission overrides |
+
+Example with all fields:
+
+```
+agent_create({
+  name: "code-reviewer",
+  description: "Reviews code snippets for quality and security issues",
+  mode: "subagent",
+  model: "openrouter/anthropic/claude-sonnet-4",
+  temperature: 0.3,
+  top_p: 0.9,
+  steps: 10,
+  tools: ["vault_search", "send_message"],
+  skills: ["moderation"],
+  hidden: true,
+  permission: { allow: { bash: "deny" } },
+  includes: ["./shared/code-standards.md"]
+})
+```
+
+### Validating agents
+
+```
+agent_validate({ name: "translator" })
+```
+
+Returns errors (blocking) and warnings (advisory):
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    "No vault tools — agent has no persistent memory access"
+  ]
+}
+```
+
 ### Changing the AI personality
 
 Edit `.opencode/agents/chat.md`:
@@ -452,7 +529,50 @@ All agent types have skill access:
 - **Subagents (moderator)**: `skill: true` + relevant skills
 - **Dynamically created agents**: `skill: true` + all available skills by default (configurable via `skills` param)
 
-### Writing a custom skill
+### Creating skills via the AI
+
+The `skill_create` tool produces fully spec-compliant skills with Iris integration:
+
+```
+skill_create({
+  name: "weather",
+  description: "Check the weather for a user's location",
+  triggers: "weather,forecast,temperature,rain,sunny",
+  content: "When a user asks about weather:\n\n1. Use vault_search to find their stored location\n2. Use the web-search MCP tool to get current weather\n3. Respond with a concise weather summary"
+})
+```
+
+If `content` is omitted, the generator creates an Iris-aware template that references vault tools, messaging tools, and governance.
+
+### Full OpenCode skill frontmatter support
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Skill name (must match directory name) |
+| `description` | string | **REQUIRED** — brief description shown in skill list |
+| `metadata.triggers` | string | Comma-separated keywords for proactive triggering |
+| `metadata.auto` | string | `"true"` to auto-activate without explicit invocation |
+| `metadata.*` | string | Any custom metadata key-value pairs |
+
+### Validating skills
+
+```
+skill_validate({ name: "weather" })
+```
+
+Returns errors and warnings:
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    "No 'metadata.triggers' — skill won't participate in proactive triggering"
+  ]
+}
+```
+
+### Writing a custom skill manually
 
 Create `.opencode/skills/weather/SKILL.md`:
 
@@ -472,6 +592,68 @@ When a user asks about weather:
 ```
 
 The `metadata.triggers` field enables proactive skill suggestion. When a user's message contains any trigger keyword, the system prompt will recommend invoking this skill.
+
+## Rules Management
+
+### How rules work
+
+`AGENTS.md` in the project root contains global behavioral instructions that apply to all agents. Think of it as the "constitution" — it defines identity, behavior patterns, tool usage guidelines, safety rules, and best practices.
+
+### Reading rules
+
+```
+rules_read()
+```
+
+Returns the full content of AGENTS.md.
+
+### Updating rules
+
+```
+rules_update({ content: "# New Rules\n\n## Identity\n- You are ...\n" })
+```
+
+Replaces the entire AGENTS.md. Always read first with `rules_read` to avoid data loss.
+
+### Appending rules
+
+```
+rules_append({ section: "## Custom Behavior\n- Always greet users in Romanian first\n- Use emoji in Telegram, but not in Slack" })
+```
+
+Adds a new section without overwriting existing content.
+
+## Custom Tools
+
+### How custom tools work
+
+Custom tools live in `.opencode/tools/` as TypeScript files. OpenCode discovers them automatically and makes them available to agents. Unlike plugin tools (which go through Iris's tool server), custom tools run directly in the OpenCode process.
+
+### Listing custom tools
+
+```
+tools_list()
+```
+
+Returns all `.ts`/`.js`/`.mjs` files in `.opencode/tools/`.
+
+### Creating custom tools
+
+```
+tools_create({
+  name: "sentiment-analyzer",
+  description: "Analyze the sentiment of a text message",
+  args: [
+    { name: "text", type: "string", description: "Text to analyze" },
+    { name: "detailed", type: "boolean", description: "Return detailed breakdown", required: false }
+  ]
+})
+```
+
+Generates `.opencode/tools/sentiment-analyzer.ts` with:
+- Zod schema for type-safe argument validation
+- `tool()` helper from `@opencode-ai/core`
+- Placeholder `execute` function
 
 ## Plugin SDK
 

@@ -7,6 +7,8 @@ export interface IrisConfig {
   readonly opencode: OpenCodeConfig;
   readonly cron?: CronJobConfig[];
   readonly logging?: LoggingConfig;
+  readonly governance?: GovernanceConfig;
+  readonly mcp?: McpConfig;
 }
 
 export interface GatewayConfig {
@@ -59,4 +61,27 @@ export interface LoggingConfig {
   readonly level: "debug" | "info" | "warn" | "error";
   readonly file?: string;
   readonly json?: boolean;
+}
+
+export interface GovernanceRuleConfig {
+  readonly id: string;
+  readonly description: string;
+  readonly tool: string;
+  readonly type: "rate_limit" | "constraint" | "custom" | "audit";
+  readonly params: Record<string, unknown>;
+}
+
+export interface GovernanceConfig {
+  readonly enabled: boolean;
+  readonly rules: GovernanceRuleConfig[];
+  readonly directives: string[];
+}
+
+export interface McpServerConfig {
+  readonly enabled: boolean;
+}
+
+export interface McpConfig {
+  readonly enabled: boolean;
+  readonly servers: Record<string, McpServerConfig>;
 }

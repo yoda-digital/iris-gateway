@@ -55,6 +55,29 @@ const loggingSchema = z.object({
   json: z.boolean().optional(),
 });
 
+const governanceRuleSchema = z.object({
+  id: z.string().min(1),
+  description: z.string().default(""),
+  tool: z.string().min(1),
+  type: z.enum(["rate_limit", "constraint", "custom", "audit"]),
+  params: z.record(z.unknown()).default({}),
+});
+
+const governanceSchema = z.object({
+  enabled: z.boolean().default(false),
+  rules: z.array(governanceRuleSchema).default([]),
+  directives: z.array(z.string()).default([]),
+});
+
+const mcpServerSchema = z.object({
+  enabled: z.boolean().default(true),
+});
+
+const mcpSchema = z.object({
+  enabled: z.boolean().default(false),
+  servers: z.record(z.string(), mcpServerSchema).default({}),
+});
+
 export const irisConfigSchema = z.object({
   gateway: gatewaySchema.default({}),
   channels: z.record(z.string(), channelAccountSchema).default({}),
@@ -62,6 +85,8 @@ export const irisConfigSchema = z.object({
   opencode: openCodeSchema.default({}),
   cron: z.array(cronJobSchema).optional(),
   logging: loggingSchema.default({}),
+  governance: governanceSchema.default({}),
+  mcp: mcpSchema.default({}),
 });
 
 export function parseConfig(raw: unknown): IrisConfig {

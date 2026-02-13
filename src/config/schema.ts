@@ -87,6 +87,7 @@ export const irisConfigSchema = z.object({
   logging: loggingSchema.default({}),
   governance: governanceSchema.default({}),
   mcp: mcpSchema.default({}),
+  plugins: z.array(z.string()).optional(),
 });
 
 export function parseConfig(raw: unknown): IrisConfig {

@@ -33,6 +33,7 @@
     "discord.js": "^14.25.0",
     "grammy": "^1.40.0",
     "hono": "^4.0.0",
+    "jiti": "^2.6.1",
     "pino": "^9.0.0",
     "proper-lockfile": "^4.1.0",
     "sharp": "^0.34.0",

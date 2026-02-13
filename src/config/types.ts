@@ -9,6 +9,7 @@ export interface IrisConfig {
   readonly logging?: LoggingConfig;
   readonly governance?: GovernanceConfig;
   readonly mcp?: McpConfig;
+  readonly plugins?: string[];
 }
 
 export interface GatewayConfig {

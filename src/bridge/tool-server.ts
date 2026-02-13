@@ -8,6 +8,7 @@ import type { VaultSearch } from "../vault/search.js";
 import type { GovernanceEngine } from "../governance/engine.js";
 import type { SessionMap } from "./session-map.js";
 import type { PluginToolDef } from "../plugins/types.js";
+import type { UsageTracker } from "../usage/tracker.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -49,6 +50,7 @@ export interface ToolServerDeps {
   governanceEngine?: GovernanceEngine | null;
   sessionMap?: SessionMap | null;
   pluginTools?: Map<string, PluginToolDef> | null;
+  usageTracker?: UsageTracker | null;
 }
 
 export class ToolServer {
@@ -62,6 +64,7 @@ export class ToolServer {
   private readonly governanceEngine: GovernanceEngine | null;
   private readonly sessionMap: SessionMap | null;
   private readonly pluginTools: Map<string, PluginToolDef> | null;
+  private readonly usageTracker: UsageTracker | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -80,6 +83,7 @@ export class ToolServer {
       this.governanceEngine = null;
       this.sessionMap = null;
       this.pluginTools = null;
+      this.usageTracker = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -90,6 +94,7 @@ export class ToolServer {
       this.governanceEngine = deps.governanceEngine ?? null;
       this.sessionMap = deps.sessionMap ?? null;
       this.pluginTools = deps.pluginTools ?? null;
+      this.usageTracker = deps.usageTracker ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -406,6 +411,39 @@ export class ToolServer {
         durationMs: body.durationMs ?? null,
       });
       return c.json({ ok: true });
+    });
+
+    // ── Usage endpoints ──
+
+    this.app.post("/usage/record", async (c) => {
+      if (!this.usageTracker) return c.json({ error: "Usage tracking not configured" }, 503);
+      const body = await c.req.json();
+      const id = this.usageTracker.record({
+        sessionId: body.sessionId ?? body.sessionID ?? null,
+        senderId: body.senderId ?? null,
+        channelId: body.channelId ?? null,
+        modelId: body.modelId ?? null,
+        providerId: body.providerId ?? null,
+        tokensInput: body.tokensInput ?? 0,
+        tokensOutput: body.tokensOutput ?? 0,
+        tokensReasoning: body.tokensReasoning ?? 0,
+        tokensCacheRead: body.tokensCacheRead ?? 0,
+        tokensCacheWrite: body.tokensCacheWrite ?? 0,
+        costUsd: body.costUsd ?? 0,
+        durationMs: body.durationMs ?? null,
+      });
+      return c.json({ id });
+    });
+
+    this.app.post("/usage/summary", async (c) => {
+      if (!this.usageTracker) return c.json({ error: "Usage tracking not configured" }, 503);
+      const body = await c.req.json().catch(() => ({}));
+      const summary = this.usageTracker.summarize({
+        senderId: body.senderId,
+        since: body.since,
+        until: body.until,
+      });
+      return c.json(summary);
     });
 
     // ── Session context for system prompt injection ──

@@ -17,6 +17,7 @@ import { VaultStore } from "../vault/store.js";
 import { VaultSearch } from "../vault/search.js";
 import { GovernanceEngine } from "../governance/engine.js";
 import { PluginLoader } from "../plugins/loader.js";
+import { UsageTracker } from "../usage/tracker.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { HealthServer } from "./health.js";
 import { TelegramAdapter } from "../channels/telegram/index.js";
@@ -40,6 +41,7 @@ export interface GatewayContext {
   vaultStore: VaultStore;
   vaultSearch: VaultSearch;
   governanceEngine: GovernanceEngine;
+  usageTracker: UsageTracker;
   pluginRegistry: IrisPluginRegistry;
 }
 
@@ -93,6 +95,9 @@ export async function startGateway(
   const vaultStore = new VaultStore(vaultDb);
   const vaultSearch = new VaultSearch(vaultDb);
 
+  // 5.55 Initialize usage tracker
+  const usageTracker = new UsageTracker(vaultDb);
+
   // 5.6 Initialize governance
   const governanceEngine = new GovernanceEngine(
     config.governance ?? { enabled: false, rules: [], directives: [] },
@@ -127,6 +132,7 @@ export async function startGateway(
     governanceEngine,
     sessionMap,
     pluginTools: pluginRegistry.tools,
+    usageTracker,
   });
   await toolServer.start();
 
@@ -292,6 +298,7 @@ export async function startGateway(
     vaultStore,
     vaultSearch,
     governanceEngine,
+    usageTracker,
     pluginRegistry,
   };
 }

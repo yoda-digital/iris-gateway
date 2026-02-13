@@ -455,6 +455,26 @@ export default (async ({ client }) => ({
       },
     }),
 
+    // ── Master Policy ──
+
+    policy_status: tool({
+      description:
+        "View the master policy configuration — the structural ceiling for all agents, skills, and tools. Shows allowed/denied tools, permission defaults, agent creation constraints, and enforcement settings.",
+      args: {},
+      async execute() {
+        return JSON.stringify(await irisGet("/policy/status"));
+      },
+    }),
+
+    policy_audit: tool({
+      description:
+        "Audit ALL existing agents and skills against the master policy. Returns compliance status and violations for each. Use this to verify the system is consistent with policy.",
+      args: {},
+      async execute() {
+        return JSON.stringify(await irisGet("/policy/audit"));
+      },
+    }),
+
     tools_create: tool({
       description:
         "Scaffold a new custom OpenCode tool in .opencode/tools/. Creates a TypeScript file with tool() helper, Zod schema, and execute function.",
@@ -502,6 +522,22 @@ export default (async ({ client }) => ({
   // ── HOOKS ──
 
   "tool.execute.before": async (input, output) => {
+    // Layer 1: Master policy check (structural ceiling)
+    try {
+      const policyResult = (await irisPost("/policy/check-tool", {
+        tool: input.tool,
+      })) as { allowed: boolean; reason?: string };
+      if (!policyResult.allowed) {
+        throw new Error(
+          `Policy blocked: ${policyResult.reason ?? "not in master allowlist"}`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("Policy blocked:"))
+        throw err;
+    }
+
+    // Layer 2: Governance check (behavioral rules)
     try {
       const result = (await irisPost("/governance/evaluate", {
         tool: input.tool,
@@ -611,6 +647,19 @@ export default (async ({ client }) => ({
   },
 
   "permission.ask": async (input, output) => {
+    // Config-driven permission enforcement via master policy
+    try {
+      const result = (await irisPost("/policy/check-permission", {
+        permission: input.permission,
+      })) as { denied: boolean };
+      if (result.denied) {
+        output.status = "deny";
+        return;
+      }
+    } catch {
+      // If policy check fails, fall back to hardcoded deny for safety
+    }
+    // Hardcoded fallback — always deny edit and bash as defense-in-depth
     if (input.permission === "edit" || input.permission === "bash") {
       output.status = "deny";
     }

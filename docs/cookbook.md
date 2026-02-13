@@ -1,6 +1,127 @@
 # Iris Cookbook
 
-Real-world patterns for governance, vault memory, hooks, agents, and multi-channel operations.
+Real-world patterns for policy, governance, vault memory, hooks, agents, and multi-channel operations.
+
+## Master Policy
+
+### How policy works
+
+The master policy is the structural ceiling — it defines what CAN exist in the system. It's configured in `iris.yaml` (or `iris.json`) and is immutable at runtime. Three enforcement layers work together:
+
+```
+Master Policy (ceiling)     — what tools/modes/permissions CAN exist
+  └─ Governance Rules       — what's ALLOWED in context (per-call behavioral rules)
+      └─ Agent Config       — what THIS agent uses (subset of policy)
+```
+
+Each layer can only NARROW the layer above it, never widen. An agent can't grant itself a tool the master policy doesn't allow.
+
+### Configuration
+
+```yaml
+policy:
+  enabled: true
+  tools:
+    allowed:           # Master allowlist — only these tools can be used
+      - send_message
+      - send_media
+      - channel_action
+      - user_info
+      - list_channels
+      - vault_search
+      - vault_remember
+      - vault_forget
+      - governance_status
+      - usage_summary
+      - skill_create
+      - skill_list
+      - skill_delete
+      - skill_validate
+      - agent_create
+      - agent_list
+      - agent_delete
+      - agent_validate
+      - rules_read
+      - rules_update
+      - rules_append
+      - tools_list
+      - tools_create
+      - canvas_update
+      - policy_status
+      - policy_audit
+    denied:            # Explicit blocklist — always denied
+      - bash
+      - eval
+      - exec
+  permissions:
+    bash: deny         # No agent can run shell commands
+    edit: deny         # No agent can edit files
+    read: deny         # No agent can read files
+  agents:
+    allowedModes:      # Only subagents can be created dynamically
+      - subagent
+    maxSteps: 20       # Max tool call steps per agent
+    requireDescription: true
+    defaultTools:      # Every agent gets these automatically
+      - vault_search
+      - skill
+    allowPrimaryCreation: false
+  skills:
+    restricted: []     # Skills that can't be assigned to dynamic agents
+    requireTriggers: false
+  enforcement:
+    blockUnknownTools: true     # Block tool calls not in allowlist
+    auditPolicyViolations: true # Log violations to audit trail
+```
+
+### Enforcement points
+
+| When | What | How |
+|------|------|-----|
+| Agent creation | Tools must be subset of `tools.allowed` | 403 with violations |
+| Agent creation | Mode must be in `agents.allowedModes` | 403 with violations |
+| Agent creation | Steps can't exceed `agents.maxSteps` | 403 with violations |
+| Agent creation | Skills can't include `skills.restricted` | 403 with violations |
+| Agent creation | Permission block can't weaken master | 403 with violations |
+| Skill creation | Name can't be in `skills.restricted` | 403 with violations |
+| Tool execution | Tool must be in `tools.allowed` | Blocked before governance |
+| Tool execution | Tool must not be in `tools.denied` | Blocked before governance |
+| Permission ask | Master `permissions` always prevails | Deny with hardcoded fallback |
+
+### Policy audit
+
+```
+policy_audit()
+```
+
+Scans ALL existing agents and skills against master policy:
+
+```json
+{
+  "enabled": true,
+  "compliant": false,
+  "results": [
+    {
+      "name": "chat",
+      "type": "agent",
+      "compliant": true,
+      "violations": []
+    },
+    {
+      "name": "rogue-agent",
+      "type": "agent",
+      "compliant": false,
+      "violations": [
+        { "level": "error", "code": "AGENT_TOOL_DENIED", "message": "Agent uses denied tool 'bash'" }
+      ]
+    }
+  ]
+}
+```
+
+### Permissive default
+
+If `policy.enabled` is `false` (default), everything is permitted. Once you enable it, the system becomes restrictive. If `tools.allowed` is empty, all tools are allowed. Once you add any tool to the allowlist, only those tools work.
 
 ## Governance Rules
 
@@ -183,7 +304,9 @@ SELECT * FROM profiles;
 1. experimental.chat.system.transform  <- injects directives, vault context, and skill suggestions into system prompt
 2. AI processes the message
 3. AI decides to call send_message tool
-4. tool.execute.before       <- governance validates the tool call
+4. tool.execute.before:
+   a. Master policy check    <- is this tool in the allowlist? not in denylist?
+   b. Governance check       <- does the tool call violate behavioral rules?
 5. Tool executes (HTTP to Iris tool-server)
 6. tool.execute.after         <- audit logs the result
 7. AI finishes

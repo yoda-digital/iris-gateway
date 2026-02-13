@@ -8,6 +8,7 @@ export interface IrisConfig {
   readonly cron?: CronJobConfig[];
   readonly logging?: LoggingConfig;
   readonly governance?: GovernanceConfig;
+  readonly policy?: PolicyConfig;
   readonly mcp?: McpConfig;
   readonly plugins?: string[];
   readonly autoReply?: AutoReplyConfig;
@@ -126,4 +127,58 @@ export interface McpServerConfig {
 export interface McpConfig {
   readonly enabled: boolean;
   readonly servers: Record<string, McpServerConfig>;
+}
+
+// ── Master Policy ──
+
+export interface PolicyToolsConfig {
+  /** Master allowlist — if non-empty, only these tools can be assigned/called. Empty = all allowed. */
+  readonly allowed: string[];
+  /** Explicit blocklist — always denied regardless of allowlist. */
+  readonly denied: string[];
+}
+
+export interface PolicyPermissionsConfig {
+  /** Master permission for bash — deny/allow. Default: deny. */
+  readonly bash: "allow" | "deny";
+  /** Master permission for file editing. Default: deny. */
+  readonly edit: "allow" | "deny";
+  /** Master permission for file reading. Default: deny. */
+  readonly read: "allow" | "deny";
+}
+
+export interface PolicyAgentsConfig {
+  /** Modes allowed for dynamically created agents. Default: [subagent]. */
+  readonly allowedModes: string[];
+  /** Max tool-call steps any dynamic agent can have. 0 = no limit. */
+  readonly maxSteps: number;
+  /** Require description field (OpenCode spec). Default: true. */
+  readonly requireDescription: boolean;
+  /** Tools every agent gets automatically. */
+  readonly defaultTools: string[];
+  /** Whether dynamic agents can be created as primary mode. Default: false. */
+  readonly allowPrimaryCreation: boolean;
+}
+
+export interface PolicySkillsConfig {
+  /** Skills that cannot be assigned to dynamic agents. */
+  readonly restricted: string[];
+  /** Warn (but don't block) if skill has no triggers. Default: false. */
+  readonly requireTriggers: boolean;
+}
+
+export interface PolicyEnforcementConfig {
+  /** Block tool calls not in master tools.allowed (if allowlist is non-empty). Default: true. */
+  readonly blockUnknownTools: boolean;
+  /** Log policy violations to audit trail. Default: true. */
+  readonly auditPolicyViolations: boolean;
+}
+
+export interface PolicyConfig {
+  readonly enabled: boolean;
+  readonly tools: PolicyToolsConfig;
+  readonly permissions: PolicyPermissionsConfig;
+  readonly agents: PolicyAgentsConfig;
+  readonly skills: PolicySkillsConfig;
+  readonly enforcement: PolicyEnforcementConfig;
 }

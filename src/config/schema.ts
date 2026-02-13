@@ -88,6 +88,34 @@ const mcpSchema = z.object({
   servers: z.record(z.string(), mcpServerSchema).default({}),
 });
 
+const policySchema = z.object({
+  enabled: z.boolean().default(false),
+  tools: z.object({
+    allowed: z.array(z.string()).default([]),
+    denied: z.array(z.string()).default([]),
+  }).default({}),
+  permissions: z.object({
+    bash: z.enum(["allow", "deny"]).default("deny"),
+    edit: z.enum(["allow", "deny"]).default("deny"),
+    read: z.enum(["allow", "deny"]).default("deny"),
+  }).default({}),
+  agents: z.object({
+    allowedModes: z.array(z.string()).default(["subagent"]),
+    maxSteps: z.number().int().min(0).default(0),
+    requireDescription: z.boolean().default(true),
+    defaultTools: z.array(z.string()).default(["vault_search", "skill"]),
+    allowPrimaryCreation: z.boolean().default(false),
+  }).default({}),
+  skills: z.object({
+    restricted: z.array(z.string()).default([]),
+    requireTriggers: z.boolean().default(false),
+  }).default({}),
+  enforcement: z.object({
+    blockUnknownTools: z.boolean().default(true),
+    auditPolicyViolations: z.boolean().default(true),
+  }).default({}),
+}).default({});
+
 export const irisConfigSchema = z.object({
   gateway: gatewaySchema.default({}),
   channels: z.record(z.string(), channelAccountSchema).default({}),
@@ -96,6 +124,7 @@ export const irisConfigSchema = z.object({
   cron: z.array(cronJobSchema).optional(),
   logging: loggingSchema.default({}),
   governance: governanceSchema.default({}),
+  policy: policySchema,
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
   canvas: z.object({

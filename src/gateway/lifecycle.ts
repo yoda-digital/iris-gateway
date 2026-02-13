@@ -16,6 +16,7 @@ import { VaultDB } from "../vault/db.js";
 import { VaultStore } from "../vault/store.js";
 import { VaultSearch } from "../vault/search.js";
 import { GovernanceEngine } from "../governance/engine.js";
+import { PolicyEngine } from "../governance/policy.js";
 import { PluginLoader } from "../plugins/loader.js";
 import { TemplateEngine } from "../auto-reply/engine.js";
 import type { AutoReplyTemplate } from "../auto-reply/types.js";
@@ -142,6 +143,14 @@ export async function startGateway(
     config.governance ?? { enabled: false, rules: [], directives: [] },
   );
 
+  // 5.65 Initialize master policy
+  const policyEngine = new PolicyEngine(
+    config.policy ?? { enabled: false, tools: { allowed: [], denied: [] }, permissions: { bash: "deny", edit: "deny", read: "deny" }, agents: { allowedModes: ["subagent"], maxSteps: 0, requireDescription: true, defaultTools: ["vault_search", "skill"], allowPrimaryCreation: false }, skills: { restricted: [], requireTriggers: false }, enforcement: { blockUnknownTools: true, auditPolicyViolations: true } },
+  );
+  if (policyEngine.enabled) {
+    logger.info("Master policy engine enabled");
+  }
+
   // 5.7 Load plugins
   const pluginRegistry = await new PluginLoader(logger).loadAll(config, stateDir);
 
@@ -216,6 +225,7 @@ export async function startGateway(
     vaultStore,
     vaultSearch,
     governanceEngine,
+    policyEngine,
     sessionMap,
     pluginTools: pluginRegistry.tools,
     usageTracker,

@@ -12,6 +12,7 @@ import type { SessionMap } from "./session-map.js";
 import type { PluginToolDef } from "../plugins/types.js";
 import type { UsageTracker } from "../usage/tracker.js";
 import type { CanvasServer } from "../canvas/server.js";
+import type { PolicyEngine } from "../governance/policy.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -51,6 +52,7 @@ export interface ToolServerDeps {
   vaultStore?: VaultStore | null;
   vaultSearch?: VaultSearch | null;
   governanceEngine?: GovernanceEngine | null;
+  policyEngine?: PolicyEngine | null;
   sessionMap?: SessionMap | null;
   pluginTools?: Map<string, PluginToolDef> | null;
   usageTracker?: UsageTracker | null;
@@ -66,6 +68,7 @@ export class ToolServer {
   private readonly vaultStore: VaultStore | null;
   private readonly vaultSearch: VaultSearch | null;
   private readonly governanceEngine: GovernanceEngine | null;
+  private readonly policyEngine: PolicyEngine | null;
   private readonly sessionMap: SessionMap | null;
   private readonly pluginTools: Map<string, PluginToolDef> | null;
   private readonly usageTracker: UsageTracker | null;
@@ -86,6 +89,7 @@ export class ToolServer {
       this.vaultStore = null;
       this.vaultSearch = null;
       this.governanceEngine = null;
+      this.policyEngine = null;
       this.sessionMap = null;
       this.pluginTools = null;
       this.usageTracker = null;
@@ -98,6 +102,7 @@ export class ToolServer {
       this.vaultStore = deps.vaultStore ?? null;
       this.vaultSearch = deps.vaultSearch ?? null;
       this.governanceEngine = deps.governanceEngine ?? null;
+      this.policyEngine = deps.policyEngine ?? null;
       this.sessionMap = deps.sessionMap ?? null;
       this.pluginTools = deps.pluginTools ?? null;
       this.usageTracker = deps.usageTracker ?? null;
@@ -485,6 +490,22 @@ export class ToolServer {
       if (!body.description?.trim()) {
         return c.json({ error: "description is required" }, 400);
       }
+
+      // ── Master policy validation ──
+      if (this.policyEngine?.enabled) {
+        const violations = this.policyEngine.validateSkillCreation({
+          name,
+          triggers: body.triggers,
+        });
+        const errors = violations.filter((v) => v.level === "error");
+        if (errors.length > 0) {
+          return c.json({
+            error: "Policy violation",
+            violations: errors.map((v) => `[${v.code}] ${v.message}`),
+          }, 403);
+        }
+      }
+
       const dir = join(skillsDir, name);
       mkdirSync(dir, { recursive: true });
 
@@ -716,6 +737,27 @@ export class ToolServer {
       if (!description?.trim()) {
         return c.json({ error: "description is required (OpenCode spec)" }, 400);
       }
+
+      // ── Master policy validation ──
+      if (this.policyEngine?.enabled) {
+        const violations = this.policyEngine.validateAgentCreation({
+          name,
+          mode: body.mode,
+          tools: body.tools,
+          skills: body.skills,
+          steps: body.steps,
+          description,
+          permission: body.permission,
+        });
+        const errors = violations.filter((v) => v.level === "error");
+        if (errors.length > 0) {
+          return c.json({
+            error: "Policy violation",
+            violations: errors.map((v) => `[${v.code}] ${v.message}`),
+          }, 403);
+        }
+      }
+
       mkdirSync(agentsDir, { recursive: true });
 
       // Build tools section as YAML map (not array) for OpenCode compatibility
@@ -728,6 +770,14 @@ export class ToolServer {
       // Always include skill tool so agents can use skills
       if (!toolEntries.some((t) => t.includes("skill:"))) {
         toolEntries.push("  skill: true");
+      }
+      // Inject policy default tools
+      if (this.policyEngine?.enabled) {
+        for (const dt of this.policyEngine.getConfig().agents.defaultTools) {
+          if (!toolEntries.some((t) => t.includes(`${dt}:`))) {
+            toolEntries.push(`  ${dt}: true`);
+          }
+        }
       }
 
       // Build skills list — default: all available skills
@@ -969,6 +1019,36 @@ export class ToolServer {
       const toolPath = join(customToolsDir, `${name}.ts`);
       writeFileSync(toolPath, content);
       return c.json({ ok: true, path: toolPath });
+    });
+
+    // ── Master Policy endpoints ──
+
+    this.app.get("/policy/status", (c) => {
+      if (!this.policyEngine) return c.json({ enabled: false });
+      return c.json({
+        enabled: this.policyEngine.enabled,
+        config: this.policyEngine.getConfig(),
+      });
+    });
+
+    this.app.post("/policy/check-tool", async (c) => {
+      if (!this.policyEngine?.enabled) return c.json({ allowed: true });
+      const body = await c.req.json();
+      const result = this.policyEngine.isToolAllowed(body.tool ?? "");
+      return c.json(result);
+    });
+
+    this.app.post("/policy/check-permission", async (c) => {
+      if (!this.policyEngine?.enabled) return c.json({ denied: false });
+      const body = await c.req.json();
+      return c.json({ denied: this.policyEngine.isPermissionDenied(body.permission ?? "") });
+    });
+
+    this.app.get("/policy/audit", (c) => {
+      if (!this.policyEngine?.enabled) return c.json({ enabled: false, results: [] });
+      const results = this.policyEngine.auditAll();
+      const compliant = results.every((r) => r.compliant);
+      return c.json({ enabled: true, compliant, results });
     });
 
     // ── Session context for system prompt injection ──

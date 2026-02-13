@@ -77,6 +77,26 @@ export async function startGateway(
   const bridge = new OpenCodeBridge(config.opencode, logger);
   await bridge.start();
 
+  // 4.5 Wait for OpenCode to be fully ready (providers, plugins)
+  const READY_TIMEOUT_MS = 30_000;
+  const READY_POLL_MS = 500;
+  const readyStart = Date.now();
+  while (Date.now() - readyStart < READY_TIMEOUT_MS) {
+    try {
+      const healthy = await bridge.checkHealth();
+      if (healthy) {
+        // Do a test prompt to ensure providers are initialized
+        const testSession = await bridge.createSession("__readiness_check__");
+        await bridge.deleteSession(testSession.id);
+        logger.info("OpenCode ready");
+        break;
+      }
+    } catch {
+      // Not ready yet
+    }
+    await new Promise((r) => setTimeout(r, READY_POLL_MS));
+  }
+
   // 5. Create security components
   const pairingStore = new PairingStore(
     stateDir,

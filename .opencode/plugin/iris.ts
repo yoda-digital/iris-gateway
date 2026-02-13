@@ -517,6 +517,125 @@ export default (async ({ client }) => ({
         return JSON.stringify(await irisPost("/canvas/update", args));
       },
     }),
+
+    // ── Proactive Intelligence tools ──
+
+    proactive_intent: tool({
+      description:
+        "Register a follow-up intent. Use when you want to check back on something later. " +
+        "Examples: user committed to doing something, you asked a question, you suggested " +
+        "something worth revisiting, you noticed something that needs monitoring.",
+      args: {
+        what: tool.schema.string().describe("What to follow up on"),
+        why: tool.schema.string().optional().describe("Why this matters"),
+        delayMs: tool.schema
+          .number()
+          .optional()
+          .describe("Milliseconds until follow-up (default: 24h = 86400000)"),
+        confidence: tool.schema
+          .number()
+          .optional()
+          .describe("How confident you are this needs follow-up, 0-1 (default: 0.8)"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisPost("/proactive/intent", {
+            sessionID: (this as any).sessionID,
+            what: args.what,
+            why: args.why,
+            delayMs: args.delayMs,
+            confidence: args.confidence,
+          }),
+        );
+      },
+    }),
+
+    proactive_cancel: tool({
+      description: "Cancel a pending proactive intent by ID.",
+      args: {
+        id: tool.schema.string().describe("Intent ID to cancel"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/proactive/cancel", args));
+      },
+    }),
+
+    proactive_list: tool({
+      description:
+        "List pending proactive intents and triggers. Use to see what follow-ups are scheduled.",
+      args: {
+        limit: tool.schema
+          .number()
+          .optional()
+          .describe("Max results (default: 20)"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisGet(`/proactive/pending?limit=${args.limit ?? 20}`),
+        );
+      },
+    }),
+
+    proactive_quota: tool({
+      description:
+        "Check your proactive message quota and engagement rate for a user. " +
+        "Use before deciding whether to register an intent.",
+      args: {
+        senderId: tool.schema.string().describe("User's sender ID"),
+        channelId: tool.schema.string().describe("Channel ID"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisGet(
+            `/proactive/quota?senderId=${encodeURIComponent(args.senderId)}&channelId=${encodeURIComponent(args.channelId)}`,
+          ),
+        );
+      },
+    }),
+
+    proactive_scan: tool({
+      description:
+        "Force a passive scan for dormant users. Returns list of users who have been inactive.",
+      args: {
+        thresholdMs: tool.schema
+          .number()
+          .optional()
+          .describe("Inactive for N ms (default: 7 days)"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisPost("/proactive/scan", { thresholdMs: args.thresholdMs }),
+        );
+      },
+    }),
+
+    proactive_execute: tool({
+      description: "Manually trigger execution of a specific pending intent now.",
+      args: {
+        id: tool.schema.string().describe("Intent ID to execute immediately"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/proactive/execute", args));
+      },
+    }),
+
+    proactive_engage: tool({
+      description:
+        "Record that a user engaged with a proactive message (replied). " +
+        "This improves the engagement rate used for self-tuning.",
+      args: {
+        senderId: tool.schema.string().describe("User who engaged"),
+        channelId: tool.schema.string().describe("Channel"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisPost("/proactive/engage", {
+            senderId: args.senderId,
+            channelId: args.channelId,
+          }),
+        );
+      },
+    }),
   },
 
   // ── HOOKS ──
@@ -614,6 +733,29 @@ export default (async ({ client }) => ({
       if (ctx.directives) output.system.push(ctx.directives);
       if (ctx.channelRules) output.system.push(ctx.channelRules);
       if (ctx.userContext) output.system.push(ctx.userContext);
+
+      // Proactive awareness injection
+      try {
+        if (input.sessionID) {
+          const pending = (await irisGet("/proactive/pending?limit=5")) as {
+            intents: Array<{ what: string }>;
+            triggers: Array<{ type: string }>;
+          };
+          const pendingCount =
+            (pending.intents?.length ?? 0) + (pending.triggers?.length ?? 0);
+
+          const block = [
+            "[PROACTIVE INTELLIGENCE]",
+            "You have proactive follow-up capability. When appropriate, use proactive_intent to schedule check-ins.",
+            pendingCount > 0
+              ? `You have ${pendingCount} pending proactive items.`
+              : "No pending items.",
+          ];
+          output.system.push(block.join("\n"));
+        }
+      } catch {
+        // Best-effort
+      }
 
       // Proactive skill triggering: get latest user message and match against skill triggers
       if (input.sessionID) {

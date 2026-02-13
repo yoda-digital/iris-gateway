@@ -242,6 +242,22 @@ export default (async ({ client }) => ({
         return JSON.stringify(await irisPost("/agents/delete", args));
       },
     }),
+
+    canvas_update: tool({
+      description: "Update the Canvas UI with components (text, markdown, chart, table, form, code, image, progress, button)",
+      args: {
+        sessionId: tool.schema.string().optional().describe("Canvas session ID (default: 'default')"),
+        component: tool.schema.object({
+          type: tool.schema.enum(["text", "markdown", "chart", "table", "code", "image", "form", "button", "progress"]),
+          id: tool.schema.string().describe("Unique component ID"),
+        }).passthrough().optional().describe("Component to add/update"),
+        clear: tool.schema.boolean().optional().describe("Clear all components"),
+        remove: tool.schema.string().optional().describe("Remove component by ID"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/canvas/update", args));
+      },
+    }),
   },
 
   // ── HOOKS ──

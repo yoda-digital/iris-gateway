@@ -21,6 +21,8 @@ import { TemplateEngine } from "../auto-reply/engine.js";
 import type { AutoReplyTemplate } from "../auto-reply/types.js";
 import { UsageTracker } from "../usage/tracker.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
+import { CanvasServer } from "../canvas/server.js";
+import { WebChatAdapter } from "../channels/webchat/index.js";
 import { HealthServer } from "./health.js";
 import { TelegramAdapter } from "../channels/telegram/index.js";
 import { WhatsAppAdapter } from "../channels/whatsapp/index.js";
@@ -52,6 +54,7 @@ const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
   whatsapp: () => new WhatsAppAdapter(),
   discord: () => new DiscordAdapter(),
   slack: () => new SlackAdapter(),
+  webchat: () => new WebChatAdapter(),
 };
 
 const SSE_RECONNECT_DELAY_MS = 3_000;
@@ -144,6 +147,34 @@ export async function startGateway(
     templateEngine,
   );
 
+  // 8.5 Start canvas server if enabled
+  let canvasServer: CanvasServer | null = null;
+  if (config.canvas?.enabled) {
+    canvasServer = new CanvasServer({
+      port: config.canvas.port,
+      hostname: config.canvas.hostname,
+      logger,
+      onMessage: (sessionId, text) => {
+        const webchatAdapter = registry.get("webchat");
+        if (webchatAdapter) {
+          webchatAdapter.events.emit("message", {
+            id: `wc-${Date.now()}`,
+            channelId: "webchat",
+            senderId: `webchat:${sessionId}`,
+            senderName: "Web User",
+            chatId: sessionId,
+            chatType: "dm" as const,
+            text,
+            timestamp: Date.now(),
+            raw: null,
+          });
+        }
+      },
+    });
+    await canvasServer.start();
+    logger.info({ port: config.canvas.port }, "Canvas server started");
+  }
+
   // 9. Start tool server
   const toolServer = new ToolServer({
     registry,
@@ -154,6 +185,7 @@ export async function startGateway(
     sessionMap,
     pluginTools: pluginRegistry.tools,
     usageTracker,
+    canvasServer,
   });
   await toolServer.start();
 
@@ -197,6 +229,11 @@ export async function startGateway(
     // Inject message cache into adapters that support it
     if ("setMessageCache" in adapter && typeof adapter.setMessageCache === "function") {
       (adapter as { setMessageCache(cache: MessageCache): void }).setMessageCache(messageCache);
+    }
+
+    // Wire webchat adapter to canvas server
+    if ("setCanvasServer" in adapter && typeof adapter.setCanvasServer === "function" && canvasServer) {
+      (adapter as { setCanvasServer(server: CanvasServer): void }).setCanvasServer(canvasServer);
     }
 
     // Wire adapter events to message router
@@ -291,6 +328,7 @@ export async function startGateway(
     messageCache.dispose();
 
     // Stop servers
+    if (canvasServer) await canvasServer.stop();
     await toolServer.stop();
     await healthServer.stop();
     await bridge.stop();

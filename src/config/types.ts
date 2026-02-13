@@ -11,6 +11,13 @@ export interface IrisConfig {
   readonly mcp?: McpConfig;
   readonly plugins?: string[];
   readonly autoReply?: AutoReplyConfig;
+  readonly canvas?: CanvasConfig;
+}
+
+export interface CanvasConfig {
+  readonly enabled: boolean;
+  readonly port: number;
+  readonly hostname: string;
 }
 
 export interface AutoReplyConfig {
@@ -42,7 +49,7 @@ export interface GatewayConfig {
 }
 
 export interface ChannelAccountConfig {
-  readonly type: "telegram" | "whatsapp" | "discord" | "slack";
+  readonly type: "telegram" | "whatsapp" | "discord" | "slack" | "webchat";
   readonly enabled: boolean;
   readonly token?: string;
   readonly appToken?: string;

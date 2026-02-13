@@ -19,7 +19,7 @@ const streamingSchema = z.object({
 });
 
 const channelAccountSchema = z.object({
-  type: z.enum(["telegram", "whatsapp", "discord", "slack"]),
+  type: z.enum(["telegram", "whatsapp", "discord", "slack", "webchat"]),
   enabled: z.boolean().default(false),
   token: z.string().optional(),
   appToken: z.string().optional(),
@@ -98,6 +98,11 @@ export const irisConfigSchema = z.object({
   governance: governanceSchema.default({}),
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
+  canvas: z.object({
+    enabled: z.boolean().default(false),
+    port: z.number().int().positive().default(19880),
+    hostname: z.string().default("127.0.0.1"),
+  }).optional(),
   autoReply: z.object({
     enabled: z.boolean().default(false),
     templates: z.array(z.object({

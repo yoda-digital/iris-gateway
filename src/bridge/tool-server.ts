@@ -11,6 +11,7 @@ import type { GovernanceEngine } from "../governance/engine.js";
 import type { SessionMap } from "./session-map.js";
 import type { PluginToolDef } from "../plugins/types.js";
 import type { UsageTracker } from "../usage/tracker.js";
+import type { CanvasServer } from "../canvas/server.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -53,6 +54,7 @@ export interface ToolServerDeps {
   sessionMap?: SessionMap | null;
   pluginTools?: Map<string, PluginToolDef> | null;
   usageTracker?: UsageTracker | null;
+  canvasServer?: CanvasServer | null;
 }
 
 export class ToolServer {
@@ -67,6 +69,7 @@ export class ToolServer {
   private readonly sessionMap: SessionMap | null;
   private readonly pluginTools: Map<string, PluginToolDef> | null;
   private readonly usageTracker: UsageTracker | null;
+  private readonly canvasServer: CanvasServer | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -86,6 +89,7 @@ export class ToolServer {
       this.sessionMap = null;
       this.pluginTools = null;
       this.usageTracker = null;
+      this.canvasServer = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -97,6 +101,7 @@ export class ToolServer {
       this.sessionMap = deps.sessionMap ?? null;
       this.pluginTools = deps.pluginTools ?? null;
       this.usageTracker = deps.usageTracker ?? null;
+      this.canvasServer = deps.canvasServer ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -446,6 +451,24 @@ export class ToolServer {
         until: body.until,
       });
       return c.json(summary);
+    });
+
+    // ── Canvas endpoints ──
+
+    this.app.post("/canvas/update", async (c) => {
+      if (!this.canvasServer) return c.json({ error: "Canvas not configured" }, 503);
+      const body = await c.req.json();
+      const sessionId = body.sessionId ?? "default";
+      if (body.component) {
+        this.canvasServer.updateComponent(sessionId, body.component);
+      }
+      if (body.clear) {
+        this.canvasServer.getSession(sessionId).clearComponents();
+      }
+      if (body.remove) {
+        this.canvasServer.getSession(sessionId).removeComponent(body.remove);
+      }
+      return c.json({ ok: true });
     });
 
     // ── Skill CRUD endpoints ──

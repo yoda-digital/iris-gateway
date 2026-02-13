@@ -167,6 +167,81 @@ export default (async ({ client }) => ({
         return JSON.stringify(await irisGet("/governance/rules"));
       },
     }),
+
+    usage_summary: tool({
+      description: "Get usage and cost summary for a user or all users",
+      args: {
+        senderId: tool.schema.string().optional().describe("Filter by sender ID"),
+        since: tool.schema.number().optional().describe("Unix timestamp for start of period"),
+        until: tool.schema.number().optional().describe("Unix timestamp for end of period"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/usage/summary", args));
+      },
+    }),
+
+    skill_create: tool({
+      description: "Create a new OpenCode skill with SKILL.md file",
+      args: {
+        name: tool.schema.string().describe("Skill name (lowercase, dashes, starts with letter)"),
+        description: tool.schema.string().describe("Brief skill description"),
+        content: tool.schema.string().describe("Skill content (markdown body after frontmatter)"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/skills/create", args));
+      },
+    }),
+
+    skill_list: tool({
+      description: "List all available OpenCode skills",
+      args: {},
+      async execute() {
+        return JSON.stringify(await irisGet("/skills/list"));
+      },
+    }),
+
+    skill_delete: tool({
+      description: "Delete an OpenCode skill by name",
+      args: {
+        name: tool.schema.string().describe("Skill name to delete"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/skills/delete", args));
+      },
+    }),
+
+    agent_create: tool({
+      description: "Create a new OpenCode agent with markdown file",
+      args: {
+        name: tool.schema.string().describe("Agent name (lowercase, dashes, starts with letter)"),
+        prompt: tool.schema.string().describe("Agent system prompt"),
+        mode: tool.schema.enum(["primary", "subagent", "all"]).optional().describe("Agent mode (default: subagent)"),
+        model: tool.schema.string().optional().describe("Model override"),
+        temperature: tool.schema.number().optional().describe("Temperature override"),
+        tools: tool.schema.array(tool.schema.string()).optional().describe("Tool names to enable"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/agents/create", args));
+      },
+    }),
+
+    agent_list: tool({
+      description: "List all available OpenCode agents",
+      args: {},
+      async execute() {
+        return JSON.stringify(await irisGet("/agents/list"));
+      },
+    }),
+
+    agent_delete: tool({
+      description: "Delete an OpenCode agent by name",
+      args: {
+        name: tool.schema.string().describe("Agent name to delete"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/agents/delete", args));
+      },
+    }),
   },
 
   // ── HOOKS ──

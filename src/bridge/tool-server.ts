@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { z } from "zod";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { Logger } from "../logging/logger.js";
 import type { VaultStore } from "../vault/store.js";
@@ -444,6 +446,134 @@ export class ToolServer {
         until: body.until,
       });
       return c.json(summary);
+    });
+
+    // ── Skill CRUD endpoints ──
+
+    const skillsDir = resolve(process.cwd(), ".opencode", "skills");
+    const agentsDir = resolve(process.cwd(), ".opencode", "agents");
+
+    this.app.post("/skills/create", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
+        return c.json({ error: "Invalid skill name (lowercase, dashes, starts with letter)" }, 400);
+      }
+      const dir = join(skillsDir, name);
+      mkdirSync(dir, { recursive: true });
+      const content = [
+        "---",
+        `name: ${name}`,
+        `description: ${body.description ?? ""}`,
+        "---",
+        "",
+        body.content ?? "",
+      ].join("\n");
+      writeFileSync(join(dir, "SKILL.md"), content);
+      return c.json({ ok: true, path: join(dir, "SKILL.md") });
+    });
+
+    this.app.get("/skills/list", (c) => {
+      if (!existsSync(skillsDir)) return c.json({ skills: [] });
+      const skills: Array<{ name: string; path: string; description: string }> = [];
+      for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+        const skillFile = join(skillsDir, entry.name, "SKILL.md");
+        let description = "";
+        if (existsSync(skillFile)) {
+          const raw = readFileSync(skillFile, "utf-8");
+          const match = raw.match(/description:\s*(.+)/);
+          if (match) description = match[1].trim();
+        }
+        skills.push({ name: entry.name, path: skillFile, description });
+      }
+      return c.json({ skills });
+    });
+
+    this.app.post("/skills/delete", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name) return c.json({ error: "name required" }, 400);
+      const dir = join(skillsDir, name);
+      if (!existsSync(dir)) return c.json({ error: "Skill not found" }, 404);
+      rmSync(dir, { recursive: true, force: true });
+      return c.json({ ok: true });
+    });
+
+    this.app.post("/skills/validate", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name) return c.json({ valid: false, error: "name required" });
+      const dir = join(skillsDir, name);
+      const skillFile = join(dir, "SKILL.md");
+      if (!existsSync(skillFile)) return c.json({ valid: false, error: "SKILL.md not found" });
+      const raw = readFileSync(skillFile, "utf-8");
+      const hasFrontmatter = raw.startsWith("---") && raw.indexOf("---", 3) > 3;
+      if (!hasFrontmatter) return c.json({ valid: false, error: "Missing YAML frontmatter" });
+      return c.json({ valid: true });
+    });
+
+    // ── Agent CRUD endpoints ──
+
+    this.app.post("/agents/create", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
+        return c.json({ error: "Invalid agent name (lowercase, dashes, starts with letter)" }, 400);
+      }
+      mkdirSync(agentsDir, { recursive: true });
+      const frontmatter = [
+        "---",
+        body.mode ? `mode: ${body.mode}` : "mode: subagent",
+        body.model ? `model: ${body.model}` : "",
+        body.temperature != null ? `temperature: ${body.temperature}` : "",
+        body.tools?.length ? `tools: [${body.tools.join(", ")}]` : "",
+        "---",
+      ].filter(Boolean).join("\n");
+      const content = `${frontmatter}\n\n${body.prompt ?? `You are the ${name} agent.`}\n`;
+      writeFileSync(join(agentsDir, `${name}.md`), content);
+      return c.json({ ok: true, path: join(agentsDir, `${name}.md`) });
+    });
+
+    this.app.get("/agents/list", (c) => {
+      if (!existsSync(agentsDir)) return c.json({ agents: [] });
+      const agents: Array<{ name: string; path: string; mode: string }> = [];
+      for (const entry of readdirSync(agentsDir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+        const agentPath = join(agentsDir, entry.name);
+        const raw = readFileSync(agentPath, "utf-8");
+        const modeMatch = raw.match(/mode:\s*(\w+)/);
+        agents.push({
+          name: entry.name.replace(/\.md$/, ""),
+          path: agentPath,
+          mode: modeMatch?.[1] ?? "unknown",
+        });
+      }
+      return c.json({ agents });
+    });
+
+    this.app.post("/agents/delete", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name) return c.json({ error: "name required" }, 400);
+      const agentFile = join(agentsDir, `${name}.md`);
+      if (!existsSync(agentFile)) return c.json({ error: "Agent not found" }, 404);
+      rmSync(agentFile);
+      return c.json({ ok: true });
+    });
+
+    this.app.post("/agents/validate", async (c) => {
+      const body = await c.req.json();
+      const name = body.name as string;
+      if (!name) return c.json({ valid: false, error: "name required" });
+      const agentFile = join(agentsDir, `${name}.md`);
+      if (!existsSync(agentFile)) return c.json({ valid: false, error: "Agent file not found" });
+      const raw = readFileSync(agentFile, "utf-8");
+      const hasFrontmatter = raw.startsWith("---") && raw.indexOf("---", 3) > 3;
+      if (!hasFrontmatter) return c.json({ valid: false, error: "Missing YAML frontmatter" });
+      const hasMode = /mode:\s*\w+/.test(raw);
+      if (!hasMode) return c.json({ valid: false, error: "Missing mode in frontmatter" });
+      return c.json({ valid: true });
     });
 
     // ── Session context for system prompt injection ──

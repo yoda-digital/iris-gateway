@@ -15,7 +15,7 @@ Multi-channel AI messaging gateway. Connects Telegram, WhatsApp, Discord, and Sl
 git clone https://github.com/yoda-digital/iris-gateway.git iris && cd iris
 pnpm install
 pnpm run build
-pnpm test              # 338 tests, all must pass
+pnpm test              # 400 tests, all must pass
 ```
 
 ## Configure
@@ -45,6 +45,9 @@ Config sections:
 | `opencode` | OpenCode server port, auto-spawn toggle |
 | `cron` | Scheduled prompts delivered to channels |
 | `governance` | Rule engine: constraints, rate limits, audit, directives |
+| `plugins` | Array of plugin paths (auto-discovered from `./plugins/` and `~/.iris/plugins/`) |
+| `autoReply` | Template-based auto-reply engine (bypass AI for common queries) |
+| `canvas` | Canvas UI server (WebSocket-based A2UI dashboard) |
 | `mcp` | MCP server toggles (sequential-thinking, tavily) |
 | `logging` | Log level |
 
@@ -61,26 +64,26 @@ Health check: `curl http://127.0.0.1:19876/health`
 
 ```
  Telegram --+
- WhatsApp --+                 +------------+
- Discord  --+-- Adapters --> Router --> OpenCode --> AI Model
- Slack    --+      |           |         Bridge
-                   v           v           |
-               Security     Session      Plugin
-               Gate         Map        (9 tools, 6 hooks)
-                                         |
-                              +----------+----------+
-                              |          |          |
-                            Vault    Governance   Audit
-                          (SQLite)    Engine       Log
+ WhatsApp --+                                    +------------+
+ Discord  --+-- Adapters --> Auto-Reply --> Router --> OpenCode --> AI Model
+ Slack    --+      |          Engine        |         Bridge
+ WebChat  --+      v                        v           |
+               Security              Stream       Plugin SDK
+               Gate                  Coalescer   (17 tools, 6 hooks)
+                                                       |
+                              +----------+----------+--+--+--------+
+                              |          |          |     |        |
+                            Vault    Governance   Audit  Usage   Canvas
+                          (SQLite)    Engine       Log  Tracker   (A2UI)
 ```
 
-Inbound: platform message -> adapter normalize -> security check -> session resolve -> OpenCode prompt -> SSE response -> chunk -> deliver back.
+Inbound: platform message -> adapter normalize -> security check -> auto-reply check -> session resolve -> OpenCode prompt -> SSE streaming -> coalesce -> deliver back.
 
-The OpenCode plugin (`.opencode/plugin/iris.ts`) consolidates all tools and hooks into a single file. Tools call back to the Iris process via HTTP IPC. This is architecturally necessary because `opencode serve` runs as a child process.
+The OpenCode plugin (`.opencode/plugin/iris.ts`) consolidates all tools and hooks into a single file. Tools call back to the Iris process via HTTP IPC. Plugin SDK tools are dynamically registered from `~/.iris/plugin-tools.json` manifest.
 
 ### Plugin: tools and hooks
 
-9 tools registered in the plugin:
+17 built-in tools registered in the plugin:
 
 | Tool | Purpose |
 |------|---------|
@@ -93,6 +96,14 @@ The OpenCode plugin (`.opencode/plugin/iris.ts`) consolidates all tools and hook
 | `vault_remember` | Store a fact/preference/insight |
 | `vault_forget` | Delete a memory by ID |
 | `governance_status` | Show current rules and directives |
+| `usage_summary` | Usage and cost tracking per user/period |
+| `skill_create` | Create OpenCode skills dynamically |
+| `skill_list` | List available skills |
+| `skill_delete` | Delete a skill by name |
+| `agent_create` | Create OpenCode agents dynamically |
+| `agent_list` | List available agents |
+| `agent_delete` | Delete an agent by name |
+| `canvas_update` | Update Canvas UI with rich components |
 
 6 hooks:
 
@@ -146,6 +157,7 @@ iris config show|validate           Configuration
 iris security allowlist list|add    Allowlist management
 iris cron list|add|remove           Scheduled jobs
 iris send <channel> <to> <text>     One-shot message
+iris scan [path]                   Scan directory for security issues
 ```
 
 ## Project structure
@@ -164,8 +176,9 @@ src/
   bridge/              OpenCode integration
     opencode-client.ts SDK wrapper (spawn + connect)
     session-map.ts     Channel user -> OpenCode session
-    message-router.ts  Inbound/outbound routing
+    message-router.ts  Inbound/outbound routing + auto-reply
     event-handler.ts   SSE stream processing
+    stream-coalescer.ts Text delta coalescing with break detection
     tool-server.ts     HTTP endpoints for plugin callbacks
     message-queue.ts   Delivery queue with retry
   vault/               Persistent memory (SQLite + FTS5)
@@ -177,6 +190,27 @@ src/
     engine.ts          Evaluate rules against tool calls
     types.ts           GovernanceRule, GovernanceConfig, EvaluationResult
   security/            DM policy, pairing, allowlist, rate limiter
+    scanner.ts         Code security scanner (10 detection rules)
+    scan-rules.ts      Rule definitions
+    scan-types.ts      Scanner types
+  plugins/             Plugin SDK
+    types.ts           IrisPlugin, IrisPluginApi, PluginToolDef
+    loader.ts          Plugin discovery + Jiti loading + security scan
+    registry.ts        Tool/channel/service/hook registration
+    hook-bus.ts        Plugin event dispatch
+  auto-reply/          Template-based auto-reply engine
+    engine.ts          Match/render with cooldown + once-per-sender
+    types.ts           Template, trigger, schedule types
+  usage/               Usage and cost tracking
+    tracker.ts         Record + summarize with daily breakdown
+    types.ts           UsageRecord, UsageSummary
+  canvas/              Canvas UI (A2UI)
+    server.ts          Hono + WebSocket server
+    session.ts         Component state + client broadcast
+    renderer.ts        Self-contained HTML (Chart.js, Marked.js)
+    components.ts      9 component types
+  channels/
+    webchat/           WebChat adapter for Canvas
   gateway/             Lifecycle orchestration, health server
   cron/                Scheduled jobs
   media/               Image/audio processing (sharp)
@@ -185,14 +219,14 @@ src/
   utils/               Shared utilities
 
 .opencode/
-  plugin/iris.ts       THE plugin (9 tools + 6 hooks)
+  plugin/iris.ts       THE plugin (17 tools + 6 hooks + dynamic plugin tools)
   opencode.json        Model config, MCP servers, permissions
   agents/chat.md       Primary agent system prompt
   skills/              greeting, help, moderation, onboarding, summarize, web-search
 
 test/
-  unit/                41 test files, 338 tests
-  integration/         Pipeline tests
+  unit/                50 test files, 387 tests
+  integration/         Pipeline, plugin SDK, streaming, auto-reply tests
 ```
 
 ## Docker

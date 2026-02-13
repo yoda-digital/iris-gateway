@@ -30,6 +30,24 @@
 - Use `vault_forget` to delete a specific memory when asked
 - Use `governance_status` to check current rules and directives
 
+### Usage Tracking
+- Use `usage_summary` to get usage and cost stats for a user or all users
+- Supports filtering by sender ID and time range (since/until Unix timestamps)
+
+### Skill & Agent Management
+- Use `skill_create` to create new OpenCode skills dynamically (SKILL.md files)
+- Use `skill_list` to list all available skills
+- Use `skill_delete` to remove a skill by name
+- Use `agent_create` to create new OpenCode agents with custom prompts
+- Use `agent_list` to list all available agents
+- Use `agent_delete` to remove an agent by name
+
+### Canvas UI (A2UI)
+- Use `canvas_update` to push rich components to the Canvas dashboard
+- Supported component types: text, markdown, chart, table, form, code, image, button, progress
+- Each component needs a unique `id` and a `type`
+- Use `clear: true` to clear all components, `remove: "id"` to remove one
+
 ### When to Use Vault
 - On first message from a user: search vault for their profile and memories
 - When a user tells you something about themselves: remember it

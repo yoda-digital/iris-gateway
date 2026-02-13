@@ -450,6 +450,171 @@ When a user asks about weather:
 4. Respond with a concise weather summary
 ```
 
+## Plugin SDK
+
+### Writing a custom plugin
+
+Create a directory at `./plugins/my-plugin/index.ts`:
+
+```typescript
+import type { IrisPlugin } from "../../src/plugins/types.js";
+
+const plugin: IrisPlugin = {
+  id: "my-plugin",
+  name: "My Plugin",
+  version: "1.0.0",
+  async register(api) {
+    // Register a custom tool
+    api.registerTool("my_tool", {
+      description: "Does something useful",
+      args: { input: { type: "string" } },
+      async execute(args, ctx) {
+        return { result: `Processed: ${args.input}` };
+      },
+    });
+
+    // Register a hook
+    api.registerHook("message.inbound", async (msg) => {
+      api.logger.info({ from: msg.senderId }, "Inbound message via plugin");
+    });
+  },
+};
+
+export default plugin;
+```
+
+Plugins are auto-discovered from `./plugins/` and `~/.iris/plugins/`. Or specify paths explicitly in config:
+
+```json
+{
+  "plugins": ["./plugins/my-plugin", "/opt/iris-plugins/analytics"]
+}
+```
+
+### Security scanning
+
+Plugins are scanned before loading. If the scanner detects critical issues (dangerous exec, eval, crypto mining, data exfiltration, etc.), the plugin is blocked. Use `iris scan ./plugins/my-plugin` to check manually.
+
+### Plugin manifest
+
+After loading, Iris writes `~/.iris/plugin-tools.json` with all registered plugin tools. The OpenCode plugin reads this manifest and dynamically registers tool wrappers so the AI can call plugin tools.
+
+## Streaming Configuration
+
+### Enable streaming per channel
+
+```json
+{
+  "channels": {
+    "telegram": {
+      "type": "telegram",
+      "enabled": true,
+      "token": "${env:TELEGRAM_BOT_TOKEN}",
+      "streaming": {
+        "enabled": true,
+        "minChars": 300,
+        "maxChars": 4096,
+        "idleMs": 800,
+        "breakOn": "paragraph",
+        "editInPlace": true
+      }
+    }
+  }
+}
+```
+
+`breakOn` options: `paragraph` (break at `\n\n`), `sentence` (break at `.!?`), `word` (break at spaces).
+
+`editInPlace`: when true, updates the same message instead of sending new chunks. Best for Telegram (supports message editing).
+
+## Auto-Reply Templates
+
+### Bypass AI for common queries
+
+```json
+{
+  "autoReply": {
+    "enabled": true,
+    "templates": [
+      {
+        "id": "greeting",
+        "trigger": { "type": "keyword", "words": ["hello", "hi"] },
+        "response": "Hello {sender.name}! How can I help?",
+        "priority": 10,
+        "channels": ["telegram", "discord"]
+      },
+      {
+        "id": "hours",
+        "trigger": { "type": "regex", "pattern": "office hours|business hours" },
+        "response": "Our hours are Mon-Fri 9am-5pm.",
+        "priority": 5
+      },
+      {
+        "id": "help",
+        "trigger": { "type": "command", "name": "help" },
+        "response": "Commands: /help, /status",
+        "priority": 20,
+        "forwardToAi": false
+      }
+    ]
+  }
+}
+```
+
+Trigger types: `exact`, `regex`, `keyword`, `command`, `schedule`.
+
+Variables: `{sender.name}`, `{sender.id}`, `{channel}`, `{time}`, `{date}`.
+
+Options: `cooldown` (seconds), `once` (fire once per sender), `channels` (filter), `chatTypes` (dm/group), `forwardToAi` (also send to AI).
+
+## Usage Tracking
+
+### Query usage via the AI
+
+The AI can use `usage_summary` to report costs:
+
+```
+User: "How much have I used this month?"
+AI calls: usage_summary({ senderId: "482509234", since: 1706745600 })
+```
+
+### Query usage database directly
+
+```bash
+sqlite3 ~/.iris/vault.db "SELECT sender_id, SUM(input_tokens) as input, SUM(output_tokens) as output, SUM(cost_usd) as cost FROM usage_log GROUP BY sender_id;"
+```
+
+## Canvas UI (A2UI)
+
+### Enable the Canvas server
+
+```json
+{
+  "canvas": {
+    "enabled": true,
+    "port": 19878,
+    "hostname": "127.0.0.1"
+  }
+}
+```
+
+Open `http://127.0.0.1:19878` for the default canvas session. The AI can push components via `canvas_update`:
+
+```
+AI calls: canvas_update({
+  component: {
+    type: "chart",
+    id: "usage-chart",
+    chartType: "bar",
+    data: { labels: ["Mon", "Tue"], datasets: [{ data: [10, 20] }] }
+  }
+})
+```
+
+Supported components: text, markdown, chart (Chart.js), table, code, image, form, button, progress.
+
+The webchat channel adapter routes messages through the Canvas UI for browser-based conversations.
+
 ## Debugging
 
 ### Check health

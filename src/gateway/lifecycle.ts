@@ -21,6 +21,8 @@ import { PluginLoader } from "../plugins/loader.js";
 import { TemplateEngine } from "../auto-reply/engine.js";
 import type { AutoReplyTemplate } from "../auto-reply/types.js";
 import { UsageTracker } from "../usage/tracker.js";
+import { IntentStore } from "../proactive/store.js";
+import { PulseEngine } from "../proactive/engine.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { CanvasServer } from "../canvas/server.js";
 import { WebChatAdapter } from "../channels/webchat/index.js";
@@ -48,6 +50,8 @@ export interface GatewayContext {
   governanceEngine: GovernanceEngine;
   usageTracker: UsageTracker;
   pluginRegistry: IrisPluginRegistry;
+  intentStore: IntentStore | null;
+  pulseEngine: PulseEngine | null;
 }
 
 const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
@@ -151,7 +155,15 @@ export async function startGateway(
     logger.info("Master policy engine enabled");
   }
 
-  // 5.7 Load plugins
+  // 5.7 Initialize proactive system
+  let intentStore: IntentStore | null = null;
+  let pulseEngine: PulseEngine | null = null;
+  if (config.proactive?.enabled) {
+    intentStore = new IntentStore(vaultDb);
+    logger.info("Proactive intent store initialized");
+  }
+
+  // 5.8 Load plugins
   const pluginRegistry = await new PluginLoader(logger).loadAll(config, stateDir);
 
   // 6. Create session map
@@ -230,6 +242,7 @@ export async function startGateway(
     pluginTools: pluginRegistry.tools,
     usageTracker,
     canvasServer,
+    intentStore,
   });
   await toolServer.start();
 
@@ -326,6 +339,22 @@ export async function startGateway(
     }
   }
 
+  // 12.6 Start proactive pulse engine
+  if (config.proactive?.enabled && intentStore) {
+    pulseEngine = new PulseEngine({
+      store: intentStore,
+      bridge,
+      router,
+      sessionMap,
+      vaultStore,
+      registry,
+      logger,
+      config: config.proactive,
+    });
+    pulseEngine.start();
+    logger.info("Proactive pulse engine started");
+  }
+
   // Emit gateway.ready hook
   await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
 
@@ -350,6 +379,9 @@ export async function startGateway(
     forceExit.unref();
 
     abortController.abort();
+
+    // Stop proactive engine
+    if (pulseEngine) pulseEngine.stop();
 
     // Stop accepting new messages first
     for (const adapter of registry.list()) {
@@ -404,6 +436,8 @@ export async function startGateway(
     governanceEngine,
     usageTracker,
     pluginRegistry,
+    intentStore,
+    pulseEngine,
   };
 }
 

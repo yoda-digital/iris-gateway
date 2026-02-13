@@ -13,6 +13,7 @@ import type { PluginToolDef } from "../plugins/types.js";
 import type { UsageTracker } from "../usage/tracker.js";
 import type { CanvasServer } from "../canvas/server.js";
 import type { PolicyEngine } from "../governance/policy.js";
+import type { IntentStore } from "../proactive/store.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -57,6 +58,7 @@ export interface ToolServerDeps {
   pluginTools?: Map<string, PluginToolDef> | null;
   usageTracker?: UsageTracker | null;
   canvasServer?: CanvasServer | null;
+  intentStore?: IntentStore | null;
 }
 
 export class ToolServer {
@@ -73,6 +75,7 @@ export class ToolServer {
   private readonly pluginTools: Map<string, PluginToolDef> | null;
   private readonly usageTracker: UsageTracker | null;
   private readonly canvasServer: CanvasServer | null;
+  private readonly intentStore: IntentStore | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -94,6 +97,7 @@ export class ToolServer {
       this.pluginTools = null;
       this.usageTracker = null;
       this.canvasServer = null;
+      this.intentStore = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -107,6 +111,7 @@ export class ToolServer {
       this.pluginTools = deps.pluginTools ?? null;
       this.usageTracker = deps.usageTracker ?? null;
       this.canvasServer = deps.canvasServer ?? null;
+      this.intentStore = deps.intentStore ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();

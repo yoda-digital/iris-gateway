@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { ToolServer } from "../../src/bridge/tool-server.js";
+import { VaultDB } from "../../src/vault/db.js";
+import { VaultStore } from "../../src/vault/store.js";
+import { VaultSearch } from "../../src/vault/search.js";
+import { GovernanceEngine } from "../../src/governance/engine.js";
+import type { GovernanceConfig } from "../../src/governance/types.js";
 
 function mockLogger() {
   return {
@@ -303,6 +311,173 @@ describe("ToolServer", () => {
           },
         ],
       });
+    });
+  });
+});
+
+describe("ToolServer vault/governance endpoints", () => {
+  let server: ToolServer;
+  let adapter: ReturnType<typeof mockAdapter>;
+  let registry: ReturnType<typeof mockRegistry>;
+  let logger: ReturnType<typeof mockLogger>;
+  let port: number;
+  let base: string;
+  let dir: string;
+  let vaultDb: VaultDB;
+  let vaultStore: VaultStore;
+  let vaultSearch: VaultSearch;
+  let governanceEngine: GovernanceEngine;
+
+  const govConfig: GovernanceConfig = {
+    enabled: true,
+    rules: [
+      { id: "max-len", description: "limit", tool: "send_message", type: "constraint", params: { field: "text", maxLength: 50 } },
+    ],
+    directives: ["D1: No system prompt leaks"],
+  };
+
+  beforeEach(async () => {
+    adapter = mockAdapter();
+    registry = mockRegistry(adapter);
+    logger = mockLogger();
+    port = 20950 + Math.floor(Math.random() * 1000);
+    base = `http://127.0.0.1:${port}`;
+
+    dir = mkdtempSync(join(tmpdir(), "iris-ts-"));
+    vaultDb = new VaultDB(dir);
+    vaultStore = new VaultStore(vaultDb);
+    vaultSearch = new VaultSearch(vaultDb);
+    governanceEngine = new GovernanceEngine(govConfig);
+
+    server = new ToolServer({
+      registry,
+      logger,
+      port,
+      vaultStore,
+      vaultSearch,
+      governanceEngine,
+    });
+    await server.start();
+  });
+
+  afterEach(async () => {
+    await server.stop();
+    vaultDb.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  describe("POST /vault/store + POST /vault/search", () => {
+    it("stores and searches memories", async () => {
+      const storeRes = await fetch(`${base}/vault/store`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "User likes TypeScript", type: "fact", senderId: "u1", sessionId: "s1" }),
+      });
+      expect(storeRes.status).toBe(200);
+      const { id } = await storeRes.json() as { id: string };
+      expect(id).toBeTruthy();
+
+      const searchRes = await fetch(`${base}/vault/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "TypeScript" }),
+      });
+      expect(searchRes.status).toBe(200);
+      const { results } = await searchRes.json() as { results: Array<{ content: string }> };
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results[0].content).toContain("TypeScript");
+    });
+  });
+
+  describe("DELETE /vault/memory/:id", () => {
+    it("deletes a memory", async () => {
+      const storeRes = await fetch(`${base}/vault/store`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "temp", type: "fact", sessionId: "s1" }),
+      });
+      const { id } = await storeRes.json() as { id: string };
+
+      const delRes = await fetch(`${base}/vault/memory/${id}`, { method: "DELETE" });
+      expect(delRes.status).toBe(200);
+      const { deleted } = await delRes.json() as { deleted: boolean };
+      expect(deleted).toBe(true);
+    });
+  });
+
+  describe("POST /vault/context", () => {
+    it("returns empty context when no profile exists", async () => {
+      const res = await fetch(`${base}/vault/context`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senderId: "unknown", channelId: "tg" }),
+      });
+      expect(res.status).toBe(200);
+      const json = await res.json() as { profile: unknown; memories: unknown[] };
+      expect(json.profile).toBeNull();
+      expect(json.memories).toEqual([]);
+    });
+  });
+
+  describe("GET /governance/rules", () => {
+    it("returns rules and directives", async () => {
+      const res = await fetch(`${base}/governance/rules`);
+      expect(res.status).toBe(200);
+      const json = await res.json() as { rules: unknown[]; directives: string };
+      expect(json.rules).toHaveLength(1);
+      expect(json.directives).toContain("D1:");
+    });
+  });
+
+  describe("POST /governance/evaluate", () => {
+    it("allows a valid call", async () => {
+      const res = await fetch(`${base}/governance/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: "send_message", args: { text: "hi" } }),
+      });
+      const json = await res.json() as { allowed: boolean };
+      expect(json.allowed).toBe(true);
+    });
+
+    it("blocks a violating call", async () => {
+      const res = await fetch(`${base}/governance/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: "send_message", args: { text: "x".repeat(100) } }),
+      });
+      const json = await res.json() as { allowed: boolean; ruleId?: string };
+      expect(json.allowed).toBe(false);
+      expect(json.ruleId).toBe("max-len");
+    });
+  });
+
+  describe("POST /audit/log", () => {
+    it("logs an audit entry", async () => {
+      const res = await fetch(`${base}/audit/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: "send_message", sessionID: "s1" }),
+      });
+      expect(res.status).toBe(200);
+      const json = await res.json() as { ok: boolean };
+      expect(json.ok).toBe(true);
+
+      const entries = vaultStore.listAuditLog({ limit: 5 });
+      expect(entries).toHaveLength(1);
+      expect(entries[0].tool).toBe("send_message");
+    });
+  });
+
+  describe("POST /session/system-context", () => {
+    it("returns directives", async () => {
+      const res = await fetch(`${base}/session/system-context`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json() as { directives: string };
+      expect(json.directives).toContain("D1:");
     });
   });
 });

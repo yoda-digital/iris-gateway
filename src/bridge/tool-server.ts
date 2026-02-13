@@ -3,6 +3,9 @@ import { serve } from "@hono/node-server";
 import { z } from "zod";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { Logger } from "../logging/logger.js";
+import type { VaultStore } from "../vault/store.js";
+import type { VaultSearch } from "../vault/search.js";
+import type { GovernanceEngine } from "../governance/engine.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -35,15 +38,49 @@ const userInfoSchema = z.object({
   userId: z.string().min(1),
 });
 
+export interface ToolServerDeps {
+  registry: ChannelRegistry;
+  logger: Logger;
+  port?: number;
+  vaultStore?: VaultStore | null;
+  vaultSearch?: VaultSearch | null;
+  governanceEngine?: GovernanceEngine | null;
+}
+
 export class ToolServer {
   private readonly app: Hono;
   private server: ReturnType<typeof serve> | null = null;
+  private readonly registry: ChannelRegistry;
+  private readonly logger: Logger;
+  private readonly port: number;
+  private readonly vaultStore: VaultStore | null;
+  private readonly vaultSearch: VaultSearch | null;
+  private readonly governanceEngine: GovernanceEngine | null;
 
+  constructor(deps: ToolServerDeps);
+  constructor(registry: ChannelRegistry, logger: Logger, port?: number);
   constructor(
-    private readonly registry: ChannelRegistry,
-    private readonly logger: Logger,
-    private readonly port = 19877,
+    registryOrDeps: ChannelRegistry | ToolServerDeps,
+    logger?: Logger,
+    port?: number,
   ) {
+    if (logger !== undefined) {
+      // Legacy 3-arg constructor
+      this.registry = registryOrDeps as ChannelRegistry;
+      this.logger = logger;
+      this.port = port ?? 19877;
+      this.vaultStore = null;
+      this.vaultSearch = null;
+      this.governanceEngine = null;
+    } else {
+      const deps = registryOrDeps as ToolServerDeps;
+      this.registry = deps.registry;
+      this.logger = deps.logger;
+      this.port = deps.port ?? 19877;
+      this.vaultStore = deps.vaultStore ?? null;
+      this.vaultSearch = deps.vaultSearch ?? null;
+      this.governanceEngine = deps.governanceEngine ?? null;
+    }
     this.app = new Hono();
     this.setupRoutes();
   }
@@ -178,6 +215,95 @@ export class ToolServer {
         capabilities: a.capabilities,
       }));
       return c.json({ channels });
+    });
+
+    // ── Vault endpoints ──
+
+    this.app.post("/vault/search", async (c) => {
+      if (!this.vaultSearch) return c.json({ error: "Vault not configured" }, 503);
+      const body = await c.req.json();
+      const results = this.vaultSearch.search(
+        body.query ?? "",
+        { senderId: body.senderId, channelId: body.channelId, type: body.type, limit: body.limit },
+      );
+      return c.json({ results });
+    });
+
+    this.app.post("/vault/store", async (c) => {
+      if (!this.vaultStore) return c.json({ error: "Vault not configured" }, 503);
+      const body = await c.req.json();
+      const id = this.vaultStore.addMemory({
+        sessionId: body.sessionId ?? "unknown",
+        channelId: body.channelId ?? null,
+        senderId: body.senderId ?? null,
+        type: body.type ?? "fact",
+        content: body.content,
+        source: body.source ?? "system",
+        confidence: body.confidence,
+        expiresAt: body.expiresAt,
+      });
+      return c.json({ id });
+    });
+
+    this.app.delete("/vault/memory/:id", async (c) => {
+      if (!this.vaultStore) return c.json({ error: "Vault not configured" }, 503);
+      const deleted = this.vaultStore.deleteMemory(c.req.param("id"));
+      return c.json({ deleted });
+    });
+
+    this.app.post("/vault/context", async (c) => {
+      if (!this.vaultStore || !this.vaultSearch) {
+        return c.json({ profile: null, memories: [] });
+      }
+      const body = await c.req.json();
+      const senderId = body.senderId;
+      const channelId = body.channelId;
+      const profile = senderId && channelId
+        ? this.vaultStore.getProfile(senderId, channelId)
+        : null;
+      const memories = senderId
+        ? this.vaultSearch.search("", { senderId, limit: 10 })
+        : [];
+      return c.json({ profile, memories });
+    });
+
+    // ── Governance endpoints ──
+
+    this.app.get("/governance/rules", (c) => {
+      if (!this.governanceEngine) return c.json({ rules: [], directives: "" });
+      return c.json({
+        rules: this.governanceEngine.getRules(),
+        directives: this.governanceEngine.getDirectivesBlock(),
+      });
+    });
+
+    this.app.post("/governance/evaluate", async (c) => {
+      if (!this.governanceEngine) return c.json({ allowed: true });
+      const body = await c.req.json();
+      const result = this.governanceEngine.evaluate(body.tool ?? "", body.args ?? {});
+      return c.json(result);
+    });
+
+    // ── Audit endpoint ──
+
+    this.app.post("/audit/log", async (c) => {
+      if (!this.vaultStore) return c.json({ ok: true });
+      const body = await c.req.json();
+      this.vaultStore.logAudit({
+        sessionId: body.sessionID ?? body.sessionId ?? null,
+        tool: body.tool ?? "unknown",
+        args: typeof body.args === "string" ? body.args : JSON.stringify(body.args ?? null),
+        result: typeof body.result === "string" ? body.result : JSON.stringify(body.result ?? null),
+        durationMs: body.durationMs ?? null,
+      });
+      return c.json({ ok: true });
+    });
+
+    // ── Session context for system prompt injection ──
+
+    this.app.post("/session/system-context", async (c) => {
+      const directives = this.governanceEngine?.getDirectivesBlock() ?? "";
+      return c.json({ directives });
     });
   }
 

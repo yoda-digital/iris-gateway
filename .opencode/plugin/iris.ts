@@ -1,5 +1,8 @@
 import type { Plugin } from "@opencode-ai/plugin";
 import { tool } from "@opencode-ai/plugin";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 const IRIS_URL =
   process.env.IRIS_TOOL_SERVER_URL || "http://127.0.0.1:19877";
@@ -22,9 +25,54 @@ async function irisGet(path: string): Promise<unknown> {
   return res.json();
 }
 
+interface PluginManifest {
+  tools: Record<string, { description: string; args: Record<string, string> }>;
+}
+
+function loadPluginTools(): Record<string, ReturnType<typeof tool>> {
+  const manifestPath =
+    process.env.IRIS_STATE_DIR
+      ? join(process.env.IRIS_STATE_DIR, "plugin-tools.json")
+      : join(homedir(), ".iris", "plugin-tools.json");
+
+  let manifest: PluginManifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as PluginManifest;
+  } catch {
+    return {};
+  }
+
+  const tools: Record<string, ReturnType<typeof tool>> = {};
+  for (const [name, def] of Object.entries(manifest.tools)) {
+    const args: Record<string, ReturnType<typeof tool.schema.string>> = {};
+    for (const [argName, zodType] of Object.entries(def.args)) {
+      // Map Zod type names to schema types; default to string
+      if (zodType === "ZodNumber") {
+        args[argName] = tool.schema.number() as never;
+      } else if (zodType === "ZodBoolean") {
+        args[argName] = tool.schema.boolean() as never;
+      } else {
+        args[argName] = tool.schema.string();
+      }
+    }
+
+    tools[`plugin_${name}`] = tool({
+      description: def.description,
+      args,
+      async execute(execArgs) {
+        return JSON.stringify(
+          await irisPost(`/tool/plugin/${name}`, execArgs),
+        );
+      },
+    });
+  }
+  return tools;
+}
+
 export default (async ({ client }) => ({
   // ── TOOLS ──
   tool: {
+    ...loadPluginTools(),
     send_message: tool({
       description: "Send a text message to a user on a messaging channel",
       args: {

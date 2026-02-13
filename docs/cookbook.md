@@ -976,3 +976,66 @@ curl -X POST http://127.0.0.1:19877/tool/list-channels | jq .
 curl -X POST http://127.0.0.1:19877/vault/search -H 'Content-Type: application/json' -d '{"query": "birthday"}'
 curl http://127.0.0.1:19877/governance/rules | jq .
 ```
+
+## Proactive Intelligence
+
+### Register a Follow-Up Intent
+
+When Iris should check back on something:
+
+```
+proactive_intent({
+  what: "check if user deployed the fix",
+  why: "user said they would deploy tomorrow",
+  delayMs: 86400000,     // 24 hours
+  confidence: 0.9
+})
+```
+
+### Check Quota Before Scheduling
+
+```
+proactive_quota({ senderId: "tg:12345", channelId: "telegram" })
+→ { allowed: true, sentToday: 1, limit: 3, engagementRate: 0.67 }
+```
+
+### View Pending Items
+
+```
+proactive_list({ limit: 10 })
+→ { intents: [...], triggers: [...] }
+```
+
+### Cancel an Intent
+
+```
+proactive_cancel({ id: "uuid-of-intent" })
+```
+
+### Force Dormancy Scan
+
+```
+proactive_scan({ thresholdMs: 604800000 })  // 7 days
+→ { users: [{ senderId: "tg:12345", name: "Alex", lastSeen: ... }] }
+```
+
+### Configuration
+
+```json
+{
+  "proactive": {
+    "enabled": true,
+    "pollIntervalMs": 60000,
+    "passiveScanIntervalMs": 21600000,
+    "softQuotas": { "perUserPerDay": 3, "globalPerDay": 100 },
+    "dormancy": { "enabled": true, "thresholdMs": 604800000 },
+    "intentDefaults": {
+      "minDelayMs": 3600000,
+      "maxAgeMs": 604800000,
+      "defaultConfidence": 0.8,
+      "confidenceThreshold": 0.5
+    },
+    "quietHours": { "start": 22, "end": 8 }
+  }
+}
+```

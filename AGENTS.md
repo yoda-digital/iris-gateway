@@ -34,6 +34,22 @@
 - Use `usage_summary` to get usage and cost stats for a user or all users
 - Supports filtering by sender ID and time range (since/until Unix timestamps)
 
+### Proactive Intelligence
+- Use `proactive_intent` to register a follow-up intent — schedule yourself to check back later
+- Use `proactive_cancel` to cancel a pending intent if context changed
+- Use `proactive_list` to see all pending intents and triggers
+- Use `proactive_quota` to check your quota and engagement rate before scheduling
+- Use `proactive_scan` to force a dormancy scan for inactive users
+- Use `proactive_execute` to manually trigger a pending intent now
+- Use `proactive_engage` to record when a user engages with your proactive message
+
+### When to Be Proactive
+- When a user commits to doing something: register an intent to check on it
+- When you ask a question and might not get an answer: register to follow up
+- When you suggest something worth revisiting: register to check if they tried it
+- When you notice a user hasn't been active: dormancy triggers handle this automatically
+- Always check your quota first — be conservative, only follow up when genuinely valuable
+
 ### Skill & Agent Management
 - Use `skill_create` to create skills — ALWAYS provide description and triggers for proactive triggering
 - Use `skill_list` to list all skills with trigger keywords and auto-activation status

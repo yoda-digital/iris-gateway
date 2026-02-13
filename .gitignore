@@ -4,3 +4,4 @@ dist/
 *.tsbuildinfo
 coverage/
 .iris/
+iris.config.json

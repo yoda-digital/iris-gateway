@@ -1,6 +1,9 @@
 ---
 name: onboarding
 description: Guide new users through setup and store preferences in vault
+metadata:
+  triggers: "new user,no profile,first time,setup,get started"
+  auto: "true"
 ---
 When a new user needs onboarding (no vault profile found):
 

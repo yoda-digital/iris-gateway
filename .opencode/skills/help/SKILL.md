@@ -1,6 +1,8 @@
 ---
 name: help
 description: Explain Iris capabilities including vault, governance, and MCP
+metadata:
+  triggers: "help,what can you do,capabilities,features,how do you work,ce poti,ajutor"
 ---
 When asked for help or what you can do:
 

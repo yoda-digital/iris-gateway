@@ -1,6 +1,8 @@
 ---
 name: greeting
 description: Welcome users with vault-aware personalization
+metadata:
+  triggers: "hello,hi,hey,salut,buna,ciao,howdy,good morning,good evening,good afternoon"
 ---
 When a user sends their first message or says hello:
 

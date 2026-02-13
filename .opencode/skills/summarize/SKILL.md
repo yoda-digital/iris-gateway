@@ -1,6 +1,8 @@
 ---
 name: summarize
 description: Summarize conversation and extract key facts to vault
+metadata:
+  triggers: "summarize,summary,recap,what did we talk about,rezumat"
 ---
 When asked to summarize the current conversation:
 

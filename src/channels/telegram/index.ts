@@ -66,7 +66,9 @@ export class TelegramAdapter implements ChannelAdapter {
     this.botUserId = String(botInfo.id);
 
     // bot.start() never resolves (runs polling loop forever), so fire-and-forget
-    this.bot.start({ drop_pending_updates: true });
+    this.bot.start({ drop_pending_updates: true }).catch((err) => {
+      this.events.emit("error", err instanceof Error ? err : new Error(String(err)));
+    });
     this.events.emit("connected");
   }
 

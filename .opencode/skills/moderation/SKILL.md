@@ -1,6 +1,9 @@
 ---
 name: moderation
 description: Content moderation with governance-aware safety checks
+metadata:
+  triggers: "moderate,safety check,content review,policy check"
+  auto: "true"
 ---
 When evaluating message safety:
 

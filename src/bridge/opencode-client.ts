@@ -93,12 +93,54 @@ export class OpenCodeBridge {
     return reasoningParts.map((p) => p.text).join("");
   }
 
-  async sendMessageAsync(sessionId: string, text: string): Promise<void> {
-    await this.getClient().session.promptAsync({
-      path: { id: sessionId },
-      body: { agent: "chat", parts: [{ type: "text", text }] },
-      throwOnError: true,
+  private getBaseUrl(): string {
+    if (this.serverHandle) return this.serverHandle.url;
+    return `http://${this.config.hostname}:${this.config.port}`;
+  }
+
+  /**
+   * Send a message and poll for the assistant response.
+   * Uses raw fetch to POST /prompt_async (bypasses SDK which may serialize
+   * differently from what the server expects).
+   */
+  async sendAndWait(
+    sessionId: string,
+    text: string,
+    timeoutMs = 120_000,
+    pollMs = 2_000,
+  ): Promise<string> {
+    const before = await this.listMessages(sessionId);
+    const knownCount = before.length;
+
+    // Raw fetch — curl works but SDK doesn't, so bypass the SDK
+    const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
+    const body = JSON.stringify({
+      agent: "chat",
+      parts: [{ type: "text", text }],
     });
+    this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    this.logger.info({ status: res.status }, "prompt_async response");
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      try {
+        const msgs = await this.listMessages(sessionId);
+        for (let i = knownCount; i < msgs.length; i++) {
+          if (msgs[i].role === "assistant" && msgs[i].text) {
+            return msgs[i].text;
+          }
+        }
+      } catch {
+        // Retry on transient errors
+      }
+    }
+    return "";
   }
 
   async subscribeEvents(

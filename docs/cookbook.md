@@ -84,13 +84,14 @@ Rules are evaluated in order. First blocking rule wins. Every evaluation (allow 
 
 ### How context injection works
 
-Every message triggers the `chat.message` hook:
+Every LLM call triggers the `experimental.chat.system.transform` hook:
 
-1. Hook fires before the AI sees the message
-2. Calls `/vault/context` with the sender's ID
-3. Server looks up user profile in `profiles` table
-4. Runs FTS5 search on `memories` table for that sender
-5. Injects a context block into the message:
+1. Hook fires before the AI processes the message
+2. Calls `/session/system-context` with the session ID
+3. Server resolves the session to a sender via `session-map`
+4. Looks up user profile in `profiles` table
+5. Runs FTS5 search on `memories` table for that sender
+6. Returns the context as `userContext` in the system prompt:
 
 ```
 [User: Nalyk | Europe/Chisinau | en]
@@ -100,7 +101,9 @@ Every message triggers the `chat.message` hook:
 - Has a cat named Pixel]
 ```
 
-The AI sees this context before the actual user message, giving it cross-session memory.
+The AI sees this context in the system prompt, giving it cross-session memory.
+
+> **Note**: Context was originally injected via the `chat.message` hook into `output.parts`, but OpenCode's `Part` type requires `id`, `sessionID`, and `messageID` fields. Adding plain `{ type, text }` objects caused `invalid_union` Zod validation errors that killed prompt processing. The system prompt approach avoids this entirely.
 
 ### Storing memories via the AI
 
@@ -177,24 +180,23 @@ SELECT * FROM profiles;
 ### Hook execution order for a single message
 
 ```
-1. chat.message              <- injects vault context into user message
-2. experimental.chat.system.transform  <- injects directives into system prompt
-3. AI processes the message
-4. AI decides to call send_message tool
-5. tool.execute.before       <- governance validates the tool call
-6. Tool executes (HTTP to Iris tool-server)
-7. tool.execute.after         <- audit logs the result
-8. AI finishes
+1. experimental.chat.system.transform  <- injects directives, vault context, and skill suggestions into system prompt
+2. AI processes the message
+3. AI decides to call send_message tool
+4. tool.execute.before       <- governance validates the tool call
+5. Tool executes (HTTP to Iris tool-server)
+6. tool.execute.after         <- audit logs the result
+7. AI finishes
 ```
 
 If the context is getting large, OpenCode triggers compaction:
 ```
-9. experimental.session.compacting  <- extracts facts, stores in vault
+8. experimental.session.compacting  <- extracts facts, stores in vault
 ```
 
 ### permission.ask hook
 
-Denies all file and bash operations. The AI cannot read/write files or run shell commands. It can only use the 9 registered Iris tools.
+Denies all file and bash operations. The AI cannot read/write files or run shell commands. It can only use the registered Iris tools.
 
 ```typescript
 "permission.ask": async (input, output) => {
@@ -240,7 +242,7 @@ The agent sees the channel ID in the tool call context.
 
 ### Moderator subagent
 
-`.opencode/agents/moderator.md` is a subagent. The primary agent can delegate content moderation:
+`.opencode/agents/moderator.md` is a subagent with skill and governance access:
 
 ```markdown
 ---
@@ -249,12 +251,17 @@ mode: subagent
 tools:
   channel_action: true
   governance_status: true
+  skill: true
+skills:
+  - moderation
 ---
-Evaluate the given message for policy violations.
-Check governance rules via governance_status.
-Return JSON: { "safe": true/false, "reason": "...", "action": "none|warn|delete" }
-If action is "delete", use channel_action to remove the message.
+You are a content moderation assistant.
+When invoked, evaluate the given message for policy violations.
+Use the `moderation` skill for guidance on how to evaluate content safety.
+Return a JSON object: { "safe": true/false, "reason": "..." }
 ```
+
+All agents (including dynamically created ones via `agent_create`) get skill access by default.
 
 ## Multi-Channel Patterns
 
@@ -418,18 +425,32 @@ For fetching arbitrary URLs:
 
 ### How skills work
 
-Skills are markdown files in `.opencode/skills/<name>/SKILL.md`. The AI discovers them automatically and invokes them when relevant. Each skill contains instructions the AI follows for a specific workflow.
+Skills are markdown files in `.opencode/skills/<name>/SKILL.md`. OpenCode discovers them automatically and makes them available via the native `skill` tool. The AI invokes skills on-demand when it decides they're relevant.
+
+**Proactive skill triggering**: Each skill defines trigger keywords in its frontmatter (`metadata.triggers`). Before every LLM call, the `experimental.chat.system.transform` hook:
+1. Fetches the latest user message from the session
+2. Matches it against trigger patterns via `/skills/suggest`
+3. Injects `[RECOMMENDED SKILLS: ...]` into the system prompt
+
+This means the AI doesn't have to guess — it gets explicit recommendations for which skills to use.
 
 ### Available skills
 
-| Skill | Trigger | What it does |
-|-------|---------|-------------|
-| `greeting` | New user says hello | Searches vault for profile, personalizes greeting |
-| `help` | User asks for capabilities | Lists all tools and what the bot can do |
-| `moderation` | Content review needed | Checks governance rules, evaluates content |
-| `onboarding` | First-time user | Collects name, timezone, language, stores in vault |
-| `summarize` | User asks for summary | Extracts key facts from conversation, stores in vault |
-| `web-search` | User wants web info | Guides use of Tavily MCP if available |
+| Skill | Trigger keywords | What it does |
+|-------|-----------------|-------------|
+| `greeting` | hello, hi, hey, salut, buna, ciao, good morning/evening | Searches vault for profile, personalizes greeting |
+| `help` | help, what can you do, capabilities, features, ce poti | Lists all tools and what the bot can do |
+| `moderation` | moderate, safety check, content review (auto) | Checks governance rules, evaluates content |
+| `onboarding` | new user, no profile, first time, setup (auto) | Collects name, timezone, language, stores in vault |
+| `summarize` | summarize, summary, recap, rezumat | Extracts key facts from conversation, stores in vault |
+| `web-search` | search, look up, find online, google, cauta | Guides use of Tavily MCP if available |
+
+### Skill access across agents
+
+All agent types have skill access:
+- **Primary agent (chat)**: `skill: true` + all skills listed in frontmatter
+- **Subagents (moderator)**: `skill: true` + relevant skills
+- **Dynamically created agents**: `skill: true` + all available skills by default (configurable via `skills` param)
 
 ### Writing a custom skill
 
@@ -437,10 +458,10 @@ Create `.opencode/skills/weather/SKILL.md`:
 
 ```markdown
 ---
+name: weather
 description: Check the weather for a user's location
-tools:
-  - vault_search
-  - send_message
+metadata:
+  triggers: "weather,forecast,temperature,rain,sunny"
 ---
 When a user asks about weather:
 
@@ -449,6 +470,8 @@ When a user asks about weather:
 3. Use the web-search MCP tool (if available) to get current weather
 4. Respond with a concise weather summary
 ```
+
+The `metadata.triggers` field enables proactive skill suggestion. When a user's message contains any trigger keyword, the system prompt will recommend invoking this skill.
 
 ## Plugin SDK
 

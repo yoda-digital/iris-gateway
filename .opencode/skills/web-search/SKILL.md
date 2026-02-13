@@ -1,6 +1,8 @@
 ---
 name: web-search
 description: Guide web search using Tavily MCP server
+metadata:
+  triggers: "search,look up,find online,google,search the web,cauta"
 ---
 When asked to search the web:
 

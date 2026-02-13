@@ -536,6 +536,31 @@ export class ToolServer {
       return c.json({ valid: true });
     });
 
+    this.app.post("/skills/suggest", async (c) => {
+      const body = await c.req.json();
+      const text = ((body.text as string) ?? "").toLowerCase();
+      if (!text || !existsSync(skillsDir)) return c.json({ suggestions: [] });
+
+      const suggestions: Array<{ name: string; description: string }> = [];
+      for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+        const skillFile = join(skillsDir, entry.name, "SKILL.md");
+        if (!existsSync(skillFile)) continue;
+        const raw = readFileSync(skillFile, "utf-8");
+        const triggerMatch = raw.match(/triggers:\s*"([^"]+)"/);
+        if (!triggerMatch) continue;
+        const triggers = triggerMatch[1].split(",").map((t) => t.trim().toLowerCase());
+        if (triggers.some((trigger) => text.includes(trigger))) {
+          const descMatch = raw.match(/description:\s*(.+)/);
+          suggestions.push({
+            name: entry.name,
+            description: descMatch?.[1]?.trim() ?? "",
+          });
+        }
+      }
+      return c.json({ suggestions });
+    });
+
     // ── Agent CRUD endpoints ──
 
     this.app.post("/agents/create", async (c) => {
@@ -545,15 +570,40 @@ export class ToolServer {
         return c.json({ error: "Invalid agent name (lowercase, dashes, starts with letter)" }, 400);
       }
       mkdirSync(agentsDir, { recursive: true });
-      const frontmatter = [
+
+      // Build tools section as YAML map (not array) for OpenCode compatibility
+      const toolEntries: string[] = [];
+      if (body.tools?.length) {
+        for (const t of body.tools as string[]) {
+          toolEntries.push(`  ${t}: true`);
+        }
+      }
+      // Always include skill tool so agents can use skills
+      if (!toolEntries.some((t) => t.includes("skill:"))) {
+        toolEntries.push("  skill: true");
+      }
+
+      // Build skills list
+      const skillNames: string[] = body.skills ?? [];
+      // Default: give all available skills if none specified
+      if (skillNames.length === 0) {
+        try {
+          for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+            if (entry.isDirectory()) skillNames.push(entry.name);
+          }
+        } catch { /* no skills dir */ }
+      }
+
+      const lines = [
         "---",
         body.mode ? `mode: ${body.mode}` : "mode: subagent",
         body.model ? `model: ${body.model}` : "",
         body.temperature != null ? `temperature: ${body.temperature}` : "",
-        body.tools?.length ? `tools: [${body.tools.join(", ")}]` : "",
+        toolEntries.length > 0 ? `tools:\n${toolEntries.join("\n")}` : "",
+        skillNames.length > 0 ? `skills:\n${skillNames.map((s) => `  - ${s}`).join("\n")}` : "",
         "---",
       ].filter(Boolean).join("\n");
-      const content = `${frontmatter}\n\n${body.prompt ?? `You are the ${name} agent.`}\n`;
+      const content = `${lines}\n\n${body.prompt ?? `You are the ${name} agent.`}\n`;
       writeFileSync(join(agentsDir, `${name}.md`), content);
       return c.json({ ok: true, path: join(agentsDir, `${name}.md`) });
     });
@@ -604,11 +654,36 @@ export class ToolServer {
     this.app.post("/session/system-context", async (c) => {
       const directives = this.governanceEngine?.getDirectivesBlock() ?? "";
       const body = await c.req.json().catch(() => ({}));
-      // Return governance directives and any available context
+
+      // Build user context from vault (profile + memories)
+      let userContext: string | null = null;
+      if (this.vaultStore && this.vaultSearch && body.sessionID && this.sessionMap) {
+        const entry = await this.sessionMap.findBySessionId(body.sessionID);
+        if (entry) {
+          const profile = this.vaultStore.getProfile(entry.senderId, entry.channelId);
+          const memories = this.vaultSearch.search("", { senderId: entry.senderId, limit: 10 });
+
+          const blocks: string[] = [];
+          if (profile) {
+            blocks.push(
+              `[User: ${profile.name ?? "unknown"} | ${profile.timezone ?? ""} | ${profile.language ?? ""}]`,
+            );
+          }
+          if (memories?.length > 0) {
+            blocks.push(
+              `[Relevant memories:\n${memories.map((m: { content: string }) => `- ${m.content}`).join("\n")}]`,
+            );
+          }
+          if (blocks.length > 0) {
+            userContext = blocks.join("\n");
+          }
+        }
+      }
+
       return c.json({
         directives,
         channelRules: null,
-        userContext: null,
+        userContext,
       });
     });
   }

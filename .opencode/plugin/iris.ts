@@ -259,7 +259,7 @@ export default (async ({ client }) => ({
     }),
 
     agent_create: tool({
-      description: "Create a new OpenCode agent with markdown file",
+      description: "Create a new OpenCode agent with markdown file. Agents get skill access by default.",
       args: {
         name: tool.schema.string().describe("Agent name (lowercase, dashes, starts with letter)"),
         prompt: tool.schema.string().describe("Agent system prompt"),
@@ -267,6 +267,7 @@ export default (async ({ client }) => ({
         model: tool.schema.string().optional().describe("Model override"),
         temperature: tool.schema.number().optional().describe("Temperature override"),
         tools: tool.schema.array(tool.schema.string()).optional().describe("Tool names to enable"),
+        skills: tool.schema.array(tool.schema.string()).optional().describe("Skill names to enable (default: all available skills)"),
       },
       async execute(args) {
         return JSON.stringify(await irisPost("/agents/create", args));
@@ -348,34 +349,10 @@ export default (async ({ client }) => ({
     }
   },
 
-  "chat.message": async (input, output) => {
-    try {
-      const ctx = (await irisPost("/vault/context", {
-        sessionID: input.sessionID,
-      })) as {
-        profile: Record<string, unknown> | null;
-        memories: Array<{ content: string }>;
-      };
-
-      const blocks: string[] = [];
-      if (ctx.profile) {
-        const p = ctx.profile;
-        blocks.push(
-          `[User: ${p["name"] ?? "unknown"} | ${p["timezone"] ?? ""} | ${p["language"] ?? ""}]`,
-        );
-      }
-      if (ctx.memories?.length > 0) {
-        blocks.push(
-          `[Relevant memories:\n${ctx.memories.map((m) => `- ${m.content}`).join("\n")}]`,
-        );
-      }
-      if (blocks.length > 0) {
-        output.parts.unshift({ type: "text", text: blocks.join("\n") });
-      }
-    } catch {
-      // Don't fail message on context injection error
-    }
-  },
+  // NOTE: vault context injection moved to experimental.chat.system.transform
+  // via /session/system-context endpoint. The chat.message hook's output.parts
+  // requires full Part objects (id, sessionID, messageID) — adding plain
+  // { type, text } objects caused invalid_union Zod errors in OpenCode.
 
   "experimental.session.compacting": async (input, output) => {
     try {
@@ -411,6 +388,33 @@ export default (async ({ client }) => ({
       if (ctx.directives) output.system.push(ctx.directives);
       if (ctx.channelRules) output.system.push(ctx.channelRules);
       if (ctx.userContext) output.system.push(ctx.userContext);
+
+      // Proactive skill triggering: get latest user message and match against skill triggers
+      if (input.sessionID) {
+        try {
+          const msgs = await client.v2.session.message.list({ path: { sessionID: input.sessionID } });
+          const userMsgs = (msgs.data ?? []).filter((m: { role: string }) => m.role === "user");
+          const latest = userMsgs[userMsgs.length - 1] as { parts?: Array<{ type: string; text?: string }> } | undefined;
+          const latestText = latest?.parts?.find((p: { type: string }) => p.type === "text")?.text;
+
+          if (latestText) {
+            const result = (await irisPost("/skills/suggest", { text: latestText })) as {
+              suggestions: Array<{ name: string; description: string }>;
+            };
+
+            if (result.suggestions?.length > 0) {
+              const skillList = result.suggestions
+                .map((s) => `- ${s.name}: ${s.description}`)
+                .join("\n");
+              output.system.push(
+                `[RECOMMENDED SKILLS for this message — invoke these with the skill tool:\n${skillList}]`,
+              );
+            }
+          }
+        } catch {
+          // Best-effort — don't fail the LLM call if skill matching fails
+        }
+      }
     } catch {
       // Best-effort
     }

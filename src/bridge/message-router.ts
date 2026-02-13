@@ -225,11 +225,23 @@ export class MessageRouter {
       this.activeCoalescers.set(entry.openCodeSessionId, coalescer);
     }
 
-    // Send message to OpenCode (async, response comes via SSE events)
-    await this.bridge.sendMessageAsync(
+    // Send message and poll for response
+    const response = await this.bridge.sendAndWait(
       entry.openCodeSessionId,
       messageText,
     );
+
+    // Clean up streaming coalescer (not used in polling path)
+    const coalescer = this.activeCoalescers.get(entry.openCodeSessionId);
+    if (coalescer) {
+      coalescer.dispose();
+      this.activeCoalescers.delete(entry.openCodeSessionId);
+    }
+    this.pendingResponses.delete(entry.openCodeSessionId);
+
+    if (response) {
+      await this.sendResponse(msg.channelId, msg.chatId, response, msg.id);
+    }
   }
 
   async sendResponse(

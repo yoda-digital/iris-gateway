@@ -131,6 +131,21 @@ export class MessageRouter {
       }
     }
 
+    // /new command — reset session
+    if (msg.text?.trim().toLowerCase() === "/new" || msg.text?.trim().toLowerCase() === "/start") {
+      const key = this.sessionMap.buildKey(msg.channelId, msg.chatId, msg.chatType);
+      await this.sessionMap.reset(key);
+      log.info("Session reset via /new command");
+      if (adapter) {
+        await adapter.sendText({
+          to: msg.chatId,
+          text: "Session reset. Send a message to start fresh.",
+          replyToId: msg.id,
+        });
+      }
+      return;
+    }
+
     // Auto-reply check
     if (this.templateEngine) {
       const match = this.templateEngine.match(msg);

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/free",
+  "small_model": "openrouter/arcee-ai/trinity-large-preview:free",
+  "provider": {
+    "openrouter": {
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1"
+      }
+    }
+  },
+  "tools": {
+    "write": false,
+    "bash": false,
+    "glob": false,
+    "grep": false,
+    "read": false,
+    "edit": false,
+    "patch": false,
+    "lsp": false,
+    "webfetch": false,
+    "websearch": false
+  },
+  "permission": {
+    "edit": "deny",
+    "bash": "deny",
+    "external_directory": "deny"
+  },
+  "share": "disabled",
+  "server": {
+    "port": 4096,
+    "hostname": "127.0.0.1"
+  }
+}

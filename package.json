@@ -1,0 +1,60 @@
+{
+  "name": "iris-messenger",
+  "version": "0.1.0",
+  "description": "Multi-channel AI messenger powered by OpenCode CLI",
+  "keywords": ["ai", "messenger", "telegram", "whatsapp", "discord", "slack", "opencode"],
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "bin": {
+    "iris": "dist/entry.js"
+  },
+  "main": "dist/entry.js",
+  "scripts": {
+    "dev": "tsx src/entry.ts",
+    "build": "tsc",
+    "start": "node dist/entry.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "iris": "tsx src/entry.ts"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "latest",
+    "grammy": "^1.40.0",
+    "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "discord.js": "^14.18.0",
+    "@slack/bolt": "^4.6.0",
+    "commander": "^13.1.0",
+    "zod": "^3.24.0",
+    "express": "^5.1.0",
+    "tslog": "^4.10.0",
+    "proper-lockfile": "^4.1.2",
+    "@clack/prompts": "^0.10.0",
+    "cron-parser": "^4.9.0",
+    "sharp": "^0.33.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.12.0",
+    "@types/express": "^5.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "@types/proper-lockfile": "^4.1.4"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@10.4.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@whiskeysockets/baileys",
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
+  }
+}

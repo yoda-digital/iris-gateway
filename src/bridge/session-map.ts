@@ -76,6 +76,14 @@ export class SessionMap {
     await this.save();
   }
 
+  async findBySessionId(openCodeSessionId: string): Promise<SessionMapEntry | null> {
+    await this.ensureLoaded();
+    for (const entry of this.entries.values()) {
+      if (entry.openCodeSessionId === openCodeSessionId) return entry;
+    }
+    return null;
+  }
+
   async list(): Promise<SessionMapEntry[]> {
     await this.ensureLoaded();
     return [...this.entries.values()];

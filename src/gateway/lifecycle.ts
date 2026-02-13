@@ -119,6 +119,7 @@ export async function startGateway(
     vaultStore,
     vaultSearch,
     governanceEngine,
+    sessionMap,
   });
   await toolServer.start();
 

@@ -20,11 +20,15 @@ export interface SessionInfo {
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
+  private readonly projectDir: string;
 
   constructor(
     private readonly config: OpenCodeConfig,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    // Resolve project directory: explicit config, or cwd (where .opencode/ lives)
+    this.projectDir = config.projectDir ?? process.cwd();
+  }
 
   async start(): Promise<void> {
     if (this.config.autoSpawn) {
@@ -62,6 +66,7 @@ export class OpenCodeBridge {
   async createSession(title?: string): Promise<SessionInfo> {
     const response = await this.getClient().session.create({
       body: { title: title ?? "Iris Chat" },
+      query: { directory: this.projectDir },
       throwOnError: true,
     });
     const session = response.data;
@@ -75,7 +80,7 @@ export class OpenCodeBridge {
   async sendMessage(sessionId: string, text: string): Promise<string> {
     const response = await this.getClient().session.prompt({
       path: { id: sessionId },
-      body: { parts: [{ type: "text", text }] },
+      body: { agent: "chat", parts: [{ type: "text", text }] },
       throwOnError: true,
     });
     const parts = response.data.parts ?? [];
@@ -91,7 +96,7 @@ export class OpenCodeBridge {
   async sendMessageAsync(sessionId: string, text: string): Promise<void> {
     await this.getClient().session.promptAsync({
       path: { id: sessionId },
-      body: { parts: [{ type: "text", text }] },
+      body: { agent: "chat", parts: [{ type: "text", text }] },
       throwOnError: true,
     });
   }

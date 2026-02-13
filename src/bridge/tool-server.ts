@@ -6,6 +6,7 @@ import type { Logger } from "../logging/logger.js";
 import type { VaultStore } from "../vault/store.js";
 import type { VaultSearch } from "../vault/search.js";
 import type { GovernanceEngine } from "../governance/engine.js";
+import type { SessionMap } from "./session-map.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -45,6 +46,7 @@ export interface ToolServerDeps {
   vaultStore?: VaultStore | null;
   vaultSearch?: VaultSearch | null;
   governanceEngine?: GovernanceEngine | null;
+  sessionMap?: SessionMap | null;
 }
 
 export class ToolServer {
@@ -56,6 +58,7 @@ export class ToolServer {
   private readonly vaultStore: VaultStore | null;
   private readonly vaultSearch: VaultSearch | null;
   private readonly governanceEngine: GovernanceEngine | null;
+  private readonly sessionMap: SessionMap | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -72,6 +75,7 @@ export class ToolServer {
       this.vaultStore = null;
       this.vaultSearch = null;
       this.governanceEngine = null;
+      this.sessionMap = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -80,6 +84,7 @@ export class ToolServer {
       this.vaultStore = deps.vaultStore ?? null;
       this.vaultSearch = deps.vaultSearch ?? null;
       this.governanceEngine = deps.governanceEngine ?? null;
+      this.sessionMap = deps.sessionMap ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -257,8 +262,18 @@ export class ToolServer {
       }
       const body = await c.req.json();
       // Accept senderId/channelId directly, or resolve from sessionID via session map
-      const senderId = body.senderId ?? null;
-      const channelId = body.channelId ?? null;
+      let senderId = body.senderId ?? null;
+      let channelId = body.channelId ?? null;
+
+      // Reverse-lookup: plugin hook only has sessionID, resolve to sender
+      if (!senderId && body.sessionID && this.sessionMap) {
+        const entry = await this.sessionMap.findBySessionId(body.sessionID);
+        if (entry) {
+          senderId = entry.senderId;
+          channelId = entry.channelId;
+        }
+      }
+
       const profile = senderId && channelId
         ? this.vaultStore.getProfile(senderId, channelId)
         : null;

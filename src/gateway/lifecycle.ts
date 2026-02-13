@@ -12,6 +12,10 @@ import { SecurityGate } from "../security/dm-policy.js";
 import { PairingStore } from "../security/pairing-store.js";
 import { AllowlistStore } from "../security/allowlist-store.js";
 import { RateLimiter } from "../security/rate-limiter.js";
+import { VaultDB } from "../vault/db.js";
+import { VaultStore } from "../vault/store.js";
+import { VaultSearch } from "../vault/search.js";
+import { GovernanceEngine } from "../governance/engine.js";
 import { HealthServer } from "./health.js";
 import { TelegramAdapter } from "../channels/telegram/index.js";
 import { WhatsAppAdapter } from "../channels/whatsapp/index.js";
@@ -30,6 +34,10 @@ export interface GatewayContext {
   registry: ChannelRegistry;
   messageCache: MessageCache;
   abortController: AbortController;
+  vaultDb: VaultDB;
+  vaultStore: VaultStore;
+  vaultSearch: VaultSearch;
+  governanceEngine: GovernanceEngine;
 }
 
 const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
@@ -77,6 +85,16 @@ export async function startGateway(
     config.security,
   );
 
+  // 5.5 Initialize vault
+  const vaultDb = new VaultDB(stateDir);
+  const vaultStore = new VaultStore(vaultDb);
+  const vaultSearch = new VaultSearch(vaultDb);
+
+  // 5.6 Initialize governance
+  const governanceEngine = new GovernanceEngine(
+    config.governance ?? { enabled: false, rules: [], directives: [] },
+  );
+
   // 6. Create session map
   const sessionMap = new SessionMap(stateDir);
 
@@ -95,7 +113,13 @@ export async function startGateway(
   );
 
   // 9. Start tool server
-  const toolServer = new ToolServer(registry, logger);
+  const toolServer = new ToolServer({
+    registry,
+    logger,
+    vaultStore,
+    vaultSearch,
+    governanceEngine,
+  });
   await toolServer.start();
 
   // 10. Start health server
@@ -204,6 +228,7 @@ export async function startGateway(
     await toolServer.stop();
     await healthServer.stop();
     await bridge.stop();
+    vaultDb.close();
 
     clearTimeout(forceExit);
     logger.info("Shutdown complete");
@@ -224,6 +249,10 @@ export async function startGateway(
     registry,
     messageCache,
     abortController,
+    vaultDb,
+    vaultStore,
+    vaultSearch,
+    governanceEngine,
   };
 }
 

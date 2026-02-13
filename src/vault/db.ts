@@ -68,6 +68,25 @@ CREATE TABLE IF NOT EXISTS governance_log (
   action      TEXT CHECK(action IN ('allowed','blocked','modified')),
   reason      TEXT
 );
+
+CREATE TABLE IF NOT EXISTS usage_log (
+  id          TEXT PRIMARY KEY,
+  timestamp   INTEGER NOT NULL,
+  session_id  TEXT,
+  sender_id   TEXT,
+  channel_id  TEXT,
+  model_id    TEXT,
+  provider_id TEXT,
+  tokens_input    INTEGER DEFAULT 0,
+  tokens_output   INTEGER DEFAULT 0,
+  tokens_reasoning INTEGER DEFAULT 0,
+  tokens_cache_read  INTEGER DEFAULT 0,
+  tokens_cache_write INTEGER DEFAULT 0,
+  cost_usd    REAL DEFAULT 0,
+  duration_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_usage_sender ON usage_log(sender_id);
+CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_log(timestamp);
 `;
 
 export class VaultDB {

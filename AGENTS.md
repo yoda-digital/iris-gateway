@@ -18,6 +18,7 @@
 
 ### Channel Tools
 - Use `send_message` to reply to users on any channel
+- Use `send_media` to send images, videos, audio, or documents
 - Use `channel_action` with action "typing" before generating long responses
 - Use `channel_action` with action "react" to acknowledge messages with emoji
 - Use `user_info` when you need context about who you're talking to

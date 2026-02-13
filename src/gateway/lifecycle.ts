@@ -163,6 +163,13 @@ export async function startGateway(
 
     // Wire adapter events to message router
     adapter.events.on("message", (msg) => {
+      // Touch user profile on every inbound message
+      vaultStore.upsertProfile({
+        senderId: msg.senderId,
+        channelId: msg.channelId,
+        name: msg.senderName || null,
+      });
+
       router.handleInbound(msg).catch((err) => {
         logger.error({ err, channel: id }, "Failed to handle message");
       });

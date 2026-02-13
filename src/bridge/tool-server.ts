@@ -256,8 +256,9 @@ export class ToolServer {
         return c.json({ profile: null, memories: [] });
       }
       const body = await c.req.json();
-      const senderId = body.senderId;
-      const channelId = body.channelId;
+      // Accept senderId/channelId directly, or resolve from sessionID via session map
+      const senderId = body.senderId ?? null;
+      const channelId = body.channelId ?? null;
       const profile = senderId && channelId
         ? this.vaultStore.getProfile(senderId, channelId)
         : null;
@@ -265,6 +266,50 @@ export class ToolServer {
         ? this.vaultSearch.search("", { senderId, limit: 10 })
         : [];
       return c.json({ profile, memories });
+    });
+
+    this.app.post("/vault/extract", async (c) => {
+      // Lightweight fact extraction from conversation context.
+      // For now, returns empty — a real implementation would use an LLM
+      // to parse context into structured facts. The hook handles the
+      // "no facts" case gracefully.
+      return c.json({ facts: [] });
+    });
+
+    this.app.post("/vault/store-batch", async (c) => {
+      if (!this.vaultStore) return c.json({ ids: [] });
+      const body = await c.req.json();
+      const memories = body.memories ?? [];
+      const ids: string[] = [];
+      for (const mem of memories) {
+        const id = this.vaultStore.addMemory({
+          sessionId: body.sessionID ?? body.sessionId ?? "unknown",
+          channelId: mem.channelId ?? null,
+          senderId: mem.senderId ?? null,
+          type: mem.type ?? "insight",
+          content: mem.content,
+          source: "extracted",
+        });
+        ids.push(id);
+      }
+      return c.json({ ids });
+    });
+
+    this.app.post("/vault/profile", async (c) => {
+      if (!this.vaultStore) return c.json({ ok: false });
+      const body = await c.req.json();
+      if (!body.senderId || !body.channelId) {
+        return c.json({ error: "senderId and channelId required" }, 400);
+      }
+      this.vaultStore.upsertProfile({
+        senderId: body.senderId,
+        channelId: body.channelId,
+        name: body.name ?? null,
+        timezone: body.timezone ?? null,
+        language: body.language ?? null,
+        preferences: body.preferences,
+      });
+      return c.json({ ok: true });
     });
 
     // ── Governance endpoints ──
@@ -281,6 +326,18 @@ export class ToolServer {
       if (!this.governanceEngine) return c.json({ allowed: true });
       const body = await c.req.json();
       const result = this.governanceEngine.evaluate(body.tool ?? "", body.args ?? {});
+
+      // Log the governance decision
+      if (this.vaultStore) {
+        this.vaultStore.logGovernance({
+          sessionId: body.sessionID ?? body.sessionId ?? null,
+          tool: body.tool ?? null,
+          ruleId: result.ruleId ?? null,
+          action: result.allowed ? "allowed" : "blocked",
+          reason: result.reason ?? null,
+        });
+      }
+
       return c.json(result);
     });
 
@@ -303,7 +360,13 @@ export class ToolServer {
 
     this.app.post("/session/system-context", async (c) => {
       const directives = this.governanceEngine?.getDirectivesBlock() ?? "";
-      return c.json({ directives });
+      const body = await c.req.json().catch(() => ({}));
+      // Return governance directives and any available context
+      return c.json({
+        directives,
+        channelRules: null,
+        userContext: null,
+      });
     });
   }
 

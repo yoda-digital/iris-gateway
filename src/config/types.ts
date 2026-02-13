@@ -1,3 +1,4 @@
+import type { ProactiveConfig } from "../proactive/types.js";
 export type DmPolicyMode = "open" | "pairing" | "allowlist" | "disabled";
 
 export interface IrisConfig {
@@ -13,6 +14,7 @@ export interface IrisConfig {
   readonly plugins?: string[];
   readonly autoReply?: AutoReplyConfig;
   readonly canvas?: CanvasConfig;
+  readonly proactive?: ProactiveConfig;
 }
 
 export interface CanvasConfig {
@@ -182,3 +184,4 @@ export interface PolicyConfig {
   readonly skills: PolicySkillsConfig;
   readonly enforcement: PolicyEnforcementConfig;
 }
+export type { ProactiveConfig } from "../proactive/types.js";

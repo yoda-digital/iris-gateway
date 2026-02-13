@@ -116,6 +116,30 @@ const policySchema = z.object({
   }).default({}),
 }).default({});
 
+const proactiveSchema = z.object({
+  enabled: z.boolean().default(false),
+  pollIntervalMs: z.number().positive().default(60_000),
+  passiveScanIntervalMs: z.number().positive().default(21_600_000),
+  softQuotas: z.object({
+    perUserPerDay: z.number().int().positive().default(3),
+    globalPerDay: z.number().int().positive().default(100),
+  }).default({}),
+  dormancy: z.object({
+    enabled: z.boolean().default(true),
+    thresholdMs: z.number().positive().default(604_800_000),
+  }).default({}),
+  intentDefaults: z.object({
+    minDelayMs: z.number().positive().default(3_600_000),
+    maxAgeMs: z.number().positive().default(604_800_000),
+    defaultConfidence: z.number().min(0).max(1).default(0.8),
+    confidenceThreshold: z.number().min(0).max(1).default(0.5),
+  }).default({}),
+  quietHours: z.object({
+    start: z.number().int().min(0).max(23).default(22),
+    end: z.number().int().min(0).max(23).default(8),
+  }).default({}),
+});
+
 export const irisConfigSchema = z.object({
   gateway: gatewaySchema.default({}),
   channels: z.record(z.string(), channelAccountSchema).default({}),
@@ -125,6 +149,7 @@ export const irisConfigSchema = z.object({
   logging: loggingSchema.default({}),
   governance: governanceSchema.default({}),
   policy: policySchema,
+  proactive: proactiveSchema.optional(),
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
   canvas: z.object({

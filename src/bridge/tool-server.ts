@@ -1093,6 +1093,80 @@ export class ToolServer {
         userContext,
       });
     });
+
+    // ── Proactive endpoints ──
+
+    this.app.post("/proactive/intent", async (c) => {
+      if (!this.intentStore) return c.json({ error: "Proactive not enabled" }, 503);
+      const body = await c.req.json();
+      const sessionId = body.sessionID ?? body.sessionId ?? "";
+
+      let channelId = body.channelId ?? "";
+      let chatId = body.chatId ?? "";
+      let senderId = body.senderId ?? "";
+      if (sessionId && this.sessionMap && (!channelId || !senderId)) {
+        const entry = await this.sessionMap.findBySessionId(sessionId);
+        if (entry) {
+          channelId = channelId || entry.channelId;
+          chatId = chatId || entry.chatId;
+          senderId = senderId || entry.senderId;
+        }
+      }
+
+      const id = this.intentStore.addIntent({
+        sessionId,
+        channelId,
+        chatId,
+        senderId,
+        what: body.what ?? "",
+        why: body.why ?? null,
+        confidence: body.confidence ?? 0.8,
+        executeAt: Date.now() + (body.delayMs ?? 86_400_000),
+      });
+      return c.json({ id });
+    });
+
+    this.app.post("/proactive/cancel", async (c) => {
+      if (!this.intentStore) return c.json({ error: "Proactive not enabled" }, 503);
+      const body = await c.req.json();
+      const ok = this.intentStore.cancelIntent(body.id ?? "");
+      return c.json({ ok });
+    });
+
+    this.app.get("/proactive/pending", (c) => {
+      if (!this.intentStore) return c.json({ intents: [], triggers: [] });
+      const limit = Number(c.req.query("limit")) || 20;
+      return c.json(this.intentStore.listAllPending(limit));
+    });
+
+    this.app.get("/proactive/quota", (c) => {
+      if (!this.intentStore) return c.json({ allowed: true, sentToday: 0, limit: 999, engagementRate: 0 });
+      const senderId = c.req.query("senderId") ?? "";
+      const channelId = c.req.query("channelId") ?? "";
+      return c.json(this.intentStore.getQuotaStatus(senderId, channelId, 3));
+    });
+
+    this.app.post("/proactive/scan", async (c) => {
+      if (!this.intentStore) return c.json({ error: "Proactive not enabled" }, 503);
+      const body = await c.req.json().catch(() => ({}));
+      const thresholdMs = body.thresholdMs ?? 604_800_000;
+      const dormant = this.intentStore.listDormantUsers(thresholdMs, 10);
+      return c.json({ users: dormant });
+    });
+
+    this.app.post("/proactive/execute", async (c) => {
+      if (!this.intentStore) return c.json({ error: "Proactive not enabled" }, 503);
+      const body = await c.req.json();
+      this.intentStore.markIntentExecuted(body.id ?? "", "manual_trigger");
+      return c.json({ ok: true });
+    });
+
+    this.app.post("/proactive/engage", async (c) => {
+      if (!this.intentStore) return c.json({ error: "Proactive not enabled" }, 503);
+      const body = await c.req.json();
+      this.intentStore.markEngaged(body.senderId ?? "", body.channelId ?? "");
+      return c.json({ ok: true });
+    });
   }
 
   async start(): Promise<void> {

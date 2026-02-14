@@ -1,39 +1,19 @@
 /**
- * Deterministic keyword-based intent category classifier.
- * Zero LLM cost — pure string matching against known patterns.
- *
- * Categories: task, work, health, hobby, social, reminder, general
+ * Intent category validator.
+ * The AI passes the category directly — no keyword guessing needed.
+ * Falls back to "general" if no category provided or invalid.
  */
 
-const CATEGORY_KEYWORDS: ReadonlyArray<[string, readonly string[]]> = [
-  ["task", ["todo", "task", "deadline", "submit", "deliver", "finish", "complete", "homework", "assignment", "project"]],
-  ["work", ["meeting", "work", "office", "boss", "colleague", "client", "salary", "report", "presentation", "email"]],
-  ["health", ["doctor", "appointment", "medicine", "gym", "exercise", "run", "sleep", "water", "meditat", "health", "pill", "vitamin"]],
-  ["hobby", ["read", "book", "game", "play", "cook", "garden", "draw", "paint", "music", "guitar", "piano", "photo"]],
-  ["social", ["call", "meet", "visit", "party", "birthday", "friend", "family", "dinner", "lunch", "coffee"]],
-  ["reminder", ["remind", "don't forget", "remember", "alarm", "wake", "timer", "schedule"]],
-];
+const VALID_CATEGORIES = new Set([
+  "task", "work", "health", "hobby", "social", "reminder", "general",
+]);
 
 /**
- * Classify a proactive intent into a category based on its `what` field.
- * Returns "general" if no keywords match.
+ * Validate and return a category for a proactive intent.
+ * @param _what - The intent text (unused — kept for backward compat)
+ * @param category - Category string from the AI (optional)
  */
-export function categorizeIntent(what: string): string {
-  const lower = what.toLowerCase();
-
-  let bestCategory = "general";
-  let bestScore = 0;
-
-  for (const [category, keywords] of CATEGORY_KEYWORDS) {
-    let score = 0;
-    for (const kw of keywords) {
-      if (lower.includes(kw)) score++;
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestCategory = category;
-    }
-  }
-
-  return bestCategory;
+export function categorizeIntent(_what: string, category?: string): string {
+  if (category && VALID_CATEGORIES.has(category)) return category;
+  return "general";
 }

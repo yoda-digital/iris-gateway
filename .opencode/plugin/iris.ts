@@ -636,6 +636,15 @@ export default (async ({ client }) => ({
         );
       },
     }),
+
+    heartbeat_status: tool({
+      description:
+        "Get Iris system health status — shows each component's status (healthy/degraded/down)",
+      args: {},
+      async execute() {
+        return JSON.stringify(await irisGet("/heartbeat/status"));
+      },
+    }),
   },
 
   // ── HOOKS ──

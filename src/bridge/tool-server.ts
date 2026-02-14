@@ -59,6 +59,7 @@ export interface ToolServerDeps {
   usageTracker?: UsageTracker | null;
   canvasServer?: CanvasServer | null;
   intentStore?: IntentStore | null;
+  heartbeatEngine?: { getStatus(): Array<{ component: string; status: string }> } | null;
 }
 
 export class ToolServer {
@@ -76,6 +77,7 @@ export class ToolServer {
   private readonly usageTracker: UsageTracker | null;
   private readonly canvasServer: CanvasServer | null;
   private readonly intentStore: IntentStore | null;
+  private heartbeatEngine: { getStatus(): Array<{ component: string; status: string }> } | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -98,6 +100,7 @@ export class ToolServer {
       this.usageTracker = null;
       this.canvasServer = null;
       this.intentStore = null;
+      this.heartbeatEngine = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -112,6 +115,7 @@ export class ToolServer {
       this.usageTracker = deps.usageTracker ?? null;
       this.canvasServer = deps.canvasServer ?? null;
       this.intentStore = deps.intentStore ?? null;
+      this.heartbeatEngine = deps.heartbeatEngine ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -1167,6 +1171,16 @@ export class ToolServer {
       this.intentStore.markEngaged(body.senderId ?? "", body.channelId ?? "");
       return c.json({ ok: true });
     });
+
+    // ── Heartbeat endpoints ──
+
+    this.app.get("/heartbeat/status", (c) => {
+      if (!this.heartbeatEngine) return c.json({ enabled: false, components: [] });
+      return c.json({
+        enabled: true,
+        components: this.heartbeatEngine.getStatus(),
+      });
+    });
   }
 
   async start(): Promise<void> {
@@ -1180,5 +1194,9 @@ export class ToolServer {
       this.server = null;
       this.logger.info("Tool server stopped");
     }
+  }
+
+  setHeartbeatEngine(engine: { getStatus(): Array<{ component: string; status: string }> }): void {
+    this.heartbeatEngine = engine;
   }
 }

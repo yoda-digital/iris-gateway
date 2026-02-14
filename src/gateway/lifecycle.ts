@@ -417,6 +417,7 @@ export async function startGateway(
       config: config.heartbeat,
     });
     heartbeatEngine.start();
+    toolServer.setHeartbeatEngine(heartbeatEngine);
     logger.info("Heartbeat engine started");
   }
 

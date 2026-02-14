@@ -146,23 +146,50 @@ export class OpenCodeBridge {
           }
 
           // Secondary: detect model completion without text response.
-          // If we see new messages (tool calls, tool results) but message count
-          // stabilizes (no new messages for 3 consecutive polls), the model is done.
-          // This handles models that respond purely through tool calls (send_message).
+          // Only count as "stable" when the LAST message is from the assistant
+          // (meaning the model had its turn and chose not to produce text).
+          // If the last message is a tool result, the model is still processing
+          // the result and may produce text next — keep waiting.
           if (newMsgs.length > 0) {
-            if (newMsgs.length === lastNewCount) {
-              stablePolls++;
+            const lastMsg = newMsgs[newMsgs.length - 1];
+
+            // Log message details for diagnostics
+            if (newMsgs.length !== lastNewCount) {
+              this.logger.info(
+                {
+                  sessionId,
+                  newMessages: newMsgs.length,
+                  messages: newMsgs.map((m) => ({
+                    role: m.role,
+                    hasText: !!m.text,
+                    textLen: m.text?.length ?? 0,
+                    hasParts: m.hasParts,
+                  })),
+                },
+                "Polling: new messages detected",
+              );
+            }
+
+            if (lastMsg.role === "assistant") {
+              // Model had its turn — count stability
+              if (newMsgs.length === lastNewCount) {
+                stablePolls++;
+              } else {
+                stablePolls = 0;
+                lastNewCount = newMsgs.length;
+              }
+              // 5 stable polls = 10s of no new messages after model's last turn
+              if (stablePolls >= 5) {
+                this.logger.info(
+                  { sessionId, newMessages: newMsgs.length },
+                  "Model completed with tool calls only (no text response)",
+                );
+                return "";
+              }
             } else {
+              // Tool result or other non-assistant message — model still processing
               stablePolls = 0;
               lastNewCount = newMsgs.length;
-            }
-            // 3 stable polls = 6s of no new messages after model activity
-            if (stablePolls >= 3) {
-              this.logger.info(
-                { sessionId, newMessages: newMsgs.length },
-                "Model completed with tool calls only (no text response)",
-              );
-              return "";
             }
           }
         } catch {

@@ -99,26 +99,11 @@ export class ArcDetector {
    * Filters out stop words and short tokens.
    */
   private extractKeywords(text: string): string[] {
-    const STOP_WORDS = new Set([
-      "the", "a", "an", "is", "are", "was", "were", "be", "been",
-      "have", "has", "had", "do", "does", "did", "will", "would",
-      "could", "should", "may", "might", "shall", "can", "to", "of",
-      "in", "for", "on", "with", "at", "by", "from", "as", "into",
-      "about", "like", "after", "before", "between", "under", "above",
-      "not", "no", "nor", "but", "and", "or", "so", "if", "then",
-      "that", "this", "these", "those", "it", "its", "my", "your",
-      "his", "her", "our", "their", "i", "you", "he", "she", "we",
-      "they", "me", "him", "us", "them", "what", "which", "who",
-      "whom", "how", "when", "where", "why", "all", "each", "every",
-      "both", "few", "more", "most", "some", "any", "very", "just",
-      "also", "than", "too", "only", "now", "here", "there",
-    ]);
-
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/[^\p{L}\p{N}\s-]/gu, " ")
       .split(/\s+/)
-      .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+      .filter((w) => w.length >= 3);
   }
 
   /**

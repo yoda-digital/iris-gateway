@@ -55,6 +55,11 @@ describe("tomorrowIntent rule", () => {
     expect(result).toBeNull();
   });
 
+  it("does NOT trigger on mid-sentence question about tomorrow", () => {
+    const result = rule.evaluate("tomorrow? I don't think so", msg, noSignals);
+    expect(result).toBeNull();
+  });
+
   it("does NOT trigger on unrelated text", () => {
     const result = rule.evaluate("The weather is nice today", msg, noSignals);
     expect(result).toBeNull();
@@ -89,6 +94,15 @@ describe("timeMention rule", () => {
   it("rejects invalid hours (>23)", () => {
     const result = rule.evaluate("item 25:00 in list", msg, noSignals);
     expect(result).toBeNull();
+  });
+
+  it("rejects invalid 12h hours (0pm, 13pm)", () => {
+    expect(findRule("time_mention").evaluate("meet at 0pm", msg, noSignals)).toBeNull();
+    expect(findRule("time_mention").evaluate("call at 13pm", msg, noSignals)).toBeNull();
+  });
+
+  it("rejects invalid minutes in 12h format", () => {
+    expect(findRule("time_mention").evaluate("meet at 3:99pm", msg, noSignals)).toBeNull();
   });
 
   it("does NOT trigger on plain numbers", () => {

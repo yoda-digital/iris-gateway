@@ -30,15 +30,14 @@ const tomorrowIntent: TriggerRule = {
   priority: 50,
   evaluate(text, _msg) {
     const lower = text.toLowerCase();
-    const words = lower.split(/[\s,.:;!]+/);
+    const words = lower.split(/[\s,.:;!?]+/);
 
     // Check if any word matches "tomorrow" in any language
     const hasTomorrow = words.some((w) => TOMORROW_WORDS.has(w));
     if (!hasTomorrow) return null;
 
     // Skip questions — universal structural check
-    const trimmed = text.trim();
-    if (trimmed.endsWith("?")) return null;
+    if (text.includes("?")) return null;
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -150,10 +149,11 @@ const timeMention: TriggerRule = {
     const match = time24 ?? time12;
     if (!match) return null;
 
-    // Validate hour range to avoid false positives
+    // Validate hour and minute ranges
     const hour = parseInt(match[1], 10);
     if (hour > 23) return null;
-    if (time24 && parseInt(match[2], 10) > 59) return null;
+    if (time12 && (hour === 0 || hour > 12)) return null;
+    if (match[2] && parseInt(match[2], 10) > 59) return null;
 
     return {
       ruleId: "time_mention",

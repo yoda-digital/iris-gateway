@@ -48,7 +48,7 @@ export class OutcomeAnalyzer {
       outcome,
     });
 
-    this.logger.debug(
+    this.logger.info(
       { intentId: params.intentId, category },
       "Outcome recorded",
     );
@@ -67,7 +67,7 @@ export class OutcomeAnalyzer {
         category: "unknown", // We don't track category on engagement side
         quality,
       });
-      this.logger.debug({ senderId, quality }, "Outcome engagement recorded");
+      this.logger.info({ senderId, quality }, "Outcome engagement recorded");
     }
   }
 

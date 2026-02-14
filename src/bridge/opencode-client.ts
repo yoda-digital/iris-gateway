@@ -154,26 +154,31 @@ export class OpenCodeBridge {
             );
           }
 
-          // Primary: look for assistant message with text
-          for (const msg of newMsgs) {
-            if (msg.role === "assistant" && msg.text) {
-              this.logger.info(
-                { textLen: msg.text.length },
-                "✅ Got response",
-              );
-              return msg.text;
+          // Primary: look for the final assistant response.
+          // Only extract text when the model is done — if the last message
+          // is an assistant placeholder (hasParts=false), the model is still
+          // generating (tool calls in progress, or composing the real reply).
+          // Returning early would grab intermediate status text like
+          // "[Checking your Gmail...]" instead of the actual answer.
+          const lastMsg = newMsgs[newMsgs.length - 1];
+          const stillGenerating = lastMsg.role === "assistant" && !lastMsg.hasParts;
+
+          if (!stillGenerating) {
+            for (let i = newMsgs.length - 1; i >= 0; i--) {
+              const msg = newMsgs[i];
+              if (msg.role === "assistant" && msg.text && msg.text !== "[user interrupted]") {
+                this.logger.info(
+                  { textLen: msg.text.length },
+                  "✅ Got response",
+                );
+                return msg.text;
+              }
             }
           }
 
           // Secondary: detect model completion without text response.
           if (newMsgs.length > 0) {
-            const lastMsg = newMsgs[newMsgs.length - 1];
-
-            // Assistant message with hasParts=false is a placeholder —
-            // model is still generating. Don't count toward stability.
-            const isPlaceholder = lastMsg.role === "assistant" && !lastMsg.hasParts;
-
-            if (!isPlaceholder && lastMsg.role === "assistant" && lastMsg.hasParts) {
+            if (!stillGenerating && lastMsg.role === "assistant" && lastMsg.hasParts) {
               // Model finished WITH parts but no text → tool calls only
               if (newMsgs.length === lastNewCount) {
                 stablePolls++;
@@ -188,7 +193,7 @@ export class OpenCodeBridge {
                 );
                 return "";
               }
-            } else if (!isPlaceholder) {
+            } else if (!stillGenerating) {
               stablePolls = 0;
               lastNewCount = newMsgs.length;
             } else {

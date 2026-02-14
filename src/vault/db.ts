@@ -142,6 +142,20 @@ export class VaultDB {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA_SQL);
+    this.migrate();
+  }
+
+  /**
+   * Forward-only migrations for existing databases.
+   * Each migration is idempotent (checks before altering).
+   */
+  private migrate(): void {
+    const columns = this.db
+      .prepare("PRAGMA table_info(proactive_intents)")
+      .all() as Array<{ name: string }>;
+    if (columns.length > 0 && !columns.some((c) => c.name === "category")) {
+      this.db.exec("ALTER TABLE proactive_intents ADD COLUMN category TEXT");
+    }
   }
 
   raw(): Database.Database {

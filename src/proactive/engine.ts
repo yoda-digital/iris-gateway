@@ -80,7 +80,7 @@ export class PulseEngine {
   async tick(): Promise<void> {
     const purged = this.store.purgeExpired(this.config.intentDefaults.maxAgeMs);
     if (purged > 0) {
-      this.logger.debug({ purged }, "Purged expired proactive items");
+      this.logger.info({ purged }, "Purged expired proactive items");
     }
 
     const intents = this.store.listPendingIntents(10);
@@ -114,7 +114,7 @@ export class PulseEngine {
         context: `User "${user.name ?? "unknown"}" inactive for ${daysInactive} days.`,
         executeAt: Date.now() + 3_600_000,
       });
-      this.logger.debug(
+      this.logger.info(
         { senderId: user.senderId, daysInactive },
         "Dormant user trigger created",
       );
@@ -144,10 +144,8 @@ export class PulseEngine {
         return;
       }
 
-      if (this.isQuietHours(intent.senderId, intent.channelId)) {
-        this.logger.debug({ id: intent.id }, "Skipped: quiet hours");
-        return;
-      }
+      // Intents are created during active conversations — don't gate by quiet hours.
+      // Quiet hours only apply to system-initiated triggers (dormancy, etc.).
 
       const result = await this.executeProactive({
         channelId: intent.channelId,
@@ -228,14 +226,14 @@ export class PulseEngine {
     );
 
     if (!response || response.trim() === SKIP_MARKER) {
-      this.logger.debug({ sourceId: params.sourceId }, "AI chose to skip");
+      this.logger.info({ sourceId: params.sourceId }, "AI chose to skip");
       return "skipped";
     }
 
     const deferMatch = response.trim().match(DEFER_REGEX);
     if (deferMatch) {
       const hours = parseInt(deferMatch[1], 10);
-      this.logger.debug({ sourceId: params.sourceId, hours }, "AI deferred");
+      this.logger.info({ sourceId: params.sourceId, hours }, "AI deferred");
       return "deferred";
     }
 

@@ -109,7 +109,7 @@ export class InferenceEngine {
         // Emit to bus
         this.bus.emit({ type: "signal_derived", senderId, signal });
 
-        this.logger.debug(
+        this.logger.info(
           { ruleId: rule.id, senderId, value: result.value, confidence: result.confidence },
           "Derived signal produced",
         );

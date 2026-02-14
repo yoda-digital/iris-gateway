@@ -36,7 +36,7 @@ export class GoalLifecycle {
   }): Goal {
     const goal = this.store.createGoal(params);
     this.bus.emit({ type: "goal_created", senderId: params.senderId, goal });
-    this.logger.debug({ goalId: goal.id, description: params.description }, "Goal created");
+    this.logger.info({ goalId: goal.id, description: params.description }, "Goal created");
     return goal;
   }
 

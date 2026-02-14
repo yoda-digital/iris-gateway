@@ -74,7 +74,7 @@ export class ArcDetector {
       });
 
       this.bus.emit({ type: "arc_created", senderId, arc });
-      this.logger.debug({ arcId: arc.id, title }, "New memory arc created");
+      this.logger.info({ arcId: arc.id, title }, "New memory arc created");
     }
   }
 
@@ -87,7 +87,7 @@ export class ArcDetector {
     for (const arc of staleArcs) {
       this.store.updateArcStatus(arc.id, "stale");
       this.bus.emit({ type: "arc_stale", senderId: arc.senderId, arcId: arc.id });
-      this.logger.debug(
+      this.logger.info(
         { arcId: arc.id, title: arc.title },
         "Arc marked stale",
       );

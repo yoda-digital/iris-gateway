@@ -31,7 +31,7 @@ export class ArcLifecycle {
       }
     }
     this.store.updateArcStatus(arcId, "resolved");
-    this.logger.debug({ arcId }, "Arc resolved");
+    this.logger.info({ arcId }, "Arc resolved");
   }
 
   /**
@@ -39,7 +39,7 @@ export class ArcLifecycle {
    */
   abandon(arcId: string): void {
     this.store.updateArcStatus(arcId, "abandoned");
-    this.logger.debug({ arcId }, "Arc abandoned");
+    this.logger.info({ arcId }, "Arc abandoned");
   }
 
   /**
@@ -47,7 +47,7 @@ export class ArcLifecycle {
    */
   reactivate(arcId: string): void {
     this.store.updateArcStatus(arcId, "active");
-    this.logger.debug({ arcId }, "Arc reactivated");
+    this.logger.info({ arcId }, "Arc reactivated");
   }
 
   /**

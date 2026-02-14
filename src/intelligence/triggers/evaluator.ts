@@ -59,7 +59,7 @@ export class TriggerEvaluator {
                 confidence: (result.payload["confidence"] as number) ?? 0.8,
                 executeAt: (result.payload["executeAt"] as number) ?? Date.now() + 86_400_000,
               });
-              this.logger.debug(
+              this.logger.info(
                 { ruleId: rule.id, what: result.payload["what"] },
                 "Trigger created intent",
               );
@@ -68,7 +68,7 @@ export class TriggerEvaluator {
 
           case "flag_for_prompt":
             // Flags are collected and injected into the prompt by the caller
-            this.logger.debug(
+            this.logger.info(
               { ruleId: rule.id, flag: result.payload["flag"] },
               "Trigger flagged for prompt",
             );

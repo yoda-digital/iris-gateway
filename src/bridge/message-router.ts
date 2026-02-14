@@ -37,6 +37,8 @@ export class MessageRouter {
     private readonly logger: Logger,
     private readonly channelConfigs: Record<string, ChannelAccountConfig> = {},
     private readonly templateEngine?: TemplateEngine | null,
+    private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
+    private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
   ) {
     this.eventHandler = new EventHandler();
     this.eventHandler.events.on("partial", (sessionId, delta) => {
@@ -162,6 +164,15 @@ export class MessageRouter {
       }
     }
 
+    // First contact detection — inject onboarding meta-prompt
+    let firstContactPrefix = "";
+    if (this.profileEnricher && this.vaultStoreRef) {
+      const profile = this.vaultStoreRef.getProfile(msg.senderId, msg.channelId);
+      if (profile && this.profileEnricher.isFirstContact(profile)) {
+        firstContactPrefix = `[FIRST CONTACT — NEW USER]\nThis user just messaged you for the first time.\nChannel: ${msg.channelId}\n\nWelcome them naturally. Learn about them through conversation, not interrogation.\nDon't announce you're "onboarding" them. Just be genuinely curious.\nPick up on cues from their message — if they ask a technical question, help first, get to know them second.\n\n---\n\n`;
+      }
+    }
+
     // Resolve session
     const entry = await this.sessionMap.resolve(
       msg.channelId,
@@ -193,6 +204,11 @@ export class MessageRouter {
       const mentionPattern = channelConfig.mentionPattern;
       const botId = adapter?.id ?? msg.channelId;
       messageText = stripBotMention(messageText, botId, mentionPattern);
+    }
+
+    // Prepend first-contact meta-prompt if applicable
+    if (firstContactPrefix) {
+      messageText = firstContactPrefix + messageText;
     }
 
     // Set up streaming coalescer if enabled for this channel

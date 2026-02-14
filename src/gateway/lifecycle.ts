@@ -229,6 +229,8 @@ export async function startGateway(
     logger,
     config.channels,
     templateEngine,
+    profileEnricher,
+    vaultStore,
   );
 
   // 8.5 Start canvas server if enabled

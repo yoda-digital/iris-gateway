@@ -943,21 +943,33 @@ Supported components: text, markdown, chart (Chart.js), table, code, image, form
 
 The webchat channel adapter routes messages through the Canvas UI for browser-based conversations.
 
-## Onboarding (Invisible User Profiling)
+## Onboarding (Two-Layer User Profiling)
 
 ### How it works
 
-Onboarding is invisible — there's no "welcome wizard." Instead, Iris silently profiles users from their messages:
+Onboarding is invisible — there's no "welcome wizard." Instead, Iris profiles users through two complementary layers:
 
-1. **First Contact**: When a brand-new user sends their first message, the MessageRouter injects a `[FIRST CONTACT]` meta-prompt into the AI's context. The AI naturally welcomes them without announcing "you're being onboarded."
+**Layer 1 — Statistical Detection (instant, zero API cost)**
 
-2. **Profile Enrichment**: On every message, the `ProfileEnricher` extracts signals:
-   - **Language**: Detects ro, ru, es, fr, de from keyword patterns
-   - **Name**: Extracts from "I'm Alex", "my name is...", "call me..."
-   - **Active Hours**: Tracks UTC hours of activity
-   - **Response Style**: After 5+ messages, classifies as concise/moderate/verbose
+On every message, the `ProfileEnricher` extracts signals automatically:
+- **Language**: Uses tinyld for statistical detection across 62 languages (ISO 639-1). Confidence scales with text length, capped at 0.75 so LLM signals can override.
+- **Script**: Unicode codepoint classification detects writing system (Latin, Cyrillic, Arabic, CJK, Devanagari, Thai, Georgian, Hebrew, Greek, Hangul). Confidence: 0.9 — near-infallible.
+- **Active Hours**: Tracks UTC hours of activity.
+- **Response Style**: After 5+ messages, classifies as concise/moderate/verbose.
 
-3. **Signal Consolidation**: Periodically, highest-confidence signals are merged into the user's vault profile.
+**Layer 2 — LLM-Powered Learning (the AI stores what it discovers)**
+
+The AI uses the `enrich_profile` tool to silently store things it learns through conversation:
+- **Name**: When the user introduces themselves.
+- **Language**: If the AI is more confident than the statistical detector.
+- **Timezone**: From contextual cues ("it's 3am here").
+- **Interests/Preferences/Notes**: Anything the AI discovers naturally.
+
+The `[PROFILE LEARNING]` block is injected into every system prompt, telling the AI to use `enrich_profile` as it learns things. Core fields (name, language, timezone) are written directly to the vault profile.
+
+**First Contact**: When a brand-new user sends their first message, the MessageRouter injects a language-agnostic `[FIRST CONTACT]` meta-prompt that tells the AI to respond in the same language as the user's message and to use `enrich_profile` to store what it learns.
+
+**Signal Consolidation**: Periodically, highest-confidence signals are merged into the user's vault profile.
 
 ### Configuration
 
@@ -970,6 +982,18 @@ onboarding:
     consolidateIntervalMs: 3600000  # 1 hour
   firstContact:
     enabled: true
+```
+
+### Using enrich_profile
+
+The AI calls this silently as it learns things:
+
+```
+User: "Меня зовут Алексей, я из Москвы"
+AI internally calls:
+  enrich_profile({ field: "name", value: "Алексей" })
+  enrich_profile({ field: "language", value: "ru", confidence: 0.95 })
+  enrich_profile({ field: "note", value: "Lives in Moscow" })
 ```
 
 ### Query enriched profiles
@@ -1034,6 +1058,72 @@ heartbeat_status()
 
 ```bash
 sqlite3 ~/.iris/vault.db "SELECT component, status, details, datetime(timestamp/1000, 'unixepoch') FROM heartbeat_log ORDER BY timestamp DESC LIMIT 20;"
+```
+
+### Heartbeat V2 Features
+
+**Multi-Agent Independence**
+Each agent runs its own health check schedule. Configure different intervals for production vs staging:
+```yaml
+heartbeat:
+  enabled: true
+  agents:
+    - agentId: "production"
+      intervals: { healthy: 30000 }
+    - agentId: "staging"
+      intervals: { healthy: 120000 }
+```
+
+**Active Hours Gating**
+Skip health checks outside business hours. Uses IANA timezone names:
+```yaml
+heartbeat:
+  activeHours:
+    start: "09:00"
+    end: "22:00"
+    timezone: "Europe/Chisinau"
+```
+
+**Per-Channel Visibility**
+Control which channels see health alerts:
+```yaml
+heartbeat:
+  visibility:
+    showOk: false
+    showAlerts: true
+    useIndicator: true
+  channelVisibility:
+    telegram: { showAlerts: false }
+```
+
+**Alert Deduplication**
+Same alert text suppressed within a configurable window (default 24h):
+```yaml
+heartbeat:
+  dedupWindowMs: 86400000
+```
+
+**Empty-Check + Exponential Backoff**
+When all components are healthy and unchanged, skip the full check and exponentially back off the interval:
+```yaml
+heartbeat:
+  emptyCheck:
+    enabled: true
+    maxBackoffMs: 300000
+```
+
+**Coalescing + Queue Awareness**
+Debounce rapid heartbeat requests. Defer when the AI queue is busy:
+```yaml
+heartbeat:
+  coalesceMs: 250
+  retryMs: 1000
+```
+
+**Manual Trigger**
+Force a health check via the `heartbeat_trigger` tool:
+```
+Use heartbeat_trigger with agentId "production" to check production health now.
 ```
 
 ## Debugging

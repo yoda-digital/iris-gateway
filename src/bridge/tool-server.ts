@@ -1250,6 +1250,7 @@ export class ToolServer {
         why: body.why ?? null,
         confidence: body.confidence ?? 0.8,
         executeAt: Date.now() + (body.delayMs ?? 86_400_000),
+        category: body.category,
       });
       return c.json({ id });
     });

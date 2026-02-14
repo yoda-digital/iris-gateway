@@ -599,6 +599,13 @@ export default (async ({ client }) => ({
       args: {
         what: tool.schema.string().describe("What to follow up on"),
         why: tool.schema.string().optional().describe("Why this matters"),
+        category: tool.schema
+          .string()
+          .optional()
+          .describe(
+            "Category for engagement tracking: task, work, health, hobby, social, reminder, general. " +
+            "Pick the one that best fits the follow-up topic. Default: general",
+          ),
         delayMs: tool.schema
           .number()
           .optional()
@@ -614,6 +621,7 @@ export default (async ({ client }) => ({
             sessionID: (this as any).sessionID,
             what: args.what,
             why: args.why,
+            category: args.category,
             delayMs: args.delayMs,
             confidence: args.confidence,
           }),

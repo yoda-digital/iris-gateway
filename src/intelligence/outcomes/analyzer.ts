@@ -27,9 +27,10 @@ export class OutcomeAnalyzer {
     senderId: string;
     channelId: string;
     what: string;
+    category?: string;
   }): void {
     const now = new Date();
-    const category = categorizeIntent(params.what);
+    const category = categorizeIntent(params.what, params.category);
 
     const outcome = this.store.recordOutcome({
       intentId: params.intentId,
@@ -74,8 +75,8 @@ export class OutcomeAnalyzer {
    * Determine if a proactive message should be sent to this user now.
    * Uses category engagement rates and timing patterns.
    */
-  shouldSend(senderId: string, what: string): { send: boolean; reason: string } {
-    const category = categorizeIntent(what);
+  shouldSend(senderId: string, what: string, intentCategory?: string): { send: boolean; reason: string } {
+    const category = categorizeIntent(what, intentCategory);
     const rates = this.store.getCategoryRates(senderId);
     const timing = this.store.getTimingPatterns(senderId);
 

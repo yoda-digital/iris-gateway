@@ -59,6 +59,7 @@ export interface AddIntentParams {
   readonly why?: string | null;
   readonly confidence?: number;
   readonly executeAt: number;
+  readonly category?: string;
 }
 
 export interface AddTriggerParams {

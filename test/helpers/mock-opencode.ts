@@ -26,6 +26,10 @@ export class MockOpenCodeBridge {
     return this.responseText;
   }
 
+  async sendAndWait(_sessionId: string, _text: string): Promise<string> {
+    return this.responseText;
+  }
+
   async sendMessageAsync(_sessionId: string, _text: string): Promise<void> {}
 
   async subscribeEvents(

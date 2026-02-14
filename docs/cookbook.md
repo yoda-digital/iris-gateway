@@ -1126,6 +1126,61 @@ Force a health check via the `heartbeat_trigger` tool:
 Use heartbeat_trigger with agentId "production" to check production health now.
 ```
 
+## CLI Tools (External Services)
+
+### Configuration
+
+```yaml
+cli:
+  enabled: true
+  timeout: 10000
+  sandbox:
+    allowedBinaries:
+      - gog
+  tools:
+    google_calendar:
+      binary: gog
+      description: "Manage Google Calendar events and calendars"
+      actions:
+        list_calendars:
+          subcommand: ["calendar", "calendars"]
+        list_events:
+          subcommand: ["calendar", "events"]
+          positional: ["calendarId"]
+        create_event:
+          subcommand: ["calendar", "create"]
+          positional: ["calendarId"]
+          flags: ["summary", "start", "end", "description", "location"]
+    google_email:
+      binary: gog
+      description: "Search and manage Gmail"
+      actions:
+        search:
+          subcommand: ["gmail", "search"]
+          positional: ["query"]
+          flags: ["max"]
+        get_message:
+          subcommand: ["gmail", "get"]
+          positional: ["messageId"]
+```
+
+### Usage Examples
+
+The AI uses CLI tools naturally in conversation:
+
+- "What's on my calendar today?" → google_calendar(action: "list_events", calendarId: "primary")
+- "Find emails from Alice" → google_email(action: "search", query: "from:alice")
+- "Create a meeting tomorrow at 2pm" → google_calendar(action: "create_event", calendarId: "primary", summary: "Meeting", start: "...", end: "...")
+- "Look up John's contact" → google_contacts(action: "search", query: "John")
+
+### Adding More CLI Tools
+
+To add a new CLI binary (e.g., `himalaya` for email):
+
+1. Add the binary to `sandbox.allowedBinaries`
+2. Add tool definitions under `tools` with actions mapping to CLI subcommands
+3. The plugin auto-discovers new tools on restart
+
 ## Debugging
 
 ### Check health

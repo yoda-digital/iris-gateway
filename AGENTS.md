@@ -67,6 +67,16 @@
 - Coalescing: rapid heartbeat requests debounced, deferred when AI queue is busy
 - Self-healing runs automatically — the system recovers before you notice
 
+### CLI Tools (External Service Integration)
+- Use `google_calendar` to list calendars, list/get/create/update events
+- Use `google_email` to search threads, get messages, send email
+- Use `google_contacts` to search/list/get/create/update/delete contacts
+- Use `google_tasks` to manage task lists and tasks (list, add, update, complete)
+- Use `google_drive` to list files, search, and get file metadata
+- All CLI tools use the `gog` binary with `--json` output
+- Actions are sandboxed: only declared subcommands can be executed
+- When using these tools, always specify the `action` parameter
+
 ### Onboarding (Two-Layer Learning)
 - **Layer 1 — Statistical (instant, zero cost)**: tinyld detects language from text (62 languages), Unicode script detection identifies writing system (Latin, Cyrillic, Arabic, CJK, etc.), active hours and response style tracked automatically
 - **Layer 2 — LLM-powered (you)**: Use `enrich_profile` to store things you learn through conversation (name, language, timezone, interests, preferences, notes)

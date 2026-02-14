@@ -15,6 +15,8 @@ import type { CanvasServer } from "../canvas/server.js";
 import type { PolicyEngine } from "../governance/policy.js";
 import type { IntentStore } from "../proactive/store.js";
 import type { SignalStore } from "../onboarding/signals.js";
+import type { CliExecutor } from "../cli/executor.js";
+import type { CliToolRegistry } from "../cli/registry.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -62,6 +64,8 @@ export interface ToolServerDeps {
   intentStore?: IntentStore | null;
   signalStore?: SignalStore | null;
   heartbeatEngine?: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
+  cliExecutor?: CliExecutor | null;
+  cliRegistry?: CliToolRegistry | null;
 }
 
 export class ToolServer {
@@ -81,6 +85,8 @@ export class ToolServer {
   private readonly intentStore: IntentStore | null;
   private readonly signalStore: SignalStore | null;
   private heartbeatEngine: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
+  private readonly cliExecutor: CliExecutor | null;
+  private readonly cliRegistry: CliToolRegistry | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -105,6 +111,8 @@ export class ToolServer {
       this.intentStore = null;
       this.signalStore = null;
       this.heartbeatEngine = null;
+      this.cliExecutor = null;
+      this.cliRegistry = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -121,6 +129,8 @@ export class ToolServer {
       this.intentStore = deps.intentStore ?? null;
       this.signalStore = deps.signalStore ?? null;
       this.heartbeatEngine = deps.heartbeatEngine ?? null;
+      this.cliExecutor = deps.cliExecutor ?? null;
+      this.cliRegistry = deps.cliRegistry ?? null;
     }
     this.app = new Hono();
     this.setupRoutes();
@@ -1244,6 +1254,42 @@ export class ToolServer {
         return c.json({ ok: true, components: this.heartbeatEngine.getStatus() });
       } catch (err) {
         return c.json({ error: "Trigger failed" }, 500);
+      }
+    });
+
+    // ── CLI tool execution ──
+
+    const cliExecSchema = z.object({
+      action: z.string().min(1),
+    }).passthrough();
+
+    this.app.post("/cli/:toolName", async (c) => {
+      if (!this.cliExecutor || !this.cliRegistry) {
+        return c.json({ error: "CLI tools not configured" }, 503);
+      }
+
+      const toolName = c.req.param("toolName");
+      const parsed = cliExecSchema.safeParse(await c.req.json());
+      if (!parsed.success) {
+        return c.json({ error: "Invalid request", details: parsed.error.flatten() }, 400);
+      }
+
+      const { action, ...args } = parsed.data;
+
+      try {
+        const cmd = this.cliRegistry.buildCommand(
+          toolName,
+          action,
+          args as Record<string, string>,
+        );
+        const result = await this.cliExecutor.exec(cmd.binary, cmd.args);
+        return c.json(result);
+      } catch (err) {
+        this.logger.error({ err, toolName, action }, "CLI tool execution failed");
+        return c.json(
+          { ok: false, error: err instanceof Error ? err.message : String(err), exitCode: -1 },
+          400,
+        );
       }
     });
   }

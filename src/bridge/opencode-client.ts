@@ -146,10 +146,10 @@ export class OpenCodeBridge {
           }
 
           // Secondary: detect model completion without text response.
-          // Only count as "stable" when the LAST message is from the assistant
-          // (meaning the model had its turn and chose not to produce text).
-          // If the last message is a tool result, the model is still processing
-          // the result and may produce text next — keep waiting.
+          // OpenCode creates an empty assistant message (hasParts=false) as a
+          // placeholder while the model is still generating. Only count as
+          // "stable/complete" when the assistant message HAS parts (meaning
+          // the model finished generating but produced tool calls, not text).
           if (newMsgs.length > 0) {
             const lastMsg = newMsgs[newMsgs.length - 1];
 
@@ -170,15 +170,18 @@ export class OpenCodeBridge {
               );
             }
 
-            if (lastMsg.role === "assistant") {
-              // Model had its turn — count stability
+            // Assistant message with hasParts=false is a placeholder — model
+            // is still generating. Don't count toward stability.
+            const isPlaceholder = lastMsg.role === "assistant" && !lastMsg.hasParts;
+
+            if (!isPlaceholder && lastMsg.role === "assistant" && lastMsg.hasParts) {
+              // Model finished its turn WITH parts but no text → tool calls only
               if (newMsgs.length === lastNewCount) {
                 stablePolls++;
               } else {
                 stablePolls = 0;
                 lastNewCount = newMsgs.length;
               }
-              // 5 stable polls = 10s of no new messages after model's last turn
               if (stablePolls >= 5) {
                 this.logger.info(
                   { sessionId, newMessages: newMsgs.length },
@@ -186,9 +189,12 @@ export class OpenCodeBridge {
                 );
                 return "";
               }
-            } else {
+            } else if (!isPlaceholder) {
               // Tool result or other non-assistant message — model still processing
               stablePolls = 0;
+              lastNewCount = newMsgs.length;
+            } else {
+              // Placeholder — just update count tracking, don't touch stability
               lastNewCount = newMsgs.length;
             }
           }

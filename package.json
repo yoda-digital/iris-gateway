@@ -7,6 +7,7 @@
     "type": "git",
     "url": "https://github.com/yoda-digital/iris-gateway.git"
   },
+  "packageManager": "pnpm@10.29.2",
   "type": "module",
   "engines": {
     "node": ">=22"

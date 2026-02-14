@@ -140,6 +140,37 @@ const proactiveSchema = z.object({
   }).default({}),
 });
 
+const onboardingSchema = z.object({
+  enabled: z.boolean().default(false),
+  enricher: z.object({
+    enabled: z.boolean().default(true),
+    signalRetentionDays: z.number().positive().default(90),
+    consolidateIntervalMs: z.number().positive().default(3_600_000),
+  }).default({}),
+  firstContact: z.object({
+    enabled: z.boolean().default(true),
+  }).default({}),
+});
+
+const heartbeatSchema = z.object({
+  enabled: z.boolean().default(false),
+  intervals: z.object({
+    healthy: z.number().positive().default(60_000),
+    degraded: z.number().positive().default(15_000),
+    critical: z.number().positive().default(5_000),
+  }).default({}),
+  selfHeal: z.object({
+    enabled: z.boolean().default(true),
+    maxAttempts: z.number().int().positive().default(3),
+    backoffTicks: z.number().int().positive().default(3),
+  }).default({}),
+  activity: z.object({
+    enabled: z.boolean().default(true),
+    dormancyThresholdMs: z.number().positive().default(604_800_000),
+  }).default({}),
+  logRetentionDays: z.number().positive().default(30),
+});
+
 export const irisConfigSchema = z.object({
   gateway: gatewaySchema.default({}),
   channels: z.record(z.string(), channelAccountSchema).default({}),
@@ -150,6 +181,8 @@ export const irisConfigSchema = z.object({
   governance: governanceSchema.default({}),
   policy: policySchema,
   proactive: proactiveSchema.optional(),
+  onboarding: onboardingSchema.optional(),
+  heartbeat: heartbeatSchema.optional(),
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
   canvas: z.object({

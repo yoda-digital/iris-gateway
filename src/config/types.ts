@@ -1,4 +1,6 @@
 import type { ProactiveConfig } from "../proactive/types.js";
+import type { OnboardingConfig } from "../onboarding/types.js";
+import type { HeartbeatConfig } from "../heartbeat/types.js";
 export type DmPolicyMode = "open" | "pairing" | "allowlist" | "disabled";
 
 export interface IrisConfig {
@@ -15,6 +17,8 @@ export interface IrisConfig {
   readonly autoReply?: AutoReplyConfig;
   readonly canvas?: CanvasConfig;
   readonly proactive?: ProactiveConfig;
+  readonly onboarding?: OnboardingConfig;
+  readonly heartbeat?: HeartbeatConfig;
 }
 
 export interface CanvasConfig {
@@ -185,3 +189,5 @@ export interface PolicyConfig {
   readonly enforcement: PolicyEnforcementConfig;
 }
 export type { ProactiveConfig } from "../proactive/types.js";
+export type { OnboardingConfig } from "../onboarding/types.js";
+export type { HeartbeatConfig } from "../heartbeat/types.js";

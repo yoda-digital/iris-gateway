@@ -207,6 +207,27 @@ const heartbeatSchema = z.object({
   })).optional(),
 });
 
+const cliActionSchema = z.object({
+  subcommand: z.array(z.string().min(1)),
+  positional: z.array(z.string().min(1)).optional(),
+  flags: z.array(z.string().min(1)).optional(),
+});
+
+const cliToolSchema = z.object({
+  binary: z.string().min(1),
+  description: z.string().min(1),
+  actions: z.record(z.string(), cliActionSchema),
+});
+
+const cliSchema = z.object({
+  enabled: z.boolean().default(false),
+  timeout: z.number().positive().default(10_000),
+  sandbox: z.object({
+    allowedBinaries: z.array(z.string().min(1)).default([]),
+  }).default({}),
+  tools: z.record(z.string(), cliToolSchema).default({}),
+});
+
 export const irisConfigSchema = z.object({
   gateway: gatewaySchema.default({}),
   channels: z.record(z.string(), channelAccountSchema).default({}),
@@ -219,6 +240,7 @@ export const irisConfigSchema = z.object({
   proactive: proactiveSchema.optional(),
   onboarding: onboardingSchema.optional(),
   heartbeat: heartbeatSchema.optional(),
+  cli: cliSchema.optional(),
   mcp: mcpSchema.default({}),
   plugins: z.array(z.string()).optional(),
   canvas: z.object({

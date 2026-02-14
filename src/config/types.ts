@@ -19,6 +19,7 @@ export interface IrisConfig {
   readonly proactive?: ProactiveConfig;
   readonly onboarding?: OnboardingConfig;
   readonly heartbeat?: HeartbeatConfig;
+  readonly cli?: import("../cli/types.js").CliConfig;
 }
 
 export interface CanvasConfig {
@@ -191,3 +192,4 @@ export interface PolicyConfig {
 export type { ProactiveConfig } from "../proactive/types.js";
 export type { OnboardingConfig } from "../onboarding/types.js";
 export type { HeartbeatConfig } from "../heartbeat/types.js";
+export type { CliConfig } from "../cli/types.js";

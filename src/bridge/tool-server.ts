@@ -705,6 +705,16 @@ export class ToolServer {
       "heartbeat_trigger — Manually trigger a heartbeat check for an agent",
     ];
 
+    // Dynamically add CLI tools to catalog
+    if (this.cliRegistry) {
+      for (const toolName of this.cliRegistry.listTools()) {
+        const def = this.cliRegistry.getToolDef(toolName);
+        if (def) {
+          irisToolCatalog.push(`${toolName} — ${def.description}`);
+        }
+      }
+    }
+
     // Helper: build Iris architecture context block for agent prompts
     const buildIrisContext = (agentName: string, agentDescription: string) => {
       const availableSkills: string[] = [];

@@ -69,10 +69,81 @@ function loadPluginTools(): Record<string, ReturnType<typeof tool>> {
   return tools;
 }
 
+interface CliToolManifest {
+  [toolName: string]: {
+    description: string;
+    actions: Record<string, {
+      positional?: string[];
+      flags?: string[];
+    }>;
+  };
+}
+
+function loadCliTools(): Record<string, ReturnType<typeof tool>> {
+  const manifestPath =
+    process.env.IRIS_STATE_DIR
+      ? join(process.env.IRIS_STATE_DIR, "cli-tools.json")
+      : join(homedir(), ".iris", "cli-tools.json");
+
+  let manifest: CliToolManifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as CliToolManifest;
+  } catch {
+    return {};
+  }
+
+  const tools: Record<string, ReturnType<typeof tool>> = {};
+  for (const [name, def] of Object.entries(manifest)) {
+    // Build action enum description
+    const actionDocs = Object.entries(def.actions)
+      .map(([action, actionDef]) => {
+        const parts = [action];
+        if (actionDef.positional?.length) parts.push(`(args: ${actionDef.positional.join(", ")})`);
+        if (actionDef.flags?.length) parts.push(`[flags: ${actionDef.flags.join(", ")}]`);
+        return `  - ${parts.join(" ")}`;
+      })
+      .join("\n");
+
+    const actionNames = Object.keys(def.actions);
+
+    // Collect all possible arg names across all actions
+    const allArgs = new Set<string>();
+    for (const actionDef of Object.values(def.actions)) {
+      if (actionDef.positional) actionDef.positional.forEach((a) => allArgs.add(a));
+      if (actionDef.flags) actionDef.flags.forEach((a) => allArgs.add(a));
+    }
+
+    const toolArgs: Record<string, ReturnType<typeof tool.schema.string>> = {
+      action: tool.schema
+        .string()
+        .describe(`Action to perform. One of: ${actionNames.join(", ")}`),
+    };
+
+    for (const argName of allArgs) {
+      toolArgs[argName] = tool.schema
+        .string()
+        .optional()
+        .describe(`Argument for CLI tool (used by actions that need it)`);
+    }
+
+    tools[name] = tool({
+      description: `${def.description}\n\nAvailable actions:\n${actionDocs}`,
+      args: toolArgs,
+      async execute(execArgs) {
+        return JSON.stringify(
+          await irisPost(`/cli/${name}`, execArgs),
+        );
+      },
+    });
+  }
+  return tools;
+}
+
 export default (async ({ client }) => ({
   // ── TOOLS ──
   tool: {
     ...loadPluginTools(),
+    ...loadCliTools(),
     send_message: tool({
       description: "Send a text message to a user on a messaging channel",
       args: {

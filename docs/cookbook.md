@@ -1284,3 +1284,84 @@ proactive_scan({ thresholdMs: 604800000 })  // 7 days
   }
 }
 ```
+
+## Intelligence Layer (v0.2)
+
+### Overview
+
+Seven deterministic subsystems — zero LLM cost, all pure Node.js + SQLite. Initialized automatically in `lifecycle.ts`. Connected via a typed, synchronous event bus (`IntelligenceBus`) that delivers events in <5ms.
+
+### Signal Inference Engine
+
+Derives higher-order signals from raw profile data. Five built-in rules:
+
+| Rule | Input | Output | Cooldown |
+|------|-------|--------|----------|
+| `timezone_from_hours` | active_hour signals | UTC offset estimate | 6h |
+| `language_stability` | language signals | stable/bilingual/unstable | 4h |
+| `engagement_trend` | active_hour signals | rising/stable/declining | 1h |
+| `response_cadence` | active_hour signals | realtime/active/async/slow | 1h |
+| `session_pattern` | active_hour signals | burst/moderate/extended | 2h |
+
+Runs automatically on every inbound message (after profile enrichment).
+
+### Event-Driven Triggers
+
+Synchronous rules evaluated in the message pipeline:
+
+| Trigger | Detection | Action |
+|---------|-----------|--------|
+| `tomorrow_intent` | "tomorrow" + "will" in 7 languages | Creates follow-up intent |
+| `date_mention` | Date patterns (DD/MM/YYYY) | Flags for AI prompt |
+| `dormancy_recovery` | Rising engagement after decline | Creates welcome-back intent |
+| `engagement_drop` | Declining engagement trend | Flags AI to be extra helpful |
+| `time_mention` | Time patterns ("at 3pm") | Flags for AI prompt |
+
+### Goal Tracking
+
+```
+goal_create({ description: "Learn Spanish", successCriteria: "Hold 5min conversation", nextAction: "Practice Duolingo", priority: 80 })
+goal_update({ id: "...", progressNote: "Completed lesson 5", nextAction: "Try conversation practice" })
+goal_complete({ id: "..." })
+goal_list()
+goal_pause({ id: "..." })
+goal_resume({ id: "..." })
+goal_abandon({ id: "..." })
+```
+
+Goals persist across sessions and are injected into every system prompt via PromptAssembler.
+
+### Narrative Arcs
+
+Automatically detected from conversation keywords. When vault facts share enough keyword overlap, they're grouped into a narrative arc (e.g., "job search", "wedding planning"). Arcs go stale after 14 days without new entries.
+
+```
+arc_list()
+arc_resolve({ id: "...", summary: "Got the job offer" })
+```
+
+### Outcome-Aware Proactive Loop
+
+Every proactive message sent by PulseEngine is categorized (task/work/health/hobby/social/reminder/general) and tracked. When a user replies, it's recorded as engagement. The OutcomeAnalyzer determines:
+
+- Category engagement rates (which types of messages get responses)
+- Timing patterns (best/worst hours and days)
+- Whether to send a proactive message based on historical data
+
+### Cross-Channel Intelligence
+
+For multi-channel users, resolves:
+- Which channels they're active on
+- Message count per channel in last 7 days
+- Preferred channel (weighted: 70% activity, 30% recency)
+- Presence hint (online_now/recent/away)
+
+### Health Gate
+
+Throttles proactive activity based on system health:
+- `normal`: Full activity
+- `reduced`: Skip low-priority proactive messages
+- `minimal`: Only critical messages
+- `paused`: No proactive activity
+
+Uses linear regression trend detection on heartbeat data to predict threshold breaches.

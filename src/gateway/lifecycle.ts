@@ -40,6 +40,19 @@ import { ActivityTracker } from "../heartbeat/activity.js";
 import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
 import { CliExecutor } from "../cli/executor.js";
 import { CliToolRegistry } from "../cli/registry.js";
+import { IntelligenceStore } from "../intelligence/store.js";
+import { IntelligenceBus } from "../intelligence/bus.js";
+import { InferenceEngine } from "../intelligence/inference/engine.js";
+import { builtinInferenceRules } from "../intelligence/inference/rules/index.js";
+import { TriggerEvaluator } from "../intelligence/triggers/evaluator.js";
+import { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
+import { ArcDetector } from "../intelligence/arcs/detector.js";
+import { ArcLifecycle } from "../intelligence/arcs/lifecycle.js";
+import { GoalLifecycle } from "../intelligence/goals/lifecycle.js";
+import { CrossChannelResolver } from "../intelligence/cross-channel/resolver.js";
+import { TrendDetector } from "../intelligence/health/trend-detector.js";
+import { HealthGate } from "../intelligence/health/gate.js";
+import { PromptAssembler } from "../intelligence/prompt-assembler.js";
 import { join } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -66,6 +79,17 @@ export interface GatewayContext {
   profileEnricher: ProfileEnricher | null;
   heartbeatEngine: HeartbeatEngine | null;
   activityTracker: ActivityTracker | null;
+  intelligenceBus: IntelligenceBus | null;
+  intelligenceStore: IntelligenceStore | null;
+  inferenceEngine: InferenceEngine | null;
+  triggerEvaluator: TriggerEvaluator | null;
+  outcomeAnalyzer: OutcomeAnalyzer | null;
+  arcDetector: ArcDetector | null;
+  arcLifecycle: ArcLifecycle | null;
+  goalLifecycle: GoalLifecycle | null;
+  crossChannelResolver: CrossChannelResolver | null;
+  healthGate: HealthGate | null;
+  promptAssembler: PromptAssembler | null;
 }
 
 const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
@@ -196,7 +220,58 @@ export async function startGateway(
     logger.info("Heartbeat store initialized");
   }
 
-  // 5.76 Initialize CLI tools
+  // 5.76 Initialize intelligence layer
+  let intelligenceBus: IntelligenceBus | null = null;
+  let intelligenceStore: IntelligenceStore | null = null;
+  let inferenceEngine: InferenceEngine | null = null;
+  let triggerEvaluator: TriggerEvaluator | null = null;
+  let outcomeAnalyzer: OutcomeAnalyzer | null = null;
+  let arcDetector: ArcDetector | null = null;
+  let arcLifecycle: ArcLifecycle | null = null;
+  let goalLifecycle: GoalLifecycle | null = null;
+  let crossChannelResolver: CrossChannelResolver | null = null;
+  let trendDetector: TrendDetector | null = null;
+  let healthGate: HealthGate | null = null;
+  let promptAssembler: PromptAssembler | null = null;
+
+  {
+    intelligenceBus = new IntelligenceBus();
+    intelligenceStore = new IntelligenceStore(vaultDb);
+
+    // Phase 1: Inference engine + triggers
+    if (signalStore) {
+      inferenceEngine = new InferenceEngine(intelligenceStore, signalStore, intelligenceBus, builtinInferenceRules, logger);
+    }
+    triggerEvaluator = new TriggerEvaluator(intelligenceStore, intentStore, intelligenceBus, logger);
+
+    // Phase 2: Outcomes + arcs
+    outcomeAnalyzer = new OutcomeAnalyzer(intelligenceStore, intelligenceBus, logger);
+    arcDetector = new ArcDetector(intelligenceStore, intelligenceBus, logger);
+    arcLifecycle = new ArcLifecycle(intelligenceStore, intelligenceBus, logger);
+
+    // Phase 3: Goals + cross-channel
+    goalLifecycle = new GoalLifecycle(intelligenceStore, intelligenceBus, logger);
+    crossChannelResolver = new CrossChannelResolver(vaultDb, intelligenceBus, logger);
+
+    // Phase 4: Health trends + gate (requires heartbeat store)
+    if (heartbeatStore) {
+      trendDetector = new TrendDetector(vaultDb, logger);
+      healthGate = new HealthGate(heartbeatStore, trendDetector, intelligenceBus, logger);
+    }
+
+    // Prompt assembler — wires all context providers
+    promptAssembler = new PromptAssembler(
+      arcLifecycle,
+      goalLifecycle,
+      outcomeAnalyzer,
+      crossChannelResolver,
+      healthGate,
+    );
+
+    logger.info("Intelligence layer initialized (bus, store, inference, triggers, outcomes, arcs, goals, cross-channel, health gate, prompt assembler)");
+  }
+
+  // 5.77 Initialize CLI tools
   let cliExecutor: CliExecutor | null = null;
   let cliRegistry: CliToolRegistry | null = null;
   if (config.cli?.enabled) {
@@ -298,6 +373,12 @@ export async function startGateway(
     signalStore,
     cliExecutor,
     cliRegistry,
+    intelligenceStore,
+    goalLifecycle,
+    arcLifecycle,
+    arcDetector,
+    outcomeAnalyzer,
+    promptAssembler,
   });
   await toolServer.start();
 
@@ -370,6 +451,23 @@ export async function startGateway(
       // Track activity for heartbeat
       if (activityTracker) {
         activityTracker.recordMessage(msg.senderId, msg.channelId);
+      }
+
+      // Intelligence: run inference engine (derives higher-order signals)
+      if (inferenceEngine) {
+        inferenceEngine.evaluate(msg.senderId, msg.channelId).catch((err) => {
+          logger.error({ err }, "Inference engine evaluation failed");
+        });
+      }
+
+      // Intelligence: record engagement with proactive messages
+      if (outcomeAnalyzer) {
+        outcomeAnalyzer.recordEngagement(msg.senderId);
+      }
+
+      // Intelligence: process message as potential arc entry
+      if (arcDetector && msg.text) {
+        arcDetector.processMemory(msg.senderId, msg.text, undefined, "conversation");
       }
 
       router.handleInbound(msg).catch((err) => {
@@ -486,6 +584,9 @@ export async function startGateway(
     // Stop heartbeat engine
     if (heartbeatEngine) heartbeatEngine.stop();
 
+    // Dispose intelligence bus
+    if (intelligenceBus) intelligenceBus.dispose();
+
     // Stop accepting new messages first
     for (const adapter of registry.list()) {
       try {
@@ -573,6 +674,17 @@ export async function startGateway(
     profileEnricher,
     heartbeatEngine,
     activityTracker,
+    intelligenceBus,
+    intelligenceStore,
+    inferenceEngine,
+    triggerEvaluator,
+    outcomeAnalyzer,
+    arcDetector,
+    arcLifecycle,
+    goalLifecycle,
+    crossChannelResolver,
+    healthGate,
+    promptAssembler,
   };
 }
 

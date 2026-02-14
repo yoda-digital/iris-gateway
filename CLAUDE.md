@@ -68,7 +68,9 @@ Hono HTTP server (port 19877) that handles all tool execution. This is the large
 - `/rules/*` — AGENTS.md read/update/append
 - `/tools/*` — custom tools discovery and scaffolding
 - `/canvas/*` — Canvas UI updates
-- `/session/*` — system prompt context building
+- `/session/*` — system prompt context building (includes intelligence context via PromptAssembler)
+- `/goals/*` — goal CRUD (create, update, complete, pause, resume, abandon, list)
+- `/arcs/*` — narrative arc management (list, resolve, add-memory)
 - `/cli/:toolName` — CLI tool execution (sandboxed binary calls)
 - `/onboarding/*` — profile enrichment
 - `/proactive/*` — intent CRUD, quota, dormancy
@@ -86,7 +88,7 @@ Each layer can only narrow further, never widen. Policy is also checked at agent
 
 ### Vault (Persistent Memory)
 
-SQLite database at `~/.iris/vault.db` with FTS5 full-text search. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`. The `experimental.chat.system.transform` hook injects user profile + relevant memories into every system prompt automatically.
+SQLite database at `~/.iris/vault.db` with FTS5 full-text search. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`, `derived_signals`, `inference_log`, `proactive_outcomes`, `memory_arcs`, `arc_entries`, `goals`. The `experimental.chat.system.transform` hook injects user profile + relevant memories + intelligence context into every system prompt automatically.
 
 ### Onboarding
 
@@ -95,6 +97,24 @@ Two-layer user profiling (`src/onboarding/`). Layer 1: tinyld language detection
 ### Heartbeat
 
 Adaptive health monitoring (`src/heartbeat/`). Five checkers (bridge, channels, vault, sessions, memory) on intervals that tighten as health degrades (60s/15s/5s). Self-healing with backoff. Multi-agent support. Active hours gating (IANA timezone). Alert dedup. Empty-check optimization with exponential backoff. Request coalescing.
+
+### Intelligence Layer
+
+Seven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pure Node.js + SQLite:
+
+- **IntelligenceBus** (`bus.ts`) — typed synchronous event emitter connecting all subsystems.
+- **IntelligenceStore** (`store.ts`) — single SQLite store managing 6 tables (derived_signals, inference_log, proactive_outcomes, memory_arcs, arc_entries, goals).
+- **InferenceEngine** (`inference/engine.ts`) — runs 5 statistical rules (timezone, language stability, engagement trend, response cadence, session pattern) with cooldowns.
+- **TriggerEvaluator** (`triggers/evaluator.ts`) — synchronous regex/signal rules in the message pipeline.
+- **OutcomeAnalyzer** (`outcomes/analyzer.ts`) — category-segmented engagement tracking with timing patterns.
+- **ArcDetector** (`arcs/detector.ts`) — detects narrative threads from keyword overlap.
+- **GoalLifecycle** (`goals/lifecycle.ts`) — persistent goal state machine (active/paused/completed/abandoned).
+- **CrossChannelResolver** (`cross-channel/resolver.ts`) — unified presence/preference detection.
+- **TrendDetector** (`health/trend-detector.ts`) — linear regression on heartbeat metrics.
+- **HealthGate** (`health/gate.ts`) — throttles proactive activity based on system health.
+- **PromptAssembler** (`prompt-assembler.ts`) — builds structured prompt sections from all intelligence sources.
+
+Initialized in `lifecycle.ts` after onboarding. Wired into the message pipeline (adapter handler) for inference + trigger evaluation + engagement marking + arc detection.
 
 ### CLI Tools
 
@@ -146,6 +166,9 @@ Known: 6 pre-existing test failures in `pipeline.test.ts` and `message-router.te
 | `src/cli/registry.ts` | Config-driven tool-to-command mapper |
 | `src/onboarding/enricher.ts` | tinyld language + Unicode script + statistical profiling |
 | `src/heartbeat/engine.ts` | Multi-agent health orchestrator |
+| `src/intelligence/store.ts` | Intelligence store — 6 SQLite tables for all intelligence data |
+| `src/intelligence/bus.ts` | Typed event bus connecting all intelligence subsystems |
+| `src/intelligence/prompt-assembler.ts` | Structured prompt builder (arcs, goals, outcomes, health) |
 | `AGENTS.md` | AI behavioral rules (injected into all agents) |
 | `docs/cookbook.md` | Comprehensive usage patterns and examples |
 

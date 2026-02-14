@@ -17,6 +17,12 @@ import type { IntentStore } from "../proactive/store.js";
 import type { SignalStore } from "../onboarding/signals.js";
 import type { CliExecutor } from "../cli/executor.js";
 import type { CliToolRegistry } from "../cli/registry.js";
+import type { IntelligenceStore } from "../intelligence/store.js";
+import type { GoalLifecycle } from "../intelligence/goals/lifecycle.js";
+import type { ArcLifecycle } from "../intelligence/arcs/lifecycle.js";
+import type { ArcDetector } from "../intelligence/arcs/detector.js";
+import type { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
+import type { PromptAssembler } from "../intelligence/prompt-assembler.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -66,6 +72,12 @@ export interface ToolServerDeps {
   heartbeatEngine?: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
   cliExecutor?: CliExecutor | null;
   cliRegistry?: CliToolRegistry | null;
+  intelligenceStore?: IntelligenceStore | null;
+  goalLifecycle?: GoalLifecycle | null;
+  arcLifecycle?: ArcLifecycle | null;
+  arcDetector?: ArcDetector | null;
+  outcomeAnalyzer?: OutcomeAnalyzer | null;
+  promptAssembler?: PromptAssembler | null;
 }
 
 export class ToolServer {
@@ -87,6 +99,12 @@ export class ToolServer {
   private heartbeatEngine: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
   private readonly cliExecutor: CliExecutor | null;
   private readonly cliRegistry: CliToolRegistry | null;
+  private readonly intelligenceStore: IntelligenceStore | null;
+  private readonly goalLifecycle: GoalLifecycle | null;
+  private readonly arcLifecycle: ArcLifecycle | null;
+  private readonly arcDetector: ArcDetector | null;
+  private readonly outcomeAnalyzer: OutcomeAnalyzer | null;
+  private readonly promptAssembler: PromptAssembler | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -113,6 +131,12 @@ export class ToolServer {
       this.heartbeatEngine = null;
       this.cliExecutor = null;
       this.cliRegistry = null;
+      this.intelligenceStore = null;
+      this.goalLifecycle = null;
+      this.arcLifecycle = null;
+      this.arcDetector = null;
+      this.outcomeAnalyzer = null;
+      this.promptAssembler = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
       this.registry = deps.registry;
@@ -131,6 +155,12 @@ export class ToolServer {
       this.heartbeatEngine = deps.heartbeatEngine ?? null;
       this.cliExecutor = deps.cliExecutor ?? null;
       this.cliRegistry = deps.cliRegistry ?? null;
+      this.intelligenceStore = deps.intelligenceStore ?? null;
+      this.goalLifecycle = deps.goalLifecycle ?? null;
+      this.arcLifecycle = deps.arcLifecycle ?? null;
+      this.arcDetector = deps.arcDetector ?? null;
+      this.outcomeAnalyzer = deps.outcomeAnalyzer ?? null;
+      this.promptAssembler = deps.promptAssembler ?? null;
     }
     this.app = new Hono();
     this.setupMiddleware();
@@ -1175,10 +1205,20 @@ export class ToolServer {
         }
       }
 
+      // Build intelligence context from prompt assembler
+      let intelligenceContext: string | null = null;
+      if (this.promptAssembler && this.sessionMap && body.sessionID) {
+        const resolvedEntry = await this.sessionMap.findBySessionId(body.sessionID);
+        if (resolvedEntry) {
+          intelligenceContext = this.promptAssembler.render(resolvedEntry.senderId);
+        }
+      }
+
       return c.json({
         directives,
         channelRules,
         userContext,
+        intelligenceContext,
       });
     });
 
@@ -1300,6 +1340,136 @@ export class ToolServer {
       }
 
       this.logger.debug({ senderId, field, value, confidence }, "Profile enriched via LLM");
+      return c.json({ ok: true });
+    });
+
+    // ── Goal endpoints ──
+
+    this.app.post("/goals/create", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const sessionId = body.sessionID ?? body.sessionId ?? "";
+
+      let senderId = body.senderId ?? "";
+      let channelId = body.channelId ?? "";
+      if (sessionId && this.sessionMap && (!senderId || !channelId)) {
+        const entry = await this.sessionMap.findBySessionId(sessionId);
+        if (entry) {
+          senderId = senderId || entry.senderId;
+          channelId = channelId || entry.channelId;
+        }
+      }
+
+      const goal = this.goalLifecycle.create({
+        senderId,
+        channelId,
+        description: body.description ?? "",
+        arcId: body.arcId ?? undefined,
+        successCriteria: body.successCriteria ?? undefined,
+        nextAction: body.nextAction ?? undefined,
+        nextActionDue: body.nextActionDue ?? undefined,
+        priority: body.priority ?? undefined,
+      });
+      return c.json(goal);
+    });
+
+    this.app.post("/goals/update", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const id = body.id ?? "";
+      const updated = this.goalLifecycle.progress(
+        id,
+        body.progressNote ?? "",
+        body.nextAction ?? undefined,
+        body.nextActionDue ?? undefined,
+      );
+      if (!updated) return c.json({ error: "Goal not found" }, 404);
+      return c.json(updated);
+    });
+
+    this.app.post("/goals/complete", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const result = this.goalLifecycle.transition(body.id ?? "", "completed");
+      if (!result) return c.json({ error: "Goal not found or invalid transition" }, 400);
+      return c.json(result);
+    });
+
+    this.app.post("/goals/pause", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const result = this.goalLifecycle.transition(body.id ?? "", "paused");
+      if (!result) return c.json({ error: "Goal not found or invalid transition" }, 400);
+      return c.json(result);
+    });
+
+    this.app.post("/goals/resume", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const result = this.goalLifecycle.transition(body.id ?? "", "active");
+      if (!result) return c.json({ error: "Goal not found or invalid transition" }, 400);
+      return c.json(result);
+    });
+
+    this.app.post("/goals/abandon", async (c) => {
+      if (!this.goalLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const result = this.goalLifecycle.transition(body.id ?? "", "abandoned");
+      if (!result) return c.json({ error: "Goal not found or invalid transition" }, 400);
+      return c.json(result);
+    });
+
+    this.app.post("/goals/list", async (c) => {
+      if (!this.goalLifecycle) return c.json({ active: [], paused: [] });
+      const body = await c.req.json();
+      const sessionId = body.sessionID ?? body.sessionId ?? "";
+
+      let senderId = body.senderId ?? "";
+      if (sessionId && this.sessionMap && !senderId) {
+        const entry = await this.sessionMap.findBySessionId(sessionId);
+        if (entry) senderId = entry.senderId;
+      }
+      if (!senderId) return c.json({ active: [], paused: [] });
+      return c.json(this.goalLifecycle.listGoals(senderId));
+    });
+
+    // ── Arc endpoints ──
+
+    this.app.post("/arcs/list", async (c) => {
+      if (!this.arcLifecycle) return c.json({ arcs: [] });
+      if (!this.intelligenceStore) return c.json({ arcs: [] });
+      const body = await c.req.json();
+      const sessionId = body.sessionID ?? body.sessionId ?? "";
+
+      let senderId = body.senderId ?? "";
+      if (sessionId && this.sessionMap && !senderId) {
+        const entry = await this.sessionMap.findBySessionId(sessionId);
+        if (entry) senderId = entry.senderId;
+      }
+      if (!senderId) return c.json({ arcs: [] });
+      return c.json({ arcs: this.intelligenceStore.getArcsBySender(senderId) });
+    });
+
+    this.app.post("/arcs/resolve", async (c) => {
+      if (!this.arcLifecycle) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      this.arcLifecycle.resolve(body.id ?? "", body.summary ?? undefined);
+      return c.json({ ok: true });
+    });
+
+    this.app.post("/arcs/add-memory", async (c) => {
+      if (!this.arcDetector) return c.json({ error: "Intelligence not enabled" }, 503);
+      const body = await c.req.json();
+      const sessionId = body.sessionID ?? body.sessionId ?? "";
+
+      let senderId = body.senderId ?? "";
+      if (sessionId && this.sessionMap && !senderId) {
+        const entry = await this.sessionMap.findBySessionId(sessionId);
+        if (entry) senderId = entry.senderId;
+      }
+      if (!senderId) return c.json({ error: "Could not resolve sender" }, 400);
+
+      this.arcDetector.processMemory(senderId, body.content ?? "", body.memoryId, body.source ?? "tool");
       return c.json({ ok: true });
     });
 

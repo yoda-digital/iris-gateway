@@ -55,7 +55,7 @@ describe("HealthServer", () => {
 
       const body = await res.json();
       expect(body).toHaveProperty("status");
-      expect(body).toHaveProperty("version", "0.1.0");
+      expect(body).toHaveProperty("version", "0.2.0");
       expect(body).toHaveProperty("uptime");
       expect(body).toHaveProperty("uptimeHuman");
       expect(body).toHaveProperty("system");

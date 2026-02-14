@@ -2,7 +2,7 @@
 
 Multi-channel AI messaging gateway. Routes messages between Telegram, WhatsApp, Discord, Slack, and WebChat through [OpenCode CLI](https://github.com/nicholasgriffintn/opencode) with free models via OpenRouter.
 
-Learns users invisibly. Monitors its own health. Heals itself. Manages your calendar, email, contacts, and tasks through sandboxed CLI tools. As of February 2026, Arcee Trinity models (large + mini) work well for both chat and tool calling on the free tier.
+Learns users invisibly. Monitors its own health. Heals itself. Tracks goals, detects narrative arcs, tunes proactive messaging from engagement data, and routes intelligence across channels. Manages your calendar, email, contacts, and tasks through sandboxed CLI tools. As of February 2026, Arcee Trinity models (large + mini) work well for both chat and tool calling on the free tier.
 
 ## Requirements
 
@@ -83,17 +83,20 @@ Two cooperating processes connected via HTTP IPC:
  Slack    --+      |          Engine        |         | Bridge     |
  WebChat  --+      v                        v         |            |
                Security              Stream           | Plugin SDK |
-               Gate                  Coalescer        | (30 tools) |
+               Gate                  Coalescer        | (40+ tools)|
                                                       +------+-----+
                               +--------+--------+--------+---+---+--------+
                               |        |        |        |       |        |
                            Vault    Policy   Govern.  Proact.  Heart.   CLI
                          (SQLite)  Engine    Engine   Engine   Engine   Exec.
-                                                                        |
-                                                               gog, bird, ...
+                              |                          |       |
+                        Intelligence Layer           Outcome  Trend
+                        (Bus, Inference,            Analyzer  Detector
+                         Triggers, Arcs,              |        |
+                         Goals, CrossCh)          HealthGate  gog, ...
 ```
 
-Inbound: platform message -> adapter normalize -> security check -> auto-reply check -> onboarding enrichment -> session resolve -> OpenCode prompt -> streaming coalesce -> deliver.
+Inbound: platform message -> adapter normalize -> security check -> auto-reply check -> onboarding enrichment -> inference engine -> trigger evaluator -> session resolve -> OpenCode prompt -> streaming coalesce -> deliver.
 
 ### Two-process boundary
 
@@ -101,7 +104,7 @@ The AI calls tools -> plugin makes HTTP POST to `http://127.0.0.1:19877/tool/*` 
 
 ### Tools
 
-30 built-in tools registered in the plugin:
+40+ built-in tools registered in the plugin:
 
 | Tool | Purpose |
 |------|---------|
@@ -137,13 +140,22 @@ The AI calls tools -> plugin makes HTTP POST to `http://127.0.0.1:19877/tool/*` 
 | `enrich_profile` | Store learned user attribute |
 | `heartbeat_status` | Check system health across agents |
 | `heartbeat_trigger` | Force immediate health check |
+| `goal_create` | Create a persistent goal for the user |
+| `goal_update` | Update progress on an existing goal |
+| `goal_complete` | Mark a goal as achieved |
+| `goal_list` | List active and paused goals |
+| `goal_pause` | Pause a goal temporarily |
+| `goal_resume` | Resume a paused goal |
+| `goal_abandon` | Mark a goal as no longer relevant |
+| `arc_list` | List active narrative arcs |
+| `arc_resolve` | Mark a narrative arc as concluded |
 | `google_calendar` | Manage Calendar (via gog CLI) |
 | `google_email` | Search/manage Gmail (via gog CLI) |
 | `google_contacts` | Manage Contacts (via gog CLI) |
 | `google_tasks` | Manage Tasks (via gog CLI) |
 | `google_drive` | Browse/search Drive (via gog CLI) |
 
-Plus `proactive_quota`, `proactive_scan`, `proactive_execute`, `proactive_engage` for the proactive system.
+Plus `proactive_quota`, `proactive_scan`, `proactive_execute`, `proactive_engage` for the proactive system, and `arcs/add-memory` as an internal endpoint.
 
 ### Hooks
 
@@ -177,6 +189,20 @@ Adaptive health monitoring with self-healing. Five parallel checkers (bridge, ch
 - Empty-check + exponential backoff: skip full check when all healthy and unchanged.
 - Coalescing: debounce rapid requests, defer when AI queue is busy.
 
+### Intelligence Layer (v0.2)
+
+Seven deterministic subsystems — zero LLM cost, all pure Node.js + SQLite:
+
+1. **Signal Inference Engine** — derives higher-order signals (timezone, language stability, engagement trend, response cadence, session pattern) from raw profile signals using statistical rules with cooldowns.
+2. **Event-Driven Triggers** — synchronous regex and signal-threshold rules that fire in the message pipeline (tomorrow-intent, date/time mentions, dormancy recovery, engagement drops).
+3. **Outcome-Aware Proactive Loop** — category-segmented engagement tracking (task/work/health/hobby/social/reminder) with timing patterns, fed back into proactive decision-making.
+4. **Memory Arcs** — temporal narrative threads that track evolving situations. Detected from keyword overlap in conversation. Auto-stale after 14 days.
+5. **Goal Tracking** — persistent goals with state machine (active/paused/completed/abandoned), success criteria, next-action queue. Injected into every system prompt.
+6. **Cross-Channel Intelligence** — unified presence/preference detection across channels. Determines which channel a user prefers based on activity patterns.
+7. **Self-Tuning Heartbeat** — linear regression trend detection on health metrics, predictive threshold breach detection, health-aware proactive throttling (normal/reduced/minimal/paused).
+
+All subsystems connected via **IntelligenceBus** — a typed, synchronous, in-process event emitter (<5ms per message). Context assembled by **PromptAssembler** into structured sections (arcs, goals, proactive insights, cross-channel, trigger flags, health hints) injected into every system prompt.
+
 ### CLI Tools
 
 Sandboxed integration with local CLI binaries. Config-driven: declare a binary, its subcommands, and which arguments each action accepts. The executor validates against a whitelist before spawning (execFile, not exec -- no shell injection). Always appends `--json --no-input`.
@@ -185,7 +211,7 @@ Currently wraps `gog` (Google Calendar, Gmail, Contacts, Tasks, Drive). Extensib
 
 ### Memory Vault
 
-SQLite database at `~/.iris/vault.db`. FTS5 full-text search on memory content. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`.
+SQLite database at `~/.iris/vault.db`. FTS5 full-text search on memory content. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`, `derived_signals`, `inference_log`, `proactive_outcomes`, `memory_arcs`, `arc_entries`, `goals`.
 
 The `experimental.chat.system.transform` hook auto-injects user profile and relevant memories into every system prompt.
 
@@ -278,6 +304,18 @@ src/
     types.ts            CliConfig, CliToolDef, CliExecResult
     program.ts          Iris CLI (clipanion)
     commands/           CLI command implementations
+  intelligence/         Intelligence layer (v0.2 — all deterministic, zero AI cost)
+    types.ts            All interfaces (signals, outcomes, arcs, goals, health, events)
+    bus.ts              Typed synchronous event bus
+    store.ts            SQLite store (6 new tables)
+    prompt-assembler.ts Structured prompt builder
+    inference/          Signal inference engine + 5 rules
+    triggers/           Event-driven trigger evaluator + builtin rules
+    outcomes/           Category-segmented engagement tracking
+    arcs/               Narrative arc detection + lifecycle
+    goals/              Goal state machine + lifecycle
+    cross-channel/      Unified presence/preference resolver
+    health/             Trend detector + health gate
   proactive/            Proactive follow-up system
     engine.ts           Pulse engine (poll, scan, quiet hours)
     store.ts            Intent/trigger persistence (SQLite)
@@ -290,7 +328,7 @@ src/
   utils/                Shared utilities
 
 .opencode/
-  plugin/iris.ts        THE plugin (40+ tools, 5 hooks, dynamic CLI/plugin tools)
+  plugin/iris.ts        THE plugin (40+ tools, 5 hooks, dynamic CLI/plugin tools, goal/arc tools)
   opencode.json         Model config, MCP servers, permissions
   agents/               chat.md (primary), moderator.md (subagent)
   skills/               greeting, help, moderation, onboarding, summarize, web-search,

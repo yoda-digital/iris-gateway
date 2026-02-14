@@ -31,7 +31,7 @@ export function createCli(): Cli {
   const cli = new Cli({
     binaryLabel: "Iris",
     binaryName: "iris",
-    binaryVersion: "0.1.0",
+    binaryVersion: "0.2.0",
   });
 
   cli.register(GatewayRunCommand);

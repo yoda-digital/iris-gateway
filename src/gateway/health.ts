@@ -37,7 +37,7 @@ export class HealthServer {
       const mem = process.memoryUsage();
       return c.json({
         status: opencodeHealthy && channels.length > 0 ? "ok" : "degraded",
-        version: "0.1.0",
+        version: "0.2.0",
         uptime: Date.now() - this.startedAt,
         uptimeHuman: formatUptime(Date.now() - this.startedAt),
         channels,

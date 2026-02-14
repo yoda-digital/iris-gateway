@@ -757,6 +757,133 @@ export default (async ({ client }) => ({
         );
       },
     }),
+
+    // ── Goal Tracking tools ──
+
+    goal_create: tool({
+      description:
+        "Create a goal for the user. Use when they mention something they want to achieve, " +
+        "a project they're working on, or a commitment they've made. Goals persist across sessions.",
+      args: {
+        description: tool.schema.string().describe("What the user wants to achieve"),
+        successCriteria: tool.schema.string().optional().describe("How to know the goal is done"),
+        nextAction: tool.schema.string().optional().describe("Next concrete step"),
+        nextActionDue: tool.schema.number().optional().describe("When next action is due (Unix ms)"),
+        priority: tool.schema.number().optional().describe("1-100 priority (default: 50)"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisPost("/goals/create", {
+            sessionID: (this as any).sessionID,
+            description: args.description,
+            successCriteria: args.successCriteria,
+            nextAction: args.nextAction,
+            nextActionDue: args.nextActionDue,
+            priority: args.priority,
+          }),
+        );
+      },
+    }),
+
+    goal_update: tool({
+      description:
+        "Update progress on an existing goal. Add a progress note and optionally set next action.",
+      args: {
+        id: tool.schema.string().describe("Goal ID"),
+        progressNote: tool.schema.string().describe("What progress was made"),
+        nextAction: tool.schema.string().optional().describe("New next action"),
+        nextActionDue: tool.schema.number().optional().describe("When next action is due (Unix ms)"),
+      },
+      async execute(args) {
+        return JSON.stringify(
+          await irisPost("/goals/update", {
+            id: args.id,
+            progressNote: args.progressNote,
+            nextAction: args.nextAction,
+            nextActionDue: args.nextActionDue,
+          }),
+        );
+      },
+    }),
+
+    goal_complete: tool({
+      description: "Mark a goal as completed. Use when the user achieves their goal.",
+      args: {
+        id: tool.schema.string().describe("Goal ID to complete"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/goals/complete", { id: args.id }));
+      },
+    }),
+
+    goal_list: tool({
+      description:
+        "List the user's active and paused goals. Use to check what they're working on.",
+      args: {},
+      async execute() {
+        return JSON.stringify(
+          await irisPost("/goals/list", {
+            sessionID: (this as any).sessionID,
+          }),
+        );
+      },
+    }),
+
+    goal_pause: tool({
+      description: "Pause a goal temporarily. Use when the user wants to focus on other things.",
+      args: {
+        id: tool.schema.string().describe("Goal ID to pause"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/goals/pause", { id: args.id }));
+      },
+    }),
+
+    goal_resume: tool({
+      description: "Resume a paused goal.",
+      args: {
+        id: tool.schema.string().describe("Goal ID to resume"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/goals/resume", { id: args.id }));
+      },
+    }),
+
+    goal_abandon: tool({
+      description: "Abandon a goal. Use when the user explicitly gives up or the goal is no longer relevant.",
+      args: {
+        id: tool.schema.string().describe("Goal ID to abandon"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/goals/abandon", { id: args.id }));
+      },
+    }),
+
+    // ── Arc tools ──
+
+    arc_list: tool({
+      description:
+        "List active narrative arcs (ongoing situations/threads) for the user.",
+      args: {},
+      async execute() {
+        return JSON.stringify(
+          await irisPost("/arcs/list", {
+            sessionID: (this as any).sessionID,
+          }),
+        );
+      },
+    }),
+
+    arc_resolve: tool({
+      description: "Mark a narrative arc as resolved. Use when a situation concludes.",
+      args: {
+        id: tool.schema.string().describe("Arc ID"),
+        summary: tool.schema.string().optional().describe("Resolution summary"),
+      },
+      async execute(args) {
+        return JSON.stringify(await irisPost("/arcs/resolve", { id: args.id, summary: args.summary }));
+      },
+    }),
   },
 
   // ── HOOKS ──
@@ -849,11 +976,15 @@ export default (async ({ client }) => ({
         directives?: string;
         channelRules?: string;
         userContext?: string;
+        intelligenceContext?: string;
       };
 
       if (ctx.directives) output.system.push(ctx.directives);
       if (ctx.channelRules) output.system.push(ctx.channelRules);
       if (ctx.userContext) output.system.push(ctx.userContext);
+
+      // Intelligence layer context (arcs, goals, proactive insights, cross-channel, health)
+      if (ctx.intelligenceContext) output.system.push(ctx.intelligenceContext);
 
       // Profile learning injection
       if (ctx.userContext) {
@@ -878,7 +1009,9 @@ export default (async ({ client }) => ({
 
           const block = [
             "[PROACTIVE INTELLIGENCE]",
-            "You have proactive follow-up capability. When appropriate, use proactive_intent to schedule check-ins.",
+            "You have proactive follow-up capability. Use proactive_intent to schedule check-ins.",
+            "You can track user goals with goal_create/goal_update/goal_complete/goal_list.",
+            "Narrative arcs (ongoing situations) are tracked automatically — use arc_list to review.",
             pendingCount > 0
               ? `You have ${pendingCount} pending proactive items.`
               : "No pending items.",

@@ -38,18 +38,100 @@ describe("ProfileEnricher", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("detects language from text", () => {
+  it("detects English from text via tinyld", () => {
     enricher.enrich({
       senderId: "user1",
       channelId: "telegram",
-      text: "Salut, cum esti?",
+      text: "Hello, how are you doing today? I wanted to ask about the weather.",
       timestamp: Date.now(),
     });
 
     const signal = signalStore.getLatestSignal("user1", "telegram", "language");
     expect(signal).not.toBeNull();
-    expect(signal!.value).toBe("ro");
-    expect(signal!.confidence).toBe(0.6);
+    expect(signal!.value).toBe("en");
+    expect(signal!.confidence).toBeGreaterThan(0.4);
+    expect(signal!.confidence).toBeLessThanOrEqual(0.75);
+  });
+
+  it("detects French from text via tinyld", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "Bonjour, comment allez-vous aujourd'hui? Je voudrais savoir la météo.",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "language");
+    expect(signal).not.toBeNull();
+    expect(signal!.value).toBe("fr");
+  });
+
+  it("detects CJK text via tinyld", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "今日はとても良い天気ですね。散歩に行きましょう。",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "language");
+    expect(signal).not.toBeNull();
+    // tinyld should detect Japanese
+    expect(signal!.value).toBe("ja");
+  });
+
+  it("skips language detection for short text (<10 chars)", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "hi there",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "language");
+    expect(signal).toBeNull();
+  });
+
+  it("detects Cyrillic script", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "Привет, как дела?",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "script");
+    expect(signal).not.toBeNull();
+    expect(signal!.value).toBe("cyrillic");
+    expect(signal!.confidence).toBe(0.9);
+  });
+
+  it("detects Arabic script", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "مرحبا، كيف حالك اليوم؟",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "script");
+    expect(signal).not.toBeNull();
+    expect(signal!.value).toBe("arabic");
+    expect(signal!.confidence).toBe(0.9);
+  });
+
+  it("detects Latin script", () => {
+    enricher.enrich({
+      senderId: "user1",
+      channelId: "telegram",
+      text: "Hello world, this is a test message",
+      timestamp: Date.now(),
+    });
+
+    const signal = signalStore.getLatestSignal("user1", "telegram", "script");
+    expect(signal).not.toBeNull();
+    expect(signal!.value).toBe("latin");
+    expect(signal!.confidence).toBe(0.9);
   });
 
   it("infers active hours from timestamp", () => {
@@ -65,20 +147,6 @@ describe("ProfileEnricher", () => {
     const signal = signalStore.getLatestSignal("user1", "telegram", "active_hour");
     expect(signal).not.toBeNull();
     expect(signal!.value).toBe("14");
-  });
-
-  it("detects name from self-introduction", () => {
-    enricher.enrich({
-      senderId: "user1",
-      channelId: "telegram",
-      text: "Hi, I'm Alexander",
-      timestamp: Date.now(),
-    });
-
-    const signal = signalStore.getLatestSignal("user1", "telegram", "name");
-    expect(signal).not.toBeNull();
-    expect(signal!.value).toBe("Alexander");
-    expect(signal!.confidence).toBe(0.8);
   });
 
   it("detects response style (short messages)", () => {

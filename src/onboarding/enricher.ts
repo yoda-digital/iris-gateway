@@ -1,3 +1,4 @@
+import { detectAll } from "tinyld";
 import type { SignalStore } from "./signals.js";
 import type { VaultStore } from "../vault/store.js";
 import type { UserProfile } from "../vault/types.js";
@@ -10,38 +11,22 @@ export interface EnrichParams {
   readonly timestamp: number;
 }
 
-interface LanguagePattern {
-  readonly code: string;
-  readonly patterns: RegExp[];
+interface ScriptRange {
+  readonly name: string;
+  readonly ranges: readonly [number, number][];
 }
 
-const LANGUAGE_PATTERNS: LanguagePattern[] = [
-  {
-    code: "ro",
-    patterns: [/\bsalut\b/i, /\bbun[ăa]\b/i, /\bmul[țt]umesc\b/i, /\bcum\s+e[sș]ti\b/i],
-  },
-  {
-    code: "ru",
-    patterns: [/\bпривет\b/i, /\bздравствуй\b/i, /\bспасибо\b/i, /\bкак\s+дела\b/i],
-  },
-  {
-    code: "es",
-    patterns: [/\bhola\b/i, /\bgracias\b/i, /\bbuenos\b/i, /\bc[oó]mo\b/i],
-  },
-  {
-    code: "fr",
-    patterns: [/\bbonjour\b/i, /\bmerci\b/i, /\bcomment\b/i],
-  },
-  {
-    code: "de",
-    patterns: [/\bhallo\b/i, /\bdanke\b/i, /\bwie\s+geht\b/i],
-  },
-];
-
-const NAME_PATTERNS: RegExp[] = [
-  /\bI'?m\s+([A-Z][a-z]{1,20})\b/,
-  /\bmy\s+name\s+is\s+([A-Z][a-z]{1,20})\b/i,
-  /\bcall\s+me\s+([A-Z][a-z]{1,20})\b/i,
+const SCRIPT_RANGES: ScriptRange[] = [
+  { name: "cyrillic", ranges: [[0x0400, 0x04ff], [0x0500, 0x052f]] },
+  { name: "arabic", ranges: [[0x0600, 0x06ff], [0x0750, 0x077f], [0xfb50, 0xfdff], [0xfe70, 0xfeff]] },
+  { name: "devanagari", ranges: [[0x0900, 0x097f], [0xa8e0, 0xa8ff]] },
+  { name: "thai", ranges: [[0x0e00, 0x0e7f]] },
+  { name: "georgian", ranges: [[0x10a0, 0x10ff], [0x2d00, 0x2d2f]] },
+  { name: "hangul", ranges: [[0xac00, 0xd7af], [0x1100, 0x11ff], [0x3130, 0x318f]] },
+  { name: "cjk", ranges: [[0x4e00, 0x9fff], [0x3400, 0x4dbf], [0x3000, 0x303f], [0x3040, 0x309f], [0x30a0, 0x30ff]] },
+  { name: "hebrew", ranges: [[0x0590, 0x05ff], [0xfb1d, 0xfb4f]] },
+  { name: "greek", ranges: [[0x0370, 0x03ff], [0x1f00, 0x1fff]] },
+  { name: "latin", ranges: [[0x0041, 0x024f], [0x1e00, 0x1eff]] },
 ];
 
 export class ProfileEnricher {
@@ -62,7 +47,7 @@ export class ProfileEnricher {
 
     this.detectLanguage(senderId, channelId, text);
     this.extractActiveHours(senderId, channelId, timestamp);
-    this.detectName(senderId, channelId, text);
+    this.detectScript(senderId, channelId, text);
     this.trackResponseStyle(senderId, channelId, text);
   }
 
@@ -88,20 +73,66 @@ export class ProfileEnricher {
   }
 
   private detectLanguage(senderId: string, channelId: string, text: string): void {
-    for (const lang of LANGUAGE_PATTERNS) {
-      for (const pattern of lang.patterns) {
-        if (pattern.test(text)) {
-          this.signalStore.addSignal({
-            senderId,
-            channelId,
-            signalType: "language",
-            value: lang.code,
-            confidence: 0.6,
-          });
-          this.log.debug({ senderId, language: lang.code }, "detected language signal");
-          return;
+    if (text.length < 10) return;
+
+    const results = detectAll(text);
+    if (results.length === 0) return;
+
+    const top = results[0];
+    if (!top.lang) return;
+
+    const confidence = Math.min(0.4 + text.length * 0.005, 0.75);
+
+    this.signalStore.addSignal({
+      senderId,
+      channelId,
+      signalType: "language",
+      value: top.lang,
+      confidence,
+    });
+    this.log.debug({ senderId, language: top.lang, confidence }, "detected language signal");
+  }
+
+  private detectScript(senderId: string, channelId: string, text: string): void {
+    const counts = new Map<string, number>();
+    let total = 0;
+
+    for (const char of text) {
+      const cp = char.codePointAt(0);
+      if (cp === undefined) continue;
+      if (cp <= 0x20 || (cp >= 0x2000 && cp <= 0x206f)) continue; // skip whitespace/punctuation
+
+      for (const script of SCRIPT_RANGES) {
+        for (const [lo, hi] of script.ranges) {
+          if (cp >= lo && cp <= hi) {
+            counts.set(script.name, (counts.get(script.name) ?? 0) + 1);
+            total++;
+            break;
+          }
         }
       }
+    }
+
+    if (total === 0) return;
+
+    let bestScript = "";
+    let bestCount = 0;
+    for (const [name, count] of counts) {
+      if (count > bestCount) {
+        bestScript = name;
+        bestCount = count;
+      }
+    }
+
+    if (bestScript) {
+      this.signalStore.addSignal({
+        senderId,
+        channelId,
+        signalType: "script",
+        value: bestScript,
+        confidence: 0.9,
+      });
+      this.log.debug({ senderId, script: bestScript }, "detected script signal");
     }
   }
 
@@ -114,23 +145,6 @@ export class ProfileEnricher {
       value: String(hour),
       confidence: 0.5,
     });
-  }
-
-  private detectName(senderId: string, channelId: string, text: string): void {
-    for (const pattern of NAME_PATTERNS) {
-      const match = pattern.exec(text);
-      if (match?.[1]) {
-        this.signalStore.addSignal({
-          senderId,
-          channelId,
-          signalType: "name",
-          value: match[1],
-          confidence: 0.8,
-        });
-        this.log.debug({ senderId, name: match[1] }, "detected name signal");
-        return;
-      }
-    }
   }
 
   private trackResponseStyle(senderId: string, channelId: string, text: string): void {

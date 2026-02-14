@@ -169,7 +169,7 @@ export class MessageRouter {
     if (this.profileEnricher && this.vaultStoreRef) {
       const profile = this.vaultStoreRef.getProfile(msg.senderId, msg.channelId);
       if (profile && this.profileEnricher.isFirstContact(profile)) {
-        firstContactPrefix = `[FIRST CONTACT — NEW USER]\nThis user just messaged you for the first time.\nChannel: ${msg.channelId}\n\nWelcome them naturally. Learn about them through conversation, not interrogation.\nDon't announce you're "onboarding" them. Just be genuinely curious.\nPick up on cues from their message — if they ask a technical question, help first, get to know them second.\n\n---\n\n`;
+        firstContactPrefix = `[FIRST CONTACT — NEW USER]\nThis user just messaged you for the first time.\nChannel: ${msg.channelId}\n\nRespond in the SAME LANGUAGE as their message.\nWelcome naturally — warm but not formulaic.\nAs you learn things (name, language, timezone, interests), use enrich_profile to store them.\nDo NOT ask multiple questions at once — learn gradually through conversation.\nPick up on cues from their message — if they ask a question, help first, get to know them second.\n\n---\n\n`;
       }
     }
 

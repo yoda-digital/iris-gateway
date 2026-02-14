@@ -21,6 +21,7 @@ export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
   private readonly projectDir: string;
+  private inFlightCount = 0;
 
   constructor(
     private readonly config: OpenCodeConfig,
@@ -109,38 +110,43 @@ export class OpenCodeBridge {
     timeoutMs = 120_000,
     pollMs = 2_000,
   ): Promise<string> {
-    const before = await this.listMessages(sessionId);
-    const knownCount = before.length;
+    this.inFlightCount++;
+    try {
+      const before = await this.listMessages(sessionId);
+      const knownCount = before.length;
 
-    // Raw fetch — curl works but SDK doesn't, so bypass the SDK
-    const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
-    const body = JSON.stringify({
-      agent: "chat",
-      parts: [{ type: "text", text }],
-    });
-    this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    this.logger.info({ status: res.status }, "prompt_async response");
+      // Raw fetch — curl works but SDK doesn't, so bypass the SDK
+      const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
+      const body = JSON.stringify({
+        agent: "chat",
+        parts: [{ type: "text", text }],
+      });
+      this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      this.logger.info({ status: res.status }, "prompt_async response");
 
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, pollMs));
-      try {
-        const msgs = await this.listMessages(sessionId);
-        for (let i = knownCount; i < msgs.length; i++) {
-          if (msgs[i].role === "assistant" && msgs[i].text) {
-            return msgs[i].text;
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, pollMs));
+        try {
+          const msgs = await this.listMessages(sessionId);
+          for (let i = knownCount; i < msgs.length; i++) {
+            if (msgs[i].role === "assistant" && msgs[i].text) {
+              return msgs[i].text;
+            }
           }
+        } catch {
+          // Retry on transient errors
         }
-      } catch {
-        // Retry on transient errors
       }
+      return "";
+    } finally {
+      this.inFlightCount--;
     }
-    return "";
   }
 
   async subscribeEvents(
@@ -177,6 +183,10 @@ export class OpenCodeBridge {
       this.logger.warn({ err }, "OpenCode health check failed");
       return false;
     }
+  }
+
+  getQueueSize(): number {
+    return this.inFlightCount;
   }
 
   async listSessions(): Promise<SessionInfo[]> {

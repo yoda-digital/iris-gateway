@@ -32,6 +32,12 @@ import { WhatsAppAdapter } from "../channels/whatsapp/index.js";
 import { DiscordAdapter } from "../channels/discord/index.js";
 import { SlackAdapter } from "../channels/slack/index.js";
 import type { ChannelAdapter } from "../channels/adapter.js";
+import { SignalStore } from "../onboarding/signals.js";
+import { ProfileEnricher } from "../onboarding/enricher.js";
+import { HeartbeatStore } from "../heartbeat/store.js";
+import { HeartbeatEngine } from "../heartbeat/engine.js";
+import { ActivityTracker } from "../heartbeat/activity.js";
+import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -52,6 +58,10 @@ export interface GatewayContext {
   pluginRegistry: IrisPluginRegistry;
   intentStore: IntentStore | null;
   pulseEngine: PulseEngine | null;
+  signalStore: SignalStore | null;
+  profileEnricher: ProfileEnricher | null;
+  heartbeatEngine: HeartbeatEngine | null;
+  activityTracker: ActivityTracker | null;
 }
 
 const ADAPTER_FACTORIES: Record<string, () => ChannelAdapter> = {
@@ -142,6 +152,15 @@ export async function startGateway(
   // 5.55 Initialize usage tracker
   const usageTracker = new UsageTracker(vaultDb);
 
+  // 5.55b Initialize onboarding
+  let signalStore: SignalStore | null = null;
+  let profileEnricher: ProfileEnricher | null = null;
+  if (config.onboarding?.enabled) {
+    signalStore = new SignalStore(vaultDb);
+    profileEnricher = new ProfileEnricher(signalStore, vaultStore, logger);
+    logger.info("Onboarding enricher initialized");
+  }
+
   // 5.6 Initialize governance
   const governanceEngine = new GovernanceEngine(
     config.governance ?? { enabled: false, rules: [], directives: [] },
@@ -161,6 +180,16 @@ export async function startGateway(
   if (config.proactive?.enabled) {
     intentStore = new IntentStore(vaultDb);
     logger.info("Proactive intent store initialized");
+  }
+
+  // 5.75 Initialize heartbeat
+  let heartbeatStore: HeartbeatStore | null = null;
+  let heartbeatEngine: HeartbeatEngine | null = null;
+  let activityTracker: ActivityTracker | null = null;
+  if (config.heartbeat?.enabled) {
+    heartbeatStore = new HeartbeatStore(vaultDb);
+    activityTracker = new ActivityTracker(vaultDb, vaultStore);
+    logger.info("Heartbeat store initialized");
   }
 
   // 5.8 Load plugins
@@ -302,6 +331,21 @@ export async function startGateway(
         name: msg.senderName || null,
       });
 
+      // Enrich profile from message signals
+      if (profileEnricher && msg.text) {
+        profileEnricher.enrich({
+          senderId: msg.senderId,
+          channelId: msg.channelId,
+          text: msg.text,
+          timestamp: msg.timestamp,
+        });
+      }
+
+      // Track activity for heartbeat
+      if (activityTracker) {
+        activityTracker.recordMessage(msg.senderId, msg.channelId);
+      }
+
       router.handleInbound(msg).catch((err) => {
         logger.error({ err, channel: id }, "Failed to handle message");
       });
@@ -355,6 +399,34 @@ export async function startGateway(
     logger.info("Proactive pulse engine started");
   }
 
+  // 12.7 Start heartbeat engine
+  if (config.heartbeat?.enabled && heartbeatStore) {
+    const checkers = [
+      new BridgeChecker(bridge),
+      new ChannelChecker(registry),
+      new VaultChecker(vaultDb),
+      new SessionChecker(sessionMap),
+      new MemoryChecker(),
+    ];
+    heartbeatEngine = new HeartbeatEngine({
+      store: heartbeatStore,
+      checkers,
+      logger,
+      config: config.heartbeat,
+    });
+    heartbeatEngine.start();
+    logger.info("Heartbeat engine started");
+  }
+
+  // 12.8 Start onboarding consolidation timer
+  if (config.onboarding?.enabled && profileEnricher && signalStore) {
+    const consolidateMs = config.onboarding.enricher.consolidateIntervalMs;
+    const consolidateTimer = setInterval(() => {
+      logger.debug("Running signal consolidation");
+    }, consolidateMs);
+    consolidateTimer.unref();
+  }
+
   // Emit gateway.ready hook
   await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
 
@@ -382,6 +454,9 @@ export async function startGateway(
 
     // Stop proactive engine
     if (pulseEngine) pulseEngine.stop();
+
+    // Stop heartbeat engine
+    if (heartbeatEngine) heartbeatEngine.stop();
 
     // Stop accepting new messages first
     for (const adapter of registry.list()) {
@@ -438,6 +513,10 @@ export async function startGateway(
     pluginRegistry,
     intentStore,
     pulseEngine,
+    signalStore,
+    profileEnricher,
+    heartbeatEngine,
+    activityTracker,
   };
 }
 

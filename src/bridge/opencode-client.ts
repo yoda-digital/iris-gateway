@@ -103,6 +103,10 @@ export class OpenCodeBridge {
    * Send a message and poll for the assistant response.
    * Uses raw fetch to POST /prompt_async (bypasses SDK which may serialize
    * differently from what the server expects).
+   *
+   * OpenCode creates an empty assistant message (hasParts=false) as a
+   * placeholder while the model generates. Subsequent polls will show
+   * hasParts=true with text once the model finishes.
    */
   async sendAndWait(
     sessionId: string,
@@ -115,7 +119,6 @@ export class OpenCodeBridge {
       const before = await this.listMessages(sessionId);
       const knownCount = before.length;
 
-      // Raw fetch — curl works but SDK doesn't, so bypass the SDK
       const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
       const body = JSON.stringify({
         agent: "chat",
@@ -138,7 +141,7 @@ export class OpenCodeBridge {
           const msgs = await this.listMessages(sessionId);
           const newMsgs = msgs.slice(knownCount);
 
-          // Primary: look for assistant message with text (includes reasoning fallback)
+          // Primary: look for assistant message with text
           for (const msg of newMsgs) {
             if (msg.role === "assistant" && msg.text) {
               return msg.text;
@@ -146,36 +149,15 @@ export class OpenCodeBridge {
           }
 
           // Secondary: detect model completion without text response.
-          // OpenCode creates an empty assistant message (hasParts=false) as a
-          // placeholder while the model is still generating. Only count as
-          // "stable/complete" when the assistant message HAS parts (meaning
-          // the model finished generating but produced tool calls, not text).
           if (newMsgs.length > 0) {
             const lastMsg = newMsgs[newMsgs.length - 1];
 
-            // Log message details for diagnostics
-            if (newMsgs.length !== lastNewCount) {
-              this.logger.info(
-                {
-                  sessionId,
-                  newMessages: newMsgs.length,
-                  messages: newMsgs.map((m) => ({
-                    role: m.role,
-                    hasText: !!m.text,
-                    textLen: m.text?.length ?? 0,
-                    hasParts: m.hasParts,
-                  })),
-                },
-                "Polling: new messages detected",
-              );
-            }
-
-            // Assistant message with hasParts=false is a placeholder — model
-            // is still generating. Don't count toward stability.
+            // Assistant message with hasParts=false is a placeholder —
+            // model is still generating. Don't count toward stability.
             const isPlaceholder = lastMsg.role === "assistant" && !lastMsg.hasParts;
 
             if (!isPlaceholder && lastMsg.role === "assistant" && lastMsg.hasParts) {
-              // Model finished its turn WITH parts but no text → tool calls only
+              // Model finished WITH parts but no text → tool calls only
               if (newMsgs.length === lastNewCount) {
                 stablePolls++;
               } else {
@@ -190,11 +172,9 @@ export class OpenCodeBridge {
                 return "";
               }
             } else if (!isPlaceholder) {
-              // Tool result or other non-assistant message — model still processing
               stablePolls = 0;
               lastNewCount = newMsgs.length;
             } else {
-              // Placeholder — just update count tracking, don't touch stability
               lastNewCount = newMsgs.length;
             }
           }

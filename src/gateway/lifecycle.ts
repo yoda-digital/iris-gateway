@@ -38,6 +38,10 @@ import { HeartbeatStore } from "../heartbeat/store.js";
 import { HeartbeatEngine } from "../heartbeat/engine.js";
 import { ActivityTracker } from "../heartbeat/activity.js";
 import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
+import { CliExecutor } from "../cli/executor.js";
+import { CliToolRegistry } from "../cli/registry.js";
+import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -192,6 +196,23 @@ export async function startGateway(
     logger.info("Heartbeat store initialized");
   }
 
+  // 5.76 Initialize CLI tools
+  let cliExecutor: CliExecutor | null = null;
+  let cliRegistry: CliToolRegistry | null = null;
+  if (config.cli?.enabled) {
+    cliRegistry = new CliToolRegistry(config.cli.tools);
+    cliExecutor = new CliExecutor({
+      allowedBinaries: config.cli.sandbox.allowedBinaries,
+      timeout: config.cli.timeout,
+      logger,
+    });
+
+    // Write manifest for plugin auto-registration
+    const manifestPath = join(stateDir, "cli-tools.json");
+    writeFileSync(manifestPath, JSON.stringify(cliRegistry.getManifest(), null, 2));
+    logger.info({ tools: cliRegistry.listTools() }, "CLI tool registry initialized");
+  }
+
   // 5.8 Load plugins
   const pluginRegistry = await new PluginLoader(logger).loadAll(config, stateDir);
 
@@ -275,6 +296,8 @@ export async function startGateway(
     canvasServer,
     intentStore,
     signalStore,
+    cliExecutor,
+    cliRegistry,
   });
   await toolServer.start();
 

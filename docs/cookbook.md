@@ -644,6 +644,11 @@ This means the AI doesn't have to guess — it gets explicit recommendations for
 | `onboarding` | new user, no profile, first time, setup (auto) | Collects name, timezone, language, stores in vault |
 | `summarize` | summarize, summary, recap, rezumat | Extracts key facts from conversation, stores in vault |
 | `web-search` | search, look up, find online, google, cauta | Guides use of Tavily MCP if available |
+| `gmail-email` | email, gmail, inbox, mail, send email, check email | Search Gmail, read messages, view history, send email via `google_email` |
+| `google-calendar-events` | calendar, event, meeting, schedule, appointment | View, create, search Calendar events via `google_calendar` |
+| `google-contacts-lookup` | contact, phone number, address book, who is | Search, view, create Contacts via `google_contacts` |
+| `google-tasks-manager` | task, todo, task list, reminder, add task | View, add, complete Tasks via `google_tasks` |
+| `google-drive-files` | drive, file, document, upload, download | List, search, download Drive files via `google_drive` |
 
 ### Skill access across agents
 
@@ -1127,6 +1132,8 @@ Use heartbeat_trigger with agentId "production" to check production health now.
 ```
 
 ## CLI Tools (External Services)
+
+CLI tool infrastructure (binaries, subcommands, sandboxing) lives in `iris.config.json`. Domain knowledge (how to search Gmail, what Calendar actions exist, query syntax) lives in skills (`gmail-email`, `google-calendar-events`, `google-contacts-lookup`, `google-tasks-manager`, `google-drive-files`). This separation keeps the core config clean while giving the AI rich, focused guidance through the skill system.
 
 ### Configuration
 

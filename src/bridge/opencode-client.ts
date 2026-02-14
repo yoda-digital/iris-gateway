@@ -141,9 +141,26 @@ export class OpenCodeBridge {
           const msgs = await this.listMessages(sessionId);
           const newMsgs = msgs.slice(knownCount);
 
+          // Log poll state for debugging
+          if (newMsgs.length > 0) {
+            const details = newMsgs.map((m) => {
+              const parts = m.hasParts ? "✓" : "○";
+              const text = m.text ? ` "${m.text.substring(0, 80)}${m.text.length > 80 ? "…" : ""}"` : "";
+              return `  ${m.role}${parts}${text}`;
+            });
+            this.logger.info(
+              { newMsgs: newMsgs.length },
+              `🔄 Poll\n${details.join("\n")}`,
+            );
+          }
+
           // Primary: look for assistant message with text
           for (const msg of newMsgs) {
             if (msg.role === "assistant" && msg.text) {
+              this.logger.info(
+                { textLen: msg.text.length },
+                "✅ Got response",
+              );
               return msg.text;
             }
           }

@@ -30,6 +30,11 @@ tools:
   policy_status: true
   policy_audit: true
   canvas_update: true
+  google_email: true
+  google_calendar: true
+  google_contacts: true
+  google_tasks: true
+  google_drive: true
   agent_create: true
   agent_validate: true
   skill_create: true
@@ -41,6 +46,11 @@ skills:
   - onboarding
   - summarize
   - web-search
+  - gmail-email
+  - google-calendar-events
+  - google-contacts-lookup
+  - google-tasks-manager
+  - google-drive-files
 ---
 You are Iris's deep reasoning subagent. You handle complex tasks that require multiple tool calls, careful planning, and step-by-step execution.
 

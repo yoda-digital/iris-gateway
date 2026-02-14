@@ -95,23 +95,30 @@ export class MessageRouter {
   }
 
   async handleInbound(msg: InboundMessage): Promise<void> {
+    const startTime = Date.now();
     const log = this.logger.child({
       channel: msg.channelId,
       sender: msg.senderId,
       chat: msg.chatId,
     });
 
-    // Security check
+    const textPreview = msg.text ? `"${msg.text.substring(0, 60)}${msg.text.length > 60 ? "…" : ""}"` : "(no text)";
+    log.info(`──── INBOUND ─── ${msg.channelId}/${msg.chatType} ─── ${textPreview}`);
+
+    // ── Step 1: Adapter ──
     const adapter = this.registry.get(msg.channelId);
+    log.info(`  1 ▸ Adapter        ${adapter ? "✓ " + msg.channelId : "✗ no adapter"}`);
+
+    // ── Step 2: Security gate ──
     const checkResult: SecurityCheckResult = await this.securityGate.check({
       channelId: msg.channelId,
       senderId: msg.senderId,
       senderName: msg.senderName,
       chatType: msg.chatType,
     });
+    log.info(`  2 ▸ SecurityGate   ${checkResult.allowed ? "✓ allowed" : "✗ " + checkResult.reason}`);
 
     if (!checkResult.allowed) {
-      log.info({ reason: checkResult.reason }, "Message rejected");
       if (checkResult.message && adapter) {
         await adapter.sendText({
           to: msg.chatId,
@@ -122,22 +129,25 @@ export class MessageRouter {
       return;
     }
 
-    // Mention gating for group messages
+    // ── Step 3: Mention gating ──
     const channelConfig = this.channelConfigs[msg.channelId];
     if (channelConfig?.groupPolicy?.enabled && channelConfig.groupPolicy.requireMention) {
       const mentionPattern = channelConfig.mentionPattern;
       const botId = adapter?.id ?? msg.channelId;
       if (!shouldProcessGroupMessage(msg, botId, mentionPattern)) {
-        log.debug("Group message filtered (no bot mention)");
+        log.info("  3 ▸ MentionGate   ✗ filtered (no bot mention)");
         return;
       }
+      log.info("  3 ▸ MentionGate   ✓ mentioned");
+    } else {
+      log.info(`  3 ▸ MentionGate   ○ skipped (${msg.chatType})`);
     }
 
-    // /new command — reset session
+    // ── Step 4: Commands ──
     if (msg.text?.trim().toLowerCase() === "/new" || msg.text?.trim().toLowerCase() === "/start") {
       const key = this.sessionMap.buildKey(msg.channelId, msg.chatId, msg.chatType);
       await this.sessionMap.reset(key);
-      log.info("Session reset via /new command");
+      log.info("  4 ▸ Command       /new → session reset");
       if (adapter) {
         await adapter.sendText({
           to: msg.chatId,
@@ -147,12 +157,13 @@ export class MessageRouter {
       }
       return;
     }
+    log.info("  4 ▸ Commands      ○ not a command");
 
-    // Auto-reply check
+    // ── Step 5: Auto-reply ──
     if (this.templateEngine) {
       const match = this.templateEngine.match(msg);
       if (match) {
-        log.info({ templateId: match.template.id }, "Auto-reply matched");
+        log.info(`  5 ▸ AutoReply     ✓ matched "${match.template.id}"${match.template.forwardToAi ? " (+ forward)" : ""}`);
         if (adapter) {
           await adapter.sendText({
             to: msg.chatId,
@@ -161,19 +172,28 @@ export class MessageRouter {
           });
         }
         if (!match.template.forwardToAi) return;
+      } else {
+        log.info("  5 ▸ AutoReply     ○ no match");
       }
+    } else {
+      log.info("  5 ▸ AutoReply     ○ disabled");
     }
 
-    // First contact detection — inject onboarding meta-prompt
+    // ── Step 6: First contact detection ──
     let firstContactPrefix = "";
     if (this.profileEnricher && this.vaultStoreRef) {
       const profile = this.vaultStoreRef.getProfile(msg.senderId, msg.channelId);
       if (profile && this.profileEnricher.isFirstContact(profile)) {
         firstContactPrefix = `[FIRST CONTACT — NEW USER]\nThis user just messaged you for the first time.\nChannel: ${msg.channelId}\n\nRespond in the SAME LANGUAGE as their message.\nWelcome naturally — warm but not formulaic.\nAs you learn things (name, language, timezone, interests), use enrich_profile to store them.\nDo NOT ask multiple questions at once — learn gradually through conversation.\nPick up on cues from their message — if they ask a question, help first, get to know them second.\n\n---\n\n`;
+        log.info("  6 ▸ FirstContact  ✓ new user → meta-prompt injected");
+      } else {
+        log.info("  6 ▸ FirstContact  ○ returning user");
       }
+    } else {
+      log.info("  6 ▸ FirstContact  ○ enricher disabled");
     }
 
-    // Resolve session
+    // ── Step 7: Session resolution ──
     const entry = await this.sessionMap.resolve(
       msg.channelId,
       msg.senderId,
@@ -181,11 +201,7 @@ export class MessageRouter {
       msg.chatType,
       this.bridge,
     );
-
-    log.info(
-      { sessionId: entry.openCodeSessionId },
-      "Routing message to OpenCode",
-    );
+    log.info(`  7 ▸ Session       ✓ ${entry.openCodeSessionId}`);
 
     // Store pending response context
     this.pendingResponses.set(entry.openCodeSessionId, {
@@ -195,8 +211,9 @@ export class MessageRouter {
       createdAt: Date.now(),
     });
 
-    // Send typing indicator
+    // ── Step 8: Typing indicator ──
     await adapter?.sendTyping?.({ to: msg.chatId });
+    log.info("  8 ▸ Typing        ✓ sent");
 
     // Strip bot mention from text before forwarding to OpenCode
     let messageText = msg.text ?? "";
@@ -226,7 +243,6 @@ export class MessageRouter {
         },
         (text, isEdit) => {
           if (isEdit && adapter.editMessage) {
-            // Edit-in-place: edit the last sent message
             adapter.editMessage({ messageId: "", text, chatId: msg.chatId }).catch(() => {});
           } else {
             this.outboundQueue.enqueue({
@@ -241,7 +257,11 @@ export class MessageRouter {
       this.activeCoalescers.set(entry.openCodeSessionId, coalescer);
     }
 
-    // Send message and poll for response
+    // ── Step 9: OpenCode bridge ──
+    log.info("  9 ▸ Bridge        → prompt_async to OpenCode");
+    log.info("  ── HOOKS ── system.transform → vault context + profile learning + proactive awareness");
+    log.info("  ── MODEL ── thinking + tool calls (see ⚡ below) + response generation");
+
     const response = await this.bridge.sendAndWait(
       entry.openCodeSessionId,
       messageText,
@@ -255,10 +275,17 @@ export class MessageRouter {
     }
     this.pendingResponses.delete(entry.openCodeSessionId);
 
+    // ── Step 10: Response delivery ──
+    const elapsed = Date.now() - startTime;
     if (response) {
+      const responsePreview = `"${response.substring(0, 80)}${response.length > 80 ? "…" : ""}"`;
+      log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);
+      log.info(` 11 ▸ Deliver       → ${msg.channelId} ${responsePreview}`);
       await this.sendResponse(msg.channelId, msg.chatId, response, msg.id);
+      log.info(`──── DONE ──── ${elapsed}ms total ────`);
     } else {
-      log.warn("Empty response from AI — model may be unavailable");
+      log.warn(` 10 ▸ Response      ✗ empty (${elapsed}ms) — model may be unavailable`);
+      log.info(`──── DONE ──── ${elapsed}ms total (no response) ────`);
     }
   }
 

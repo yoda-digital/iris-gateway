@@ -2,7 +2,7 @@
 
 Multi-channel AI messaging gateway. Routes messages between Telegram, WhatsApp, Discord, Slack, and WebChat through [OpenCode CLI](https://github.com/nicholasgriffintn/opencode) with free models via OpenRouter.
 
-Learns users invisibly. Monitors its own health. Heals itself. Manages your calendar, email, contacts, and tasks through sandboxed CLI tools.
+Learns users invisibly. Monitors its own health. Heals itself. Manages your calendar, email, contacts, and tasks through sandboxed CLI tools. As of February 2026, Arcee Trinity models (large + mini) work well for both chat and tool calling on the free tier.
 
 ## Requirements
 
@@ -293,7 +293,9 @@ src/
   plugin/iris.ts        THE plugin (40+ tools, 5 hooks, dynamic CLI/plugin tools)
   opencode.json         Model config, MCP servers, permissions
   agents/               chat.md (primary), moderator.md (subagent)
-  skills/               greeting, help, moderation, onboarding, summarize, web-search
+  skills/               greeting, help, moderation, onboarding, summarize, web-search,
+                        gmail-email, google-calendar-events, google-contacts-lookup,
+                        google-tasks-manager, google-drive-files
 
 test/
   unit/                 57 test files

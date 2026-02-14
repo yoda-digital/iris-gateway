@@ -41,7 +41,7 @@ import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChec
 import { CliExecutor } from "../cli/executor.js";
 import { CliToolRegistry } from "../cli/registry.js";
 import { join } from "node:path";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -520,6 +520,34 @@ export async function startGateway(
 
   process.once("SIGTERM", shutdown);
   process.once("SIGINT", shutdown);
+
+  // Startup summary
+  try {
+    const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");
+    const ocConfig = JSON.parse(readFileSync(ocPath, "utf-8"));
+    const primaryModel = ocConfig.model ?? "unknown";
+    const smallModel = ocConfig.small_model ?? "none";
+    const channels = Object.keys(config.channels);
+    const securityMode = config.security?.defaultDmPolicy ?? "open";
+    const governanceRules = governanceEngine?.getRules?.()?.length ?? 0;
+
+    console.log("");
+    console.log("  ┌─────────────────────────────────────────┐");
+    console.log("  │             Gateway Ready                │");
+    console.log("  ├─────────────────────────────────────────┤");
+    console.log(`  │  Model:     ${primaryModel.padEnd(28)}│`);
+    console.log(`  │  Small:     ${smallModel.padEnd(28)}│`);
+    console.log(`  │  Channels:  ${channels.join(", ").padEnd(28)}│`);
+    console.log(`  │  Security:  ${securityMode.padEnd(28)}│`);
+    console.log(`  │  Rules:     ${String(governanceRules).padEnd(28)}│`);
+    console.log(`  │  OpenCode:  :${config.opencode.port}${"".padEnd(23)}│`);
+    console.log(`  │  Tools:     :19877${"".padEnd(22)}│`);
+    console.log(`  │  Health:    :19876${"".padEnd(22)}│`);
+    console.log("  └─────────────────────────────────────────┘");
+    console.log("");
+  } catch {
+    // Best-effort — don't crash on startup info
+  }
 
   logger.info("Iris gateway started");
   return {

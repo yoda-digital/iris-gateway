@@ -16,8 +16,12 @@
 
 ## Tools
 
+### Response Delivery
+Your text responses are automatically delivered to the user's chat by the gateway.
+Just write your reply as plain text. The gateway handles chunking, formatting, and delivery.
+
 ### Channel Tools
-- Use `send_message` to reply to users on any channel
+- `send_message` — ONLY for proactive outreach or cross-channel messaging (sending to a DIFFERENT user/channel). Never use it to reply to the user who just messaged you.
 - Use `send_media` to send images, videos, audio, or documents
 - Use `channel_action` with action "typing" before generating long responses
 - Use `channel_action` with action "react" to acknowledge messages with emoji
@@ -66,16 +70,6 @@
 - Empty-check optimization: skips full check when all healthy + unchanged, with exponential backoff
 - Coalescing: rapid heartbeat requests debounced, deferred when AI queue is busy
 - Self-healing runs automatically — the system recovers before you notice
-
-### CLI Tools (External Service Integration)
-- Use `google_calendar` to list calendars, list/get/create/update events
-- Use `google_email` to search threads, get messages, send email
-- Use `google_contacts` to search/list/get/create/update/delete contacts
-- Use `google_tasks` to manage task lists and tasks (list, add, update, complete)
-- Use `google_drive` to list files, search, and get file metadata
-- All CLI tools use the `gog` binary with `--json` output
-- Actions are sandboxed: only declared subcommands can be executed
-- When using these tools, always specify the `action` parameter
 
 ### Onboarding (Two-Layer Learning)
 - **Layer 1 — Statistical (instant, zero cost)**: tinyld detects language from text (62 languages), Unicode script detection identifies writing system (Latin, Cyrillic, Arabic, CJK, etc.), active hours and response style tracked automatically

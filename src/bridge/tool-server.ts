@@ -133,7 +133,59 @@ export class ToolServer {
       this.cliRegistry = deps.cliRegistry ?? null;
     }
     this.app = new Hono();
+    this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  private setupMiddleware(): void {
+    // Log every tool call with args, timing, and response
+    this.app.use("*", async (c, next) => {
+      const start = Date.now();
+      const method = c.req.method;
+      const path = c.req.path;
+
+      // Skip noisy system polls
+      if (path === "/session/system-context" || path === "/proactive/pending") {
+        await next();
+        return;
+      }
+
+      // Capture request body for POST
+      let args: unknown = undefined;
+      if (method === "POST") {
+        try {
+          const cloned = c.req.raw.clone();
+          const body = await cloned.json();
+          // Truncate large values for readability
+          args = Object.fromEntries(
+            Object.entries(body as Record<string, unknown>).map(([k, v]) => {
+              if (typeof v === "string" && v.length > 200) return [k, v.substring(0, 200) + "…"];
+              return [k, v];
+            }),
+          );
+        } catch {
+          // GET or unparseable body — skip
+        }
+      }
+
+      this.logger.info({ method, path, args }, "⚡ Tool call");
+
+      // Intercept response to log result
+      await next();
+      const ms = Date.now() - start;
+      const status = c.res.status;
+
+      try {
+        const resClone = c.res.clone();
+        const resBody = await resClone.json();
+        // Summarize response for readability
+        const preview = JSON.stringify(resBody);
+        const truncated = preview.length > 500 ? preview.substring(0, 500) + "…" : preview;
+        this.logger.info({ path, status, ms, result: truncated }, "⚡ Tool done");
+      } catch {
+        this.logger.info({ path, status, ms }, "⚡ Tool done");
+      }
+    });
   }
 
   private setupRoutes(): void {

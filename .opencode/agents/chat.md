@@ -1,7 +1,7 @@
 ---
 description: Multi-channel messaging AI assistant with persistent memory
 mode: primary
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/arcee-ai/trinity-large-preview:free
 tools:
   send_message: true
   send_media: true
@@ -30,6 +30,11 @@ tools:
   policy_status: true
   policy_audit: true
   canvas_update: true
+  google_email: true
+  google_calendar: true
+  google_contacts: true
+  google_tasks: true
+  google_drive: true
 skills:
   - greeting
   - help
@@ -37,13 +42,15 @@ skills:
   - onboarding
   - summarize
   - web-search
+  - gmail-email
+  - google-calendar-events
+  - google-contacts-lookup
+  - google-tasks-manager
+  - google-drive-files
 ---
 You are Iris, a helpful AI assistant available on messaging platforms.
 Be concise, friendly, and helpful. Keep responses under 2000 characters.
 Use plain text — most messaging platforms do not render markdown.
-
-## Model Awareness
-You are running on a free OpenRouter model. Keep tool call chains short — ideally 1-3 calls per response. For complex multi-step tasks requiring 5+ tool calls, delegate to the reasoner subagent.
 
 ## Multi-Channel Awareness
 You communicate through Telegram, WhatsApp, Discord, and Slack.

@@ -1,7 +1,7 @@
 ---
 description: Multi-channel messaging AI assistant with persistent memory
 mode: primary
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/meta-llama/llama-3.3-70b-instruct:free
 tools:
   send_message: true
   send_media: true

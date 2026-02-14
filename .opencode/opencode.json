@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/z-ai/glm-4.5-air:free",
+  "model": "openrouter/meta-llama/llama-3.3-70b-instruct:free",
   "small_model": "openrouter/arcee-ai/trinity-mini:free",
   "provider": {
     "openrouter": {

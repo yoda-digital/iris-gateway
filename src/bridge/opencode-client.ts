@@ -237,6 +237,19 @@ export class OpenCodeBridge {
     }));
   }
 
+  /**
+   * Strip leaked thinking/reasoning tags from model output.
+   * Some models (DeepSeek, GLM, etc.) leak <think>...</think> blocks
+   * into their text content. Strip them before delivering to users.
+   */
+  private stripThinking(text: string): string {
+    // Strip <think>...</think> and <reasoning>...</reasoning> blocks
+    return text
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
+      .trim();
+  }
+
   async listMessages(sessionId: string): Promise<Array<{ role: string; text: string; hasParts: boolean }>> {
     const response = await this.getClient().session.messages({
       path: { id: sessionId },
@@ -247,11 +260,13 @@ export class OpenCodeBridge {
       const parts = msg.parts ?? [];
       const textParts = parts.filter((p: Part) => p.type === "text") as TextPart[];
       let text = textParts.map((p) => p.text).join("");
-      // Fallback: if no text parts, try reasoning parts (models with mandatory reasoning like gpt-oss-120b)
+      // Fallback: if no text parts, try reasoning parts
       if (!text) {
         const reasoningParts = parts.filter((p: Part) => p.type === "reasoning") as Array<{ text: string }>;
         text = reasoningParts.map((p) => p.text).join("");
       }
+      // Strip leaked thinking tags from model output
+      text = this.stripThinking(text);
       return {
         role,
         text,

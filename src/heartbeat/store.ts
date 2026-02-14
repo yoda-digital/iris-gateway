@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS heartbeat_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   component TEXT NOT NULL, status TEXT NOT NULL,
   latency_ms INTEGER NOT NULL, details TEXT,
+  agent_id TEXT NOT NULL DEFAULT 'default',
   checked_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_heartbeat_component ON heartbeat_log(component, checked_at);
@@ -14,9 +15,18 @@ CREATE TABLE IF NOT EXISTS heartbeat_actions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   component TEXT NOT NULL, action TEXT NOT NULL,
   success INTEGER NOT NULL DEFAULT 0, error TEXT,
+  agent_id TEXT NOT NULL DEFAULT 'default',
   executed_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_actions_component ON heartbeat_actions(component, executed_at);
+
+CREATE TABLE IF NOT EXISTS heartbeat_dedup (
+  component TEXT NOT NULL,
+  agent_id TEXT NOT NULL DEFAULT 'default',
+  last_alert_text TEXT NOT NULL,
+  last_sent_at INTEGER NOT NULL,
+  PRIMARY KEY (component, agent_id)
+);
 `;
 
 interface LogCheckParams {
@@ -24,6 +34,7 @@ interface LogCheckParams {
   readonly status: string;
   readonly latencyMs: number;
   readonly details?: string;
+  readonly agentId?: string;
 }
 
 interface LogActionParams {
@@ -31,6 +42,7 @@ interface LogActionParams {
   readonly action: string;
   readonly success: boolean;
   readonly error?: string;
+  readonly agentId?: string;
 }
 
 export class HeartbeatStore {
@@ -44,14 +56,15 @@ export class HeartbeatStore {
   logCheck(params: LogCheckParams): void {
     this.db
       .prepare(
-        `INSERT INTO heartbeat_log (component, status, latency_ms, details, checked_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO heartbeat_log (component, status, latency_ms, details, agent_id, checked_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(
         params.component,
         params.status,
         params.latencyMs,
         params.details ?? null,
+        params.agentId ?? "default",
         Date.now(),
       );
   }
@@ -59,14 +72,15 @@ export class HeartbeatStore {
   logAction(params: LogActionParams): void {
     this.db
       .prepare(
-        `INSERT INTO heartbeat_actions (component, action, success, error, executed_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO heartbeat_actions (component, action, success, error, agent_id, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .run(
         params.component,
         params.action,
         params.success ? 1 : 0,
         params.error ?? null,
+        params.agentId ?? "default",
         Date.now(),
       );
   }
@@ -120,6 +134,29 @@ export class HeartbeatStore {
       .prepare("DELETE FROM heartbeat_actions WHERE executed_at <= ?")
       .run(cutoff);
     return logs.changes + actions.changes;
+  }
+
+  isDuplicate(component: string, agentId: string, text: string, windowMs: number): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT last_alert_text, last_sent_at FROM heartbeat_dedup
+         WHERE component = ? AND agent_id = ?`,
+      )
+      .get(component, agentId) as { last_alert_text: string; last_sent_at: number } | undefined;
+    if (!row) return false;
+    if (row.last_alert_text.trim() !== text.trim()) return false;
+    return Date.now() - row.last_sent_at < windowMs;
+  }
+
+  recordAlert(component: string, agentId: string, text: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO heartbeat_dedup (component, agent_id, last_alert_text, last_sent_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(component, agent_id)
+         DO UPDATE SET last_alert_text = excluded.last_alert_text, last_sent_at = excluded.last_sent_at`,
+      )
+      .run(component, agentId, text.trim(), Date.now());
   }
 
   // ── Row mappers ──

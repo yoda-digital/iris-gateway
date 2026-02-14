@@ -169,6 +169,42 @@ const heartbeatSchema = z.object({
     dormancyThresholdMs: z.number().positive().default(604_800_000),
   }).default({}),
   logRetentionDays: z.number().positive().default(30),
+  // V2
+  activeHours: z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/),
+    end: z.string().regex(/^\d{2}:\d{2}$/),
+    timezone: z.string().min(1),
+  }).optional(),
+  visibility: z.object({
+    showOk: z.boolean().default(false),
+    showAlerts: z.boolean().default(true),
+    useIndicator: z.boolean().default(true),
+  }).optional(),
+  channelVisibility: z.record(z.string(), z.object({
+    showOk: z.boolean().optional(),
+    showAlerts: z.boolean().optional(),
+    useIndicator: z.boolean().optional(),
+  })).optional(),
+  dedupWindowMs: z.number().positive().default(86_400_000).optional(),
+  emptyCheck: z.object({
+    enabled: z.boolean().default(true),
+    maxBackoffMs: z.number().nonnegative().default(300_000),
+  }).optional(),
+  coalesceMs: z.number().positive().default(250).optional(),
+  retryMs: z.number().positive().default(1_000).optional(),
+  agents: z.array(z.object({
+    agentId: z.string().min(1),
+    intervals: z.object({
+      healthy: z.number().positive().optional(),
+      degraded: z.number().positive().optional(),
+      critical: z.number().positive().optional(),
+    }).optional(),
+    activeHours: z.object({
+      start: z.string().regex(/^\d{2}:\d{2}$/),
+      end: z.string().regex(/^\d{2}:\d{2}$/),
+      timezone: z.string().min(1),
+    }).optional(),
+  })).optional(),
 });
 
 export const irisConfigSchema = z.object({

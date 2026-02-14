@@ -31,6 +31,23 @@ export interface HeartbeatActionEntry {
   readonly executedAt: number;
 }
 
+export interface ActiveHoursConfig {
+  readonly start: string;
+  readonly end: string;
+  readonly timezone: string;
+}
+
+export interface VisibilityConfig {
+  readonly showOk: boolean;
+  readonly showAlerts: boolean;
+  readonly useIndicator: boolean;
+}
+
+export interface EmptyCheckConfig {
+  readonly enabled: boolean;
+  readonly maxBackoffMs: number;
+}
+
 export interface HeartbeatConfig {
   readonly enabled: boolean;
   readonly intervals: {
@@ -48,4 +65,19 @@ export interface HeartbeatConfig {
     readonly dormancyThresholdMs: number;
   };
   readonly logRetentionDays: number;
+  // V2 features
+  readonly activeHours?: ActiveHoursConfig;
+  readonly visibility?: VisibilityConfig;
+  readonly channelVisibility?: Record<string, Partial<VisibilityConfig>>;
+  readonly dedupWindowMs?: number;
+  readonly emptyCheck?: EmptyCheckConfig;
+  readonly coalesceMs?: number;
+  readonly retryMs?: number;
+  readonly agents?: HeartbeatAgentConfig[];
+}
+
+export interface HeartbeatAgentConfig {
+  readonly agentId: string;
+  readonly intervals?: Partial<HeartbeatConfig["intervals"]>;
+  readonly activeHours?: ActiveHoursConfig;
 }

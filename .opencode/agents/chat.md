@@ -1,7 +1,7 @@
 ---
 description: Multi-channel messaging AI assistant with persistent memory
 mode: primary
-model: openrouter/arcee-ai/trinity-large-preview:free
+model: openrouter/openrouter/aurora-alpha
 tools:
   send_message: true
   send_media: true

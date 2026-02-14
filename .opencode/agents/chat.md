@@ -1,7 +1,7 @@
 ---
 description: Multi-channel messaging AI assistant with persistent memory
 mode: primary
-model: openrouter/stepfun/step-3.5-flash:free
+model: openrouter/arcee-ai/trinity-large-preview:free
 tools:
   send_message: true
   send_media: true

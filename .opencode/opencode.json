@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/arcee-ai/trinity-large-preview:free",
+  "model": "openrouter/stepfun/step-3.5-flash:free",
   "small_model": "openrouter/arcee-ai/trinity-mini:free",
   "provider": {
     "openrouter": {

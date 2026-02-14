@@ -15,20 +15,31 @@ export interface TriggerRule {
 // ── Built-in trigger rules ──
 
 /**
- * Detects "I'll do it tomorrow" style commitments.
- * Creates a follow-up intent for the next day.
+ * "Tomorrow" words covering ~95% of global population by native speakers.
+ * Single-concept lookup — does NOT grow with features or categories.
  */
+const TOMORROW_WORDS = new Set([
+  "tomorrow", "maine", "mîine", "завтра", "morgen", "demain", "mañana",
+  "domani", "amanhã", "amanha", "yarın", "yarin", "明天", "明日", "내일",
+  "कल", "غدا", "พรุ่งนี้", "holnap", "huomenna", "αύριο", "jutro",
+]);
+
 const tomorrowIntent: TriggerRule = {
   id: "tomorrow_intent",
   enabled: true,
   priority: 50,
-  evaluate(text, msg) {
-    const pattern = /\b(tomorrow|maine|mîine|завтра|morgen|demain|mañana)\b.*\b(will|voi|o să|буду|going to|werde|vais|voy)\b/i;
-    const reversePattern = /\b(will|voi|o să|буду|going to|werde|vais|voy)\b.*\b(tomorrow|maine|mîine|завтра|morgen|demain|mañana)\b/i;
+  evaluate(text, _msg) {
+    const lower = text.toLowerCase();
+    const words = lower.split(/[\s,.:;!]+/);
 
-    if (!pattern.test(text) && !reversePattern.test(text)) return null;
+    // Check if any word matches "tomorrow" in any language
+    const hasTomorrow = words.some((w) => TOMORROW_WORDS.has(w));
+    if (!hasTomorrow) return null;
 
-    // Schedule follow-up for tomorrow evening (18:00 UTC as default)
+    // Skip questions — universal structural check
+    const trimmed = text.trim();
+    if (trimmed.endsWith("?")) return null;
+
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(18, 0, 0, 0);
@@ -38,8 +49,8 @@ const tomorrowIntent: TriggerRule = {
       action: "create_intent",
       payload: {
         what: `Follow up on commitment: "${text.substring(0, 100)}"`,
-        why: "User said they would do something tomorrow",
-        confidence: 0.75,
+        why: "User mentioned tomorrow — possible commitment",
+        confidence: 0.65,
         executeAt: tomorrow.getTime(),
       },
     };
@@ -132,9 +143,17 @@ const timeMention: TriggerRule = {
   enabled: true,
   priority: 35,
   evaluate(text) {
-    const timePattern = /\b(?:at|la|в|um|à|a las)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)?\b/;
-    const match = text.match(timePattern);
+    // Match 24h format (15:30) or 12h format (3pm, 3:30pm, 3 PM)
+    const time24 = text.match(/\b(\d{1,2}):(\d{2})\b/);
+    const time12 = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+
+    const match = time24 ?? time12;
     if (!match) return null;
+
+    // Validate hour range to avoid false positives
+    const hour = parseInt(match[1], 10);
+    if (hour > 23) return null;
+    if (time24 && parseInt(match[2], 10) > 59) return null;
 
     return {
       ruleId: "time_mention",

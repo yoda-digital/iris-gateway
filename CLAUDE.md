@@ -54,6 +54,7 @@ This single file is the bridge between OpenCode and Iris. It contains:
 - **All tool definitions** — each tool is a thin HTTP wrapper calling back to the Iris tool server
 - **All hooks** — `tool.execute.before` (policy + governance enforcement), `tool.execute.after` (audit), `experimental.chat.system.transform` (vault context + skill suggestion injection), `experimental.session.compacting` (fact extraction), `permission.ask` (deny file/bash)
 - **Dynamic plugin tools** — reads `~/.iris/plugin-tools.json` manifest and registers wrappers
+- **Dynamic CLI tools** — reads `~/.iris/cli-tools.json` manifest and registers grouped tools with action enums
 
 ### Tool Server (`src/bridge/tool-server.ts`)
 
@@ -68,6 +69,10 @@ Hono HTTP server (port 19877) that handles all tool execution. This is the large
 - `/tools/*` — custom tools discovery and scaffolding
 - `/canvas/*` — Canvas UI updates
 - `/session/*` — system prompt context building
+- `/cli/:toolName` — CLI tool execution (sandboxed binary calls)
+- `/onboarding/*` — profile enrichment
+- `/proactive/*` — intent CRUD, quota, dormancy
+- `/heartbeat/*` — health status, trigger
 - `/audit/*`, `/usage/*` — logging and tracking
 
 ### Enforcement Hierarchy
@@ -81,7 +86,23 @@ Each layer can only narrow further, never widen. Policy is also checked at agent
 
 ### Vault (Persistent Memory)
 
-SQLite database at `~/.iris/vault.db` with FTS5 full-text search. Tables: `memories`, `memories_fts`, `profiles`, `audit_log`, `governance_log`, `usage_log`. The `experimental.chat.system.transform` hook injects user profile + relevant memories into every system prompt automatically.
+SQLite database at `~/.iris/vault.db` with FTS5 full-text search. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`. The `experimental.chat.system.transform` hook injects user profile + relevant memories into every system prompt automatically.
+
+### Onboarding
+
+Two-layer user profiling (`src/onboarding/`). Layer 1: tinyld language detection (62 languages) + Unicode script classification + active hours + response style -- instant, zero cost. Layer 2: AI uses `enrich_profile` tool to store what it learns through conversation. First-contact detection injects a language-agnostic meta-prompt.
+
+### Heartbeat
+
+Adaptive health monitoring (`src/heartbeat/`). Five checkers (bridge, channels, vault, sessions, memory) on intervals that tighten as health degrades (60s/15s/5s). Self-healing with backoff. Multi-agent support. Active hours gating (IANA timezone). Alert dedup. Empty-check optimization with exponential backoff. Request coalescing.
+
+### CLI Tools
+
+Sandboxed CLI binary integration (`src/cli/`). Config-driven: binary whitelist + per-tool action definitions with typed subcommands, positional args, and flags. Executor uses `execFile` (no shell). Always appends `--json --no-input`. Manifest written to `~/.iris/cli-tools.json` for plugin auto-registration. Currently wraps `gog` (Google Calendar, Gmail, Contacts, Tasks, Drive).
+
+### Proactive System
+
+Follow-up intelligence (`src/proactive/`). AI registers intents to check back on users. Passive scans detect dormant users. Soft quotas, quiet hours, engagement tracking.
 
 ### Channel Adapters
 
@@ -107,7 +128,7 @@ Iris plugins (`src/plugins/types.ts`) can register tools, channels, services, an
 
 ## Testing
 
-Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline (no mock files). Common pattern: create temp directory with `mkdtempSync`, clean up in `afterEach`. SQLite tests use in-memory or temp-dir databases.
+503 tests across 70 files in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline (no mock files). Common pattern: create temp directory with `mkdtempSync`, clean up in `afterEach`. SQLite tests use in-memory or temp-dir databases.
 
 Known: 6 pre-existing test failures in `pipeline.test.ts` and `message-router.test.ts` related to `sendAndWait` mock — these predate current work.
 
@@ -118,9 +139,13 @@ Known: 6 pre-existing test failures in `pipeline.test.ts` and `message-router.te
 | `src/gateway/lifecycle.ts` | Wires everything together — the dependency injection root |
 | `.opencode/plugin/iris.ts` | THE plugin — all tools + hooks in one file |
 | `src/bridge/tool-server.ts` | Largest file — all HTTP tool endpoints |
-| `src/bridge/message-router.ts` | Inbound message routing pipeline |
+| `src/bridge/message-router.ts` | Inbound message routing pipeline + first-contact detection |
 | `src/bridge/session-map.ts` | Session identity resolution |
 | `src/config/schema.ts` + `types.ts` | Config shape — update both together |
+| `src/cli/executor.ts` | Sandboxed CLI binary runner |
+| `src/cli/registry.ts` | Config-driven tool-to-command mapper |
+| `src/onboarding/enricher.ts` | tinyld language + Unicode script + statistical profiling |
+| `src/heartbeat/engine.ts` | Multi-agent health orchestrator |
 | `AGENTS.md` | AI behavioral rules (injected into all agents) |
 | `docs/cookbook.md` | Comprehensive usage patterns and examples |
 

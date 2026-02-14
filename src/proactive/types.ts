@@ -6,6 +6,7 @@ export interface ProactiveIntent {
   readonly senderId: string;
   readonly what: string;
   readonly why: string | null;
+  readonly category?: string | null;
   readonly confidence: number;
   readonly executeAt: number;
   readonly executedAt: number | null;

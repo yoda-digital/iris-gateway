@@ -30,8 +30,8 @@ export class IntentStore {
     this.db
       .prepare(
         `INSERT INTO proactive_intents
-         (id, session_id, channel_id, chat_id, sender_id, what, why, confidence, execute_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, session_id, channel_id, chat_id, sender_id, what, why, category, confidence, execute_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -41,6 +41,7 @@ export class IntentStore {
         params.senderId,
         params.what,
         params.why ?? null,
+        params.category ?? null,
         params.confidence ?? 0.8,
         params.executeAt,
         Date.now(),
@@ -236,6 +237,7 @@ export class IntentStore {
       senderId: row["sender_id"] as string,
       what: row["what"] as string,
       why: (row["why"] as string) ?? null,
+      category: (row["category"] as string) ?? null,
       confidence: row["confidence"] as number,
       executeAt: row["execute_at"] as number,
       executedAt: (row["executed_at"] as number) ?? null,

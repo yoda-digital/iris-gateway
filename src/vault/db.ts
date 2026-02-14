@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS proactive_intents (
   sender_id   TEXT NOT NULL,
   what        TEXT NOT NULL,
   why         TEXT,
+  category    TEXT,
   confidence  REAL DEFAULT 0.8,
   execute_at  INTEGER NOT NULL,
   executed_at INTEGER,

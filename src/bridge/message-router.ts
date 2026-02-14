@@ -257,6 +257,8 @@ export class MessageRouter {
 
     if (response) {
       await this.sendResponse(msg.channelId, msg.chatId, response, msg.id);
+    } else {
+      log.warn("Empty response from AI — model may be unavailable");
     }
   }
 

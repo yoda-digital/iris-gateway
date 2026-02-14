@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/openai/gpt-oss-120b:free",
+  "model": "openrouter/arcee-ai/trinity-large-preview:free",
   "small_model": "openrouter/arcee-ai/trinity-mini:free",
   "provider": {
     "openrouter": {

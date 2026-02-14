@@ -943,6 +943,99 @@ Supported components: text, markdown, chart (Chart.js), table, code, image, form
 
 The webchat channel adapter routes messages through the Canvas UI for browser-based conversations.
 
+## Onboarding (Invisible User Profiling)
+
+### How it works
+
+Onboarding is invisible — there's no "welcome wizard." Instead, Iris silently profiles users from their messages:
+
+1. **First Contact**: When a brand-new user sends their first message, the MessageRouter injects a `[FIRST CONTACT]` meta-prompt into the AI's context. The AI naturally welcomes them without announcing "you're being onboarded."
+
+2. **Profile Enrichment**: On every message, the `ProfileEnricher` extracts signals:
+   - **Language**: Detects ro, ru, es, fr, de from keyword patterns
+   - **Name**: Extracts from "I'm Alex", "my name is...", "call me..."
+   - **Active Hours**: Tracks UTC hours of activity
+   - **Response Style**: After 5+ messages, classifies as concise/moderate/verbose
+
+3. **Signal Consolidation**: Periodically, highest-confidence signals are merged into the user's vault profile.
+
+### Configuration
+
+```yaml
+onboarding:
+  enabled: true
+  enricher:
+    enabled: true
+    signalRetentionDays: 90
+    consolidateIntervalMs: 3600000  # 1 hour
+  firstContact:
+    enabled: true
+```
+
+### Query enriched profiles
+
+```bash
+sqlite3 ~/.iris/vault.db "SELECT * FROM profile_signals WHERE sender_id = 'tg:12345' ORDER BY confidence DESC;"
+```
+
+## Heartbeat (System Health)
+
+### How it works
+
+The Heartbeat Engine ("The Pulse") monitors Iris component health with adaptive intervals:
+
+- **Healthy**: Check every 60 seconds
+- **Degraded**: Check every 15 seconds (faster monitoring)
+- **Critical**: Check every 5 seconds (aggressive monitoring)
+
+Five parallel health checkers run on each tick:
+| Checker | What it monitors |
+|---------|-----------------|
+| Bridge | OpenCode bridge connectivity |
+| Channel | All registered channel adapters |
+| Vault | SQLite database integrity |
+| Session | Session map health |
+| Memory | Process memory usage (warn at 512MB, critical at 1024MB) |
+
+### Self-healing pipeline
+
+When a component enters `degraded` or `down` status:
+1. Engine attempts automatic recovery (up to 3 attempts)
+2. Backoff between attempts (configurable ticks)
+3. After max attempts, component is marked as permanently down until manual intervention
+
+### Configuration
+
+```yaml
+heartbeat:
+  enabled: true
+  intervals:
+    healthy: 60000     # 60s between checks when healthy
+    degraded: 15000    # 15s when degraded
+    critical: 5000     # 5s when critical
+  selfHeal:
+    enabled: true
+    maxAttempts: 3
+    backoffTicks: 3
+  activity:
+    enabled: true
+    dormancyThresholdMs: 604800000  # 7 days
+  logRetentionDays: 30
+```
+
+### Check health via the AI
+
+```
+heartbeat_status()
+→ { enabled: true, components: [{ component: "bridge", status: "healthy" }, ...] }
+```
+
+### Query heartbeat logs
+
+```bash
+sqlite3 ~/.iris/vault.db "SELECT component, status, details, datetime(timestamp/1000, 'unixepoch') FROM heartbeat_log ORDER BY timestamp DESC LIMIT 20;"
+```
+
 ## Debugging
 
 ### Check health

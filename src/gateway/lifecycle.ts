@@ -274,6 +274,7 @@ export async function startGateway(
     usageTracker,
     canvasServer,
     intentStore,
+    signalStore,
   });
   await toolServer.start();
 
@@ -415,6 +416,7 @@ export async function startGateway(
       checkers,
       logger,
       config: config.heartbeat,
+      getQueueSize: () => bridge.getQueueSize(),
     });
     heartbeatEngine.start();
     toolServer.setHeartbeatEngine(heartbeatEngine);

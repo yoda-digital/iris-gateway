@@ -14,6 +14,7 @@ import type { UsageTracker } from "../usage/tracker.js";
 import type { CanvasServer } from "../canvas/server.js";
 import type { PolicyEngine } from "../governance/policy.js";
 import type { IntentStore } from "../proactive/store.js";
+import type { SignalStore } from "../onboarding/signals.js";
 
 const sendMessageSchema = z.object({
   channel: z.string().min(1),
@@ -59,7 +60,8 @@ export interface ToolServerDeps {
   usageTracker?: UsageTracker | null;
   canvasServer?: CanvasServer | null;
   intentStore?: IntentStore | null;
-  heartbeatEngine?: { getStatus(): Array<{ component: string; status: string }> } | null;
+  signalStore?: SignalStore | null;
+  heartbeatEngine?: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
 }
 
 export class ToolServer {
@@ -77,7 +79,8 @@ export class ToolServer {
   private readonly usageTracker: UsageTracker | null;
   private readonly canvasServer: CanvasServer | null;
   private readonly intentStore: IntentStore | null;
-  private heartbeatEngine: { getStatus(): Array<{ component: string; status: string }> } | null;
+  private readonly signalStore: SignalStore | null;
+  private heartbeatEngine: { getStatus(): Array<{ agentId: string; component: string; status: string }> } | null;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -100,6 +103,7 @@ export class ToolServer {
       this.usageTracker = null;
       this.canvasServer = null;
       this.intentStore = null;
+      this.signalStore = null;
       this.heartbeatEngine = null;
     } else {
       const deps = registryOrDeps as ToolServerDeps;
@@ -115,6 +119,7 @@ export class ToolServer {
       this.usageTracker = deps.usageTracker ?? null;
       this.canvasServer = deps.canvasServer ?? null;
       this.intentStore = deps.intentStore ?? null;
+      this.signalStore = deps.signalStore ?? null;
       this.heartbeatEngine = deps.heartbeatEngine ?? null;
     }
     this.app = new Hono();
@@ -685,6 +690,7 @@ export class ToolServer {
       "rules_read — Read project behavioral rules (AGENTS.md)",
       "rules_update — Update project behavioral rules",
       "canvas_update — Push rich UI components to Canvas dashboard",
+      "enrich_profile — Silently store learned user attributes (name, language, timezone, etc.)",
     ];
 
     // Helper: build Iris architecture context block for agent prompts
@@ -1172,6 +1178,53 @@ export class ToolServer {
       return c.json({ ok: true });
     });
 
+    // ── Onboarding enrichment endpoint ──
+
+    this.app.post("/onboarding/enrich", async (c) => {
+      if (!this.signalStore) return c.json({ error: "Onboarding not configured" }, 503);
+      const body = await c.req.json();
+      const field = body.field as string;
+      const value = body.value as string;
+      if (!field || !value) return c.json({ error: "field and value required" }, 400);
+
+      const confidence = typeof body.confidence === "number" ? body.confidence : 0.9;
+
+      // Resolve sender from session
+      let senderId: string | null = null;
+      let channelId: string | null = null;
+      if (body.sessionID && this.sessionMap) {
+        const entry = await this.sessionMap.findBySessionId(body.sessionID);
+        if (entry) {
+          senderId = entry.senderId;
+          channelId = entry.channelId;
+        }
+      }
+      if (!senderId || !channelId) {
+        return c.json({ error: "Could not resolve sender from session" }, 400);
+      }
+
+      this.signalStore.addSignal({
+        senderId,
+        channelId,
+        signalType: field,
+        value,
+        confidence,
+      });
+
+      // For core profile fields, also write directly to vault profile
+      const coreFields = ["name", "language", "timezone"];
+      if (coreFields.includes(field) && this.vaultStore) {
+        this.vaultStore.upsertProfile({
+          senderId,
+          channelId,
+          [field]: value,
+        });
+      }
+
+      this.logger.debug({ senderId, field, value, confidence }, "Profile enriched via LLM");
+      return c.json({ ok: true });
+    });
+
     // ── Heartbeat endpoints ──
 
     this.app.get("/heartbeat/status", (c) => {
@@ -1196,7 +1249,7 @@ export class ToolServer {
     }
   }
 
-  setHeartbeatEngine(engine: { getStatus(): Array<{ component: string; status: string }> }): void {
+  setHeartbeatEngine(engine: { getStatus(): Array<{ agentId: string; component: string; status: string }> }): void {
     this.heartbeatEngine = engine;
   }
 }

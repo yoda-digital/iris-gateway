@@ -129,8 +129,11 @@ describe("HeartbeatEngine", () => {
     });
 
     await engine.tick();
+    vi.advanceTimersByTime(60_000);
     await engine.tick();
+    vi.advanceTimersByTime(60_000);
     await engine.tick();
+    vi.advanceTimersByTime(60_000);
     await engine.tick();
 
     expect(checker.heal).toHaveBeenCalledTimes(3);
@@ -154,6 +157,8 @@ describe("HeartbeatEngine", () => {
     const dbStatus = statuses.find((s) => s.component === "database");
     const cacheStatus = statuses.find((s) => s.component === "cache");
     expect(dbStatus?.status).toBe("healthy");
+    expect(dbStatus?.agentId).toBe("default");
     expect(cacheStatus?.status).toBe("recovering");
+    expect(cacheStatus?.agentId).toBe("default");
   });
 });

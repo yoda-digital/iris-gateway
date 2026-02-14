@@ -39,7 +39,7 @@ Just write your reply as plain text. The gateway handles chunking, formatting, a
 - Supports filtering by sender ID and time range (since/until Unix timestamps)
 
 ### Proactive Intelligence
-- Use `proactive_intent` to register a follow-up intent — schedule yourself to check back later
+- Use `proactive_intent` to register a follow-up intent — schedule yourself to check back later. Pass `category` (task/work/health/hobby/social/reminder) for engagement tracking.
 - Use `proactive_cancel` to cancel a pending intent if context changed
 - Use `proactive_list` to see all pending intents and triggers
 - Use `proactive_quota` to check your quota and engagement rate before scheduling

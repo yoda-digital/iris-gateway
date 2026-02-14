@@ -194,9 +194,9 @@ Adaptive health monitoring with self-healing. Five parallel checkers (bridge, ch
 Seven deterministic subsystems — zero LLM cost, all pure Node.js + SQLite:
 
 1. **Signal Inference Engine** — derives higher-order signals (timezone, language stability, engagement trend, response cadence, session pattern) from raw profile signals using statistical rules with cooldowns.
-2. **Event-Driven Triggers** — synchronous regex and signal-threshold rules that fire in the message pipeline (tomorrow-intent, date/time mentions, dormancy recovery, engagement drops).
-3. **Outcome-Aware Proactive Loop** — category-segmented engagement tracking (task/work/health/hobby/social/reminder) with timing patterns, fed back into proactive decision-making.
-4. **Memory Arcs** — temporal narrative threads that track evolving situations. Detected from keyword overlap in conversation. Auto-stale after 14 days.
+2. **Event-Driven Triggers** — structural pattern detection that fires in the message pipeline (temporal markers, date/time mentions, dormancy recovery, engagement drops). Language-agnostic — no regex per language.
+3. **Outcome-Aware Proactive Loop** — category-segmented engagement tracking (task/work/health/hobby/social/reminder) with timing patterns. Categories are AI-assigned (not keyword-guessed), making classification language-agnostic.
+4. **Memory Arcs** — temporal narrative threads that track evolving situations. Detected from Unicode-aware keyword overlap in conversation (supports all scripts). Auto-stale after 14 days.
 5. **Goal Tracking** — persistent goals with state machine (active/paused/completed/abandoned), success criteria, next-action queue. Injected into every system prompt.
 6. **Cross-Channel Intelligence** — unified presence/preference detection across channels. Determines which channel a user prefers based on activity patterns.
 7. **Self-Tuning Heartbeat** — linear regression trend detection on health metrics, predictive threshold breach detection, health-aware proactive throttling (normal/reduced/minimal/paused).

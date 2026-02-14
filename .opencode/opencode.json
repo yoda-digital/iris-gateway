@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openrouter/arcee-ai/trinity-large-preview:free",
+  "model": "openrouter/z-ai/glm-4.5-air:free",
   "small_model": "openrouter/arcee-ai/trinity-mini:free",
   "provider": {
     "openrouter": {
@@ -11,6 +11,9 @@
         "openai/gpt-oss-120b:free": {
           "name": "GPT-OSS 120B (Primary Chat)",
           "attachment": true,
+          "reasoning": true,
+          "tool_call": true,
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 131072,
             "output": 16384
@@ -19,6 +22,9 @@
         "z-ai/glm-4.5-air:free": {
           "name": "GLM-4.5-Air (Cron/Fallback)",
           "attachment": true,
+          "reasoning": true,
+          "tool_call": true,
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 131072,
             "output": 8192
@@ -26,6 +32,8 @@
         },
         "openrouter/aurora-alpha": {
           "name": "Aurora Alpha (Speed/Moderator)",
+          "reasoning": false,
+          "tool_call": true,
           "limit": {
             "context": 128000,
             "output": 8192
@@ -34,6 +42,9 @@
         "qwen/qwen3-coder:free": {
           "name": "Qwen3-Coder 480B (Reasoner)",
           "attachment": true,
+          "reasoning": true,
+          "tool_call": true,
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 262144,
             "output": 32768
@@ -41,6 +52,9 @@
         },
         "deepseek/deepseek-r1-0528:free": {
           "name": "DeepSeek R1 (Compactor)",
+          "reasoning": true,
+          "tool_call": false,
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
             "context": 164000,
             "output": 16384
@@ -49,6 +63,8 @@
         "arcee-ai/trinity-large-preview:free": {
           "name": "Trinity Large (Alt Primary)",
           "attachment": true,
+          "reasoning": false,
+          "tool_call": true,
           "limit": {
             "context": 131072,
             "output": 16384
@@ -56,6 +72,8 @@
         },
         "arcee-ai/trinity-mini:free": {
           "name": "Trinity Mini (Proactive/Light)",
+          "reasoning": false,
+          "tool_call": true,
           "limit": {
             "context": 131072,
             "output": 4096
@@ -64,8 +82,20 @@
         "meta-llama/llama-3.3-70b-instruct:free": {
           "name": "Llama 3.3 70B (Battle-tested Fallback)",
           "attachment": true,
+          "reasoning": false,
+          "tool_call": true,
           "limit": {
             "context": 128000,
+            "output": 8192
+          }
+        },
+        "stepfun/step-3.5-flash:free": {
+          "name": "Step 3.5 Flash (Long Context)",
+          "reasoning": true,
+          "tool_call": false,
+          "interleaved": { "field": "reasoning_content" },
+          "limit": {
+            "context": 256000,
             "output": 8192
           }
         }

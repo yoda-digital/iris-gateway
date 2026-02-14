@@ -691,6 +691,8 @@ export class ToolServer {
       "rules_update — Update project behavioral rules",
       "canvas_update — Push rich UI components to Canvas dashboard",
       "enrich_profile — Silently store learned user attributes (name, language, timezone, etc.)",
+      "heartbeat_status — Get system health status for all agents",
+      "heartbeat_trigger — Manually trigger a heartbeat check for an agent",
     ];
 
     // Helper: build Iris architecture context block for agent prompts
@@ -1233,6 +1235,16 @@ export class ToolServer {
         enabled: true,
         components: this.heartbeatEngine.getStatus(),
       });
+    });
+
+    this.app.post("/heartbeat/trigger", async (c) => {
+      if (!this.heartbeatEngine) return c.json({ error: "Heartbeat not enabled" }, 503);
+      try {
+        await (this.heartbeatEngine as any).tick();
+        return c.json({ ok: true, components: this.heartbeatEngine.getStatus() });
+      } catch (err) {
+        return c.json({ error: "Trigger failed" }, 500);
+      }
     });
   }
 

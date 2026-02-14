@@ -1,0 +1,50 @@
+{
+  "autoReply": {
+    "enabled": true,
+    "templates": [
+      {
+        "id": "greeting-fast",
+        "trigger": {
+          "type": "keyword",
+          "words": ["hello", "hi", "hey", "salut", "buna", "привет", "здравствуйте"]
+        },
+        "response": "Hey {sender.name}! How can I help you today?",
+        "priority": 10,
+        "cooldown": 300,
+        "chatTypes": ["dm"],
+        "forwardToAi": true
+      },
+      {
+        "id": "status-quick",
+        "trigger": {
+          "type": "command",
+          "name": "status"
+        },
+        "response": "All systems operational. I'm here and ready to help!",
+        "priority": 20,
+        "forwardToAi": false
+      },
+      {
+        "id": "help-quick",
+        "trigger": {
+          "type": "keyword",
+          "words": ["help", "ajutor", "помощь", "ce poti", "what can you do"]
+        },
+        "response": "I can chat, remember things about you, search the web, send media, and more. Just ask! Type /help for full details.",
+        "priority": 5,
+        "cooldown": 600,
+        "forwardToAi": true
+      },
+      {
+        "id": "rate-limit-fallback",
+        "trigger": {
+          "type": "schedule",
+          "when": { "hours": [2, 5] }
+        },
+        "response": "I'm in low-power mode right now (late night). I'll respond more fully in the morning! Leave me a message and I'll get back to you.",
+        "priority": 1,
+        "forwardToAi": false
+      }
+    ]
+  }
+}

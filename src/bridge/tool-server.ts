@@ -1096,6 +1096,7 @@ export class ToolServer {
 
       // Build user context from vault (profile + memories)
       let userContext: string | null = null;
+      let channelRules: string | null = null;
       if (this.vaultStore && this.vaultSearch && body.sessionID && this.sessionMap) {
         const entry = await this.sessionMap.findBySessionId(body.sessionID);
         if (entry) {
@@ -1116,12 +1117,15 @@ export class ToolServer {
           if (blocks.length > 0) {
             userContext = blocks.join("\n");
           }
+
+          // Inject current channel context so the model knows where to send messages
+          channelRules = `[CURRENT SESSION] channel=${entry.channelId} chatId=${entry.chatId} senderId=${entry.senderId} chatType=${entry.chatType}\nYour response text is automatically delivered to this chat. Only use send_message for cross-channel messaging or proactive outreach to OTHER users/channels.`;
         }
       }
 
       return c.json({
         directives,
-        channelRules: null,
+        channelRules,
         userContext,
       });
     });

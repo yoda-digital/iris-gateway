@@ -130,13 +130,39 @@ export class OpenCodeBridge {
       this.logger.info({ status: res.status }, "prompt_async response");
 
       const deadline = Date.now() + timeoutMs;
+      let lastNewCount = 0;
+      let stablePolls = 0;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, pollMs));
         try {
           const msgs = await this.listMessages(sessionId);
-          for (let i = knownCount; i < msgs.length; i++) {
-            if (msgs[i].role === "assistant" && msgs[i].text) {
-              return msgs[i].text;
+          const newMsgs = msgs.slice(knownCount);
+
+          // Primary: look for assistant message with text (includes reasoning fallback)
+          for (const msg of newMsgs) {
+            if (msg.role === "assistant" && msg.text) {
+              return msg.text;
+            }
+          }
+
+          // Secondary: detect model completion without text response.
+          // If we see new messages (tool calls, tool results) but message count
+          // stabilizes (no new messages for 3 consecutive polls), the model is done.
+          // This handles models that respond purely through tool calls (send_message).
+          if (newMsgs.length > 0) {
+            if (newMsgs.length === lastNewCount) {
+              stablePolls++;
+            } else {
+              stablePolls = 0;
+              lastNewCount = newMsgs.length;
+            }
+            // 3 stable polls = 6s of no new messages after model activity
+            if (stablePolls >= 3) {
+              this.logger.info(
+                { sessionId, newMessages: newMsgs.length },
+                "Model completed with tool calls only (no text response)",
+              );
+              return "";
             }
           }
         } catch {
@@ -198,17 +224,25 @@ export class OpenCodeBridge {
     }));
   }
 
-  async listMessages(sessionId: string): Promise<Array<{ role: string; text: string }>> {
+  async listMessages(sessionId: string): Promise<Array<{ role: string; text: string; hasParts: boolean }>> {
     const response = await this.getClient().session.messages({
       path: { id: sessionId },
       throwOnError: true,
     });
     return (response.data ?? []).map((msg) => {
       const role = msg.info.role;
-      const textParts = (msg.parts ?? []).filter((p: Part) => p.type === "text") as TextPart[];
+      const parts = msg.parts ?? [];
+      const textParts = parts.filter((p: Part) => p.type === "text") as TextPart[];
+      let text = textParts.map((p) => p.text).join("");
+      // Fallback: if no text parts, try reasoning parts (models with mandatory reasoning like gpt-oss-120b)
+      if (!text) {
+        const reasoningParts = parts.filter((p: Part) => p.type === "reasoning") as Array<{ text: string }>;
+        text = reasoningParts.map((p) => p.text).join("");
+      }
       return {
         role,
-        text: textParts.map((p) => p.text).join(""),
+        text,
+        hasParts: parts.length > 0,
       };
     });
   }

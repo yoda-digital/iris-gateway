@@ -175,3 +175,11 @@ Known: 6 pre-existing test failures in `pipeline.test.ts` and `message-router.te
 ## Commit Style
 
 Conventional commits: `feat(scope):`, `fix(scope):`, `refactor:`, `docs:`, `test:`.
+
+Versioning is fully automated via semantic-release. **Never manually edit the `version` field in `package.json`** — it is bumped automatically on every push to `main` based on commit types:
+- `feat:` / `feat(scope):` — minor bump (0.x.0)
+- `fix:` / `perf:` / `refactor:` — patch bump (0.0.x)
+- `BREAKING CHANGE:` in commit footer — major bump (x.0.0)
+- `docs:`, `test:`, `chore:`, `ci:`, `style:` — no release
+
+The release pipeline (`.github/workflows/release.yml`) runs after CI passes on `main`, generates CHANGELOG.md, tags the release, and creates a GitHub Release. Configuration lives in `.releaserc.json`.

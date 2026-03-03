@@ -123,6 +123,7 @@ export class ArcsStore {
     ).run(status, now, resolvedAt, arcId);
   }
 
+
   findArcByKeywords(senderId: string, keywords: string[]): MemoryArc | null {
     const arcs = this.getActiveArcs(senderId);
     for (const arc of arcs) {

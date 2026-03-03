@@ -5,6 +5,7 @@ import { removeStopwords, eng, deu, fra, spa, por, ita, rus, ron } from "stopwor
 
 export type TitleGeneratorFn = (keywords: string[], content: string) => Promise<string>;
 
+
 /**
  * Memory arc detector.
  * When new vault facts (memories) are stored, this checks whether they
@@ -96,13 +97,14 @@ export class ArcDetector {
       if (this.titleGenerator) {
         this.titleGenerator(keywords, content)
           .then((aiTitle) => {
-            if (aiTitle && aiTitle.length > 0) {
-              this.store.updateArcTitle(arc.id, aiTitle);
-              this.logger.debug({ arcId: arc.id, aiTitle }, "Arc title upgraded via AI");
+            const cleaned = aiTitle.trim().replace(/^["']+|["']+$/g, "");
+            if (cleaned) {
+              this.store.updateArcTitle(arc.id, cleaned);
+              this.logger.debug({ arcId: arc.id, aiTitle: cleaned }, "Arc title improved by AI");
             }
           })
-          .catch((err) => {
-            this.logger.debug({ err, arcId: arc.id }, "AI title generation failed — keeping fallback");
+          .catch((err: unknown) => {
+            this.logger.warn({ err, arcId: arc.id }, "AI title generation failed — keeping fallback");
           });
       }
     }

@@ -1,3 +1,10 @@
+## [1.2.0](https://github.com/yoda-digital/iris-gateway/compare/v1.1.0...v1.2.0) (2026-03-03)
+
+### Features
+
+* **docker:** add docker-compose for zero-friction deployment ([b07bfcd](https://github.com/yoda-digital/iris-gateway/commit/b07bfcdba1278915545e036cf3153974d8e43ac3))
+* **docker:** production-ready Dockerfile with multi-stage build ([21629d7](https://github.com/yoda-digital/iris-gateway/commit/21629d7045fd651d77e872972819d9aafb575e19))
+
 ## [1.1.0](https://github.com/yoda-digital/iris-gateway/compare/v1.0.5...v1.1.0) (2026-03-03)
 
 ### Features

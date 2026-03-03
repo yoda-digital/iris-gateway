@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/yoda-digital/iris-gateway/compare/v1.0.0...v1.0.1) (2026-03-03)
+
+### Bug Fixes
+
+* update README — test suite is green (531/531, 0 known failures) ([ab8010a](https://github.com/yoda-digital/iris-gateway/commit/ab8010a0f52924e8c2b207f96e8513646b1b0940)), closes [#4](https://github.com/yoda-digital/iris-gateway/issues/4)
+
 ## 1.0.0 (2026-02-15)
 
 ### Features

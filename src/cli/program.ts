@@ -25,6 +25,7 @@ import {
   SecurityAllowlistAddCommand,
 } from "./commands/security.js";
 import { DoctorCommand } from "./commands/doctor.js";
+import { InitCommand } from "./commands/init.js";
 import { ScanCommand } from "./commands/scan.js";
 
 export function createCli(): Cli {
@@ -69,6 +70,9 @@ export function createCli(): Cli {
 
   // Security scan
   cli.register(ScanCommand);
+
+  // Init wizard
+  cli.register(InitCommand);
 
   return cli;
 }

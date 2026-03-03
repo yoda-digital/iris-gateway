@@ -109,6 +109,12 @@ export class ArcsStore {
     return rows.map((r) => this.toArc(r));
   }
 
+  updateArcTitle(arcId: string, title: string): void {
+    this.db.prepare(
+      "UPDATE memory_arcs SET title = ?, updated_at = ? WHERE id = ?",
+    ).run(title, Date.now(), arcId);
+  }
+
   updateArcStatus(arcId: string, status: ArcStatus): void {
     const now = Date.now();
     const resolvedAt = status === "resolved" ? now : null;
@@ -117,11 +123,6 @@ export class ArcsStore {
     ).run(status, now, resolvedAt, arcId);
   }
 
-  updateArcTitle(arcId: string, title: string): void {
-    this.db.prepare(
-      "UPDATE memory_arcs SET title = ?, updated_at = ? WHERE id = ?",
-    ).run(title, Date.now(), arcId);
-  }
 
   findArcByKeywords(senderId: string, keywords: string[]): MemoryArc | null {
     const arcs = this.getActiveArcs(senderId);

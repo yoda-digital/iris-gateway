@@ -1,8 +1,10 @@
 import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { Logger } from "../../logging/logger.js";
+import { removeStopwords, eng, deu, fra, spa, por, ita, rus, ron } from "stopword";
 
 export type TitleGeneratorFn = (keywords: string[], content: string) => Promise<string>;
+
 
 /**
  * Memory arc detector.
@@ -15,11 +17,23 @@ export type TitleGeneratorFn = (keywords: string[], content: string) => Promise<
  * that track an evolving situation (e.g., "job search", "wedding planning").
  */
 export class ArcDetector {
+  private static readonly STOPWORD_MAP: Record<string, string[]> = {
+    en: eng,
+    de: deu,
+    fr: fra,
+    es: spa,
+    pt: por,
+    it: ita,
+    ru: rus,
+    ro: ron,
+  };
+
   constructor(
     private readonly store: IntelligenceStore,
     private readonly bus: IntelligenceBus,
     private readonly logger: Logger,
     private readonly titleGenerator?: TitleGeneratorFn,
+    private readonly userLanguage?: string,
   ) {}
 
   /**
@@ -62,10 +76,10 @@ export class ArcDetector {
 
     // No match — create a new arc if content is substantial
     if (keywords.length >= 3 && content.length >= 30) {
-      const title = this.generateTitle(keywords);
+      const fallbackTitle = this.generateTitle(keywords);
       const arc = this.store.createArc({
         senderId,
-        title,
+        title: fallbackTitle,
         summary: content.substring(0, 200),
       });
 
@@ -77,8 +91,9 @@ export class ArcDetector {
       });
 
       this.bus.emit({ type: "arc_created", senderId, arc });
-      this.logger.info({ arcId: arc.id, title }, "New memory arc created");
+      this.logger.info({ arcId: arc.id, title: fallbackTitle }, "New memory arc created");
 
+      // Async AI title upgrade (fire-and-forget)
       if (this.titleGenerator) {
         this.titleGenerator(keywords, content)
           .then((aiTitle) => {
@@ -116,11 +131,17 @@ export class ArcDetector {
    * Filters out stop words and short tokens.
    */
   private extractKeywords(text: string): string[] {
-    return text
+    const tokens = text
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s-]/gu, " ")
       .split(/\s+/)
       .filter((w) => w.length >= 3);
+
+    const stopwords = this.userLanguage
+      ? (ArcDetector.STOPWORD_MAP[this.userLanguage] ?? eng)
+      : eng;
+
+    return removeStopwords(tokens, stopwords);
   }
 
   /**

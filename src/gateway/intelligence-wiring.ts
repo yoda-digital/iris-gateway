@@ -46,6 +46,7 @@ export function initIntelligence(
   heartbeatStore: HeartbeatStore | null,
   logger: Logger,
   titleGenerator?: TitleGeneratorFn,
+  userLanguage?: string,
 ): IntelligenceComponents {
   const intelligenceBus = new IntelligenceBus();
   const intelligenceStore = new IntelligenceStore(vaultDb);
@@ -58,7 +59,7 @@ export function initIntelligence(
 
   // Phase 2: Outcomes + arcs
   const outcomeAnalyzer = new OutcomeAnalyzer(intelligenceStore, intelligenceBus, logger);
-  const arcDetector = new ArcDetector(intelligenceStore, intelligenceBus, logger, titleGenerator);
+  const arcDetector = new ArcDetector(intelligenceStore, intelligenceBus, logger, titleGenerator, userLanguage);
   const arcLifecycle = new ArcLifecycle(intelligenceStore, intelligenceBus, logger);
 
   // Phase 3: Goals + cross-channel

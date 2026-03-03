@@ -24,10 +24,10 @@ export class PromptAssembler {
   /**
    * Assemble all intelligence sections for a user.
    */
-  assemble(senderId: string, triggerFlags?: TriggerResult[]): PromptSections {
+  assemble(senderId: string, triggerFlags?: TriggerResult[], userLanguage?: string): PromptSections {
     return {
       arcs: this.arcs?.getArcContext(senderId) ?? null,
-      goals: this.goals?.getGoalContext(senderId) ?? null,
+      goals: this.goals?.getGoalContext(senderId, userLanguage) ?? null,
       proactiveContext: this.buildProactiveContext(senderId),
       crossChannel: this.crossChannel?.getContextForPrompt(senderId) ?? null,
       triggerFlags: this.buildTriggerFlags(triggerFlags),
@@ -39,8 +39,8 @@ export class PromptAssembler {
    * Render all sections into a single string for system prompt injection.
    * Only includes non-null sections.
    */
-  render(senderId: string, triggerFlags?: TriggerResult[]): string | null {
-    const sections = this.assemble(senderId, triggerFlags);
+  render(senderId: string, triggerFlags?: TriggerResult[], userLanguage?: string): string | null {
+    const sections = this.assemble(senderId, triggerFlags, userLanguage);
     const parts: string[] = [];
 
     if (sections.arcs) parts.push(sections.arcs);

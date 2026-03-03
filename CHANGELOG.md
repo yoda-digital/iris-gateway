@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/yoda-digital/iris-gateway/compare/v1.0.1...v1.0.2) (2026-03-03)
+
+### Refactoring
+
+* **bridge:** split tool-server.ts into domain routers ([8cc0a90](https://github.com/yoda-digital/iris-gateway/commit/8cc0a9098fa9a1982d7d0852810177e93f7a2d95)), closes [#5](https://github.com/yoda-digital/iris-gateway/issues/5)
+
 ## [1.0.1](https://github.com/yoda-digital/iris-gateway/compare/v1.0.0...v1.0.1) (2026-03-03)
 
 ### Bug Fixes

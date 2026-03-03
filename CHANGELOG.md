@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/yoda-digital/iris-gateway/compare/v1.0.3...v1.0.4) (2026-03-03)
+
+### Refactoring
+
+* **config:** externalize model selection — config not commits ([400ba9e](https://github.com/yoda-digital/iris-gateway/commit/400ba9e930b7bac9a6b8b5f5d2616253344bdc17)), closes [#7](https://github.com/yoda-digital/iris-gateway/issues/7)
+* **gateway:** decompose lifecycle.ts into subsystem wiring modules ([7fd822f](https://github.com/yoda-digital/iris-gateway/commit/7fd822f61041b98ebc54ad938a22ce7eae3aea22)), closes [#8](https://github.com/yoda-digital/iris-gateway/issues/8)
+
 ## [1.0.3](https://github.com/yoda-digital/iris-gateway/compare/v1.0.2...v1.0.3) (2026-03-03)
 
 ### Refactoring

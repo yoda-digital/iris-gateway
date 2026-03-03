@@ -1,80 +1,86 @@
-# Iris
+# Iris Gateway
 
-Multi-channel AI messaging gateway. Routes messages between Telegram, WhatsApp, Discord, Slack, and WebChat through [OpenCode CLI](https://github.com/nicholasgriffintn/opencode) with free models via OpenRouter.
+**Your self-hosted AI assistant that talks to you on Telegram, WhatsApp, Discord, and Slack — powered entirely by free AI models.**
 
-Learns users invisibly. Monitors its own health. Heals itself. Tracks goals, detects narrative arcs, tunes proactive messaging from engagement data, and routes intelligence across channels. Manages your calendar, email, contacts, and tasks through sandboxed CLI tools. As of February 2026, Arcee Trinity models (large + mini) work well for both chat and tool calling on the free tier.
+Run a personal AI with memory, goals, and proactive nudges on your own server, at zero model cost, using [OpenRouter's free tier](https://openrouter.ai) (Arcee Trinity works great).
 
-## Requirements
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/yoda-digital/iris-gateway/releases)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
-- Node.js >= 22
-- pnpm
-- OpenCode CLI (auto-spawned or external)
-- At least one bot token (Telegram, Discord, Slack) or WhatsApp QR auth
+- 💸 **Free models that actually work** — Arcee Trinity (large + mini) on OpenRouter's free tier handles both chat and tool calling
+- 🧠 **Intelligence layer** — learns who you are from every conversation without you lifting a finger
+- 📱 **All your channels, one brain** — Telegram, WhatsApp, Discord, Slack, WebChat share a single memory
+- 🎯 **Goal and arc tracking** — remembers what you're working on, follows up when relevant
+- 🔧 **40+ built-in tools** — calendar, email, contacts, tasks, web search out of the box
+- 🛡️ **Self-healing health monitor** — detects degradation and recovers automatically
+- 🔌 **Extensible** — write plugins, add CLI tools, create custom skills
 
-## Build
+---
 
-```
+## Quick Start
+
+Get Iris talking on Telegram in under 10 minutes:
+
+```bash
+# 1. Clone and install
 git clone https://github.com/yoda-digital/iris-gateway.git iris && cd iris
 pnpm install
-pnpm run build
-pnpm test
-```
 
-531 tests across 73 test files. All passing.
-
-## Configure
-
-```
+# 2. Configure
 cp iris.config.example.json iris.config.json
+echo "TELEGRAM_BOT_TOKEN=your_token_here" > .env
+
+# 3. Build and run
+pnpm run build && pnpm start
+
+# 4. Verify
+curl http://127.0.0.1:19876/health
 ```
 
-Set tokens in environment or `.env`:
+**Telegram bot token:** [@BotFather](https://t.me/botfather) → `/newbot`  
+**Free AI models:** Sign up at [openrouter.ai/keys](https://openrouter.ai/keys) — Arcee Trinity works on the free tier  
+**Full config reference:** [docs/configuration.md](docs/configuration.md)
 
-```
-TELEGRAM_BOT_TOKEN=...
-DISCORD_BOT_TOKEN=...
-SLACK_APP_TOKEN=xapp-...
-SLACK_BOT_TOKEN=xoxb-...
-```
+### Docker (even faster)
 
-Tokens are referenced in config as `${env:TELEGRAM_BOT_TOKEN}`. See `docs/configuration.md` for the full reference.
-
-Config sections:
-
-| Section | Purpose |
-|---------|---------|
-| `gateway` | Health server port/host (default :19876) |
-| `channels` | Per-channel adapter config (type, token, DM/group policies, streaming) |
-| `security` | DM policy mode, pairing TTL, rate limits |
-| `opencode` | OpenCode server port, auto-spawn toggle |
-| `cron` | Scheduled prompts delivered to channels |
-| `governance` | Behavioral rule engine: constraints, rate limits, audit, directives |
-| `policy` | Master policy: tool allowlists, permission ceiling, agent restrictions |
-| `proactive` | Follow-up intents, dormancy detection, quiet hours |
-| `onboarding` | Two-layer user profiling (statistical + LLM) |
-| `heartbeat` | Health monitoring with self-healing, multi-agent, active hours gating |
-| `cli` | Sandboxed CLI tool integration (gog for Google services, extensible) |
-| `plugins` | Plugin paths (auto-discovered from `./plugins/` and `~/.iris/plugins/`) |
-| `autoReply` | Template-based auto-reply engine (bypass AI for common queries) |
-| `canvas` | Canvas UI server (WebSocket-based A2UI dashboard) |
-| `mcp` | MCP server toggles |
-| `logging` | Log level, file output, JSON mode |
-
-## Run
-
-```
-pnpm run dev            # development (tsx + hot reload)
-pnpm run build && pnpm start  # production
+```bash
+cp iris.config.example.json iris.config.json
+echo "TELEGRAM_BOT_TOKEN=your_token" > .env
+docker-compose up -d
 ```
 
-Health check: `curl http://127.0.0.1:19876/health`
+---
+
+## Why Iris?
+
+|  | **Iris** | DIY Bot | n8n |
+|---|:---:|:---:|:---:|
+| Free AI models | ✅ | ❌ | ❌ |
+| Multi-channel (one brain) | ✅ | manual | ✅ |
+| Intelligence layer | ✅ | ❌ | ❌ |
+| Goal & arc tracking | ✅ | ❌ | ❌ |
+| Self-hosted | ✅ | ✅ | ✅ |
+| Setup time | ~10 min | days | hours |
+
+---
+
+## What People Use It For
+
+**Personal AI assistant** — Replace generic chatbots with something that knows your name, remembers your projects, and follows up when a deadline is approaching. Works across all your messaging apps simultaneously.
+
+**Smart home/server automation** — Send messages from cron jobs, get AI-summarized alerts, ask questions about your infrastructure in plain language from your phone.
+
+**Team assistant** — Deploy to a Discord or Slack server, configure per-channel policies, add custom tools, and give your team an AI that respects governance rules you define.
+
+---
 
 ## Architecture
 
 Two cooperating processes connected via HTTP IPC:
 
-1. **Iris Gateway** (Node.js) -- manages channels, security, vault, governance, tool server on port 19877.
-2. **OpenCode CLI** (AI backend) -- auto-spawned or external on port 4096. Single plugin gives AI access to all Iris tools via HTTP callbacks.
+1. **Iris Gateway** (Node.js) — manages channels, security, vault, governance, tool server on port 19877
+2. **OpenCode CLI** (AI backend) — auto-spawned or external on port 4096. A single plugin gives the AI access to all 40+ Iris tools via HTTP callbacks
 
 ```
  Telegram --+
@@ -96,262 +102,45 @@ Two cooperating processes connected via HTTP IPC:
                          Goals, CrossCh)          HealthGate  gog, ...
 ```
 
-Inbound: platform message -> adapter normalize -> security check -> auto-reply check -> onboarding enrichment -> inference engine -> trigger evaluator -> session resolve -> OpenCode prompt -> streaming coalesce -> deliver.
+**Inbound flow:** platform message → adapter normalize → security check → auto-reply → onboarding enrichment → inference engine → trigger evaluator → OpenCode prompt → streaming coalesce → deliver
 
-### Two-process boundary
+### Intelligence Layer
 
-The AI calls tools -> plugin makes HTTP POST to `http://127.0.0.1:19877/tool/*` -> Iris executes and returns. The OpenCode plugin (`.opencode/plugin/iris.ts`) consolidates all tools and hooks into a single file. Dynamic plugin tools registered from `~/.iris/plugin-tools.json`. CLI tools registered from `~/.iris/cli-tools.json`.
+Seven deterministic subsystems — zero LLM cost, pure Node.js + SQLite:
 
-### Tools
+- **Signal Inference Engine** — derives timezone, language, engagement trend, session patterns from raw signals
+- **Event-Driven Triggers** — structural pattern detection (temporal markers, dormancy, engagement drops). Language-agnostic.
+- **Outcome-Aware Proactive Loop** — tracks engagement by category (task/work/health/hobby/social). AI-assigned categories, not keyword-guessed.
+- **Memory Arcs** — temporal threads tracking evolving situations. Auto-stale after 14 days.
+- **Goal Tracking** — persistent goals with state machine, success criteria, next-action queue
+- **Cross-Channel Intelligence** — unified presence detection across all channels
+- **Self-Tuning Heartbeat** — linear regression trend detection, predictive threshold breach, health-aware proactive throttling
 
-40+ built-in tools registered in the plugin:
+### Security
 
-| Tool | Purpose |
-|------|---------|
-| `send_message` | Send text to a channel |
-| `send_media` | Send media (image/video/audio/doc) |
-| `channel_action` | Typing indicator, react, edit, delete |
-| `user_info` | Query user capabilities |
-| `list_channels` | List active channels |
-| `vault_search` | FTS5 search across memories |
-| `vault_remember` | Store a fact/preference/insight |
-| `vault_forget` | Delete a memory by ID |
-| `governance_status` | Current rules and directives |
-| `usage_summary` | Usage and cost tracking per user/period |
-| `skill_create` | Create OpenCode skills dynamically |
-| `skill_list` | List available skills |
-| `skill_delete` | Delete a skill by name |
-| `skill_validate` | Validate skill against spec |
-| `agent_create` | Create OpenCode agents dynamically |
-| `agent_list` | List available agents |
-| `agent_delete` | Delete an agent by name |
-| `agent_validate` | Validate agent against spec |
-| `canvas_update` | Update Canvas UI with rich components |
-| `rules_read` | Read AGENTS.md |
-| `rules_update` | Replace AGENTS.md |
-| `rules_append` | Append to AGENTS.md |
-| `tools_list` | List custom tools |
-| `tools_create` | Scaffold new TypeScript tool |
-| `policy_status` | View master policy config |
-| `policy_audit` | Audit agents/skills against policy |
-| `proactive_intent` | Register follow-up intent |
-| `proactive_cancel` | Cancel pending intent |
-| `proactive_list` | List pending intents |
-| `enrich_profile` | Store learned user attribute |
-| `heartbeat_status` | Check system health across agents |
-| `heartbeat_trigger` | Force immediate health check |
-| `goal_create` | Create a persistent goal for the user |
-| `goal_update` | Update progress on an existing goal |
-| `goal_complete` | Mark a goal as achieved |
-| `goal_list` | List active and paused goals |
-| `goal_pause` | Pause a goal temporarily |
-| `goal_resume` | Resume a paused goal |
-| `goal_abandon` | Mark a goal as no longer relevant |
-| `arc_list` | List active narrative arcs |
-| `arc_resolve` | Mark a narrative arc as concluded |
-| `google_calendar` | Manage Calendar (via gog CLI) |
-| `google_email` | Search/manage Gmail (via gog CLI) |
-| `google_contacts` | Manage Contacts (via gog CLI) |
-| `google_tasks` | Manage Tasks (via gog CLI) |
-| `google_drive` | Browse/search Drive (via gog CLI) |
+Four DM policy modes: `open`, `pairing` (default — new users get a code you approve via CLI), `allowlist`, `disabled`. Rate limiting per user per channel. Groups support `requireMention` gating.
 
-Plus `proactive_quota`, `proactive_scan`, `proactive_execute`, `proactive_engage` for the proactive system, and `arcs/add-memory` as an internal endpoint.
-
-### Hooks
-
-| Hook | Purpose |
-|------|---------|
-| `tool.execute.before` | Policy + governance validation before every tool call |
-| `tool.execute.after` | Audit logging after every tool call |
-| `experimental.chat.system.transform` | Inject vault context, profile learning, skill suggestions, governance directives |
-| `experimental.session.compacting` | Extract facts from conversation into vault |
-| `permission.ask` | Deny file/bash permissions (enforces policy ceiling) |
-
-### Onboarding
-
-Two-layer user profiling that runs invisibly on every message:
-
-**Layer 1 -- Statistical (instant, zero cost):** tinyld detects language from text (62 languages, ISO 639-1). Unicode codepoint ranges classify writing system (Latin, Cyrillic, Arabic, CJK, Devanagari, Thai, Georgian, Hebrew, Greek, Hangul). Active hours and response style tracked automatically.
-
-**Layer 2 -- LLM-powered:** The AI uses `enrich_profile` to silently store what it learns through conversation. Core fields (name, language, timezone) write directly to the vault profile. The `[PROFILE LEARNING]` block in every system prompt tells the AI to call `enrich_profile` as it discovers things.
-
-First-contact detection injects a language-agnostic meta-prompt so the AI responds in the user's language from the first message.
-
-### Heartbeat
-
-Adaptive health monitoring with self-healing. Five parallel checkers (bridge, channels, vault, sessions, memory) run on configurable intervals that tighten as health degrades:
-
-- Healthy: 60s. Degraded: 15s. Critical: 5s.
-- Self-healing: up to 3 automatic recovery attempts with backoff.
-- Multi-agent: each agent (production, staging, etc.) runs independent schedules.
-- Active hours gating: skip checks outside business hours (IANA timezone).
-- Alert dedup: same alert suppressed within configurable window (default 24h).
-- Empty-check + exponential backoff: skip full check when all healthy and unchanged.
-- Coalescing: debounce rapid requests, defer when AI queue is busy.
-
-### Intelligence Layer (v0.2)
-
-Seven deterministic subsystems — zero LLM cost, all pure Node.js + SQLite:
-
-1. **Signal Inference Engine** — derives higher-order signals (timezone, language stability, engagement trend, response cadence, session pattern) from raw profile signals using statistical rules with cooldowns.
-2. **Event-Driven Triggers** — structural pattern detection that fires in the message pipeline (temporal markers, date/time mentions, dormancy recovery, engagement drops). Language-agnostic — no regex per language.
-3. **Outcome-Aware Proactive Loop** — category-segmented engagement tracking (task/work/health/hobby/social/reminder) with timing patterns. Categories are AI-assigned (not keyword-guessed), making classification language-agnostic.
-4. **Memory Arcs** — temporal narrative threads that track evolving situations. Detected from Unicode-aware keyword overlap in conversation (supports all scripts). Auto-stale after 14 days.
-5. **Goal Tracking** — persistent goals with state machine (active/paused/completed/abandoned), success criteria, next-action queue. Injected into every system prompt.
-6. **Cross-Channel Intelligence** — unified presence/preference detection across channels. Determines which channel a user prefers based on activity patterns.
-7. **Self-Tuning Heartbeat** — linear regression trend detection on health metrics, predictive threshold breach detection, health-aware proactive throttling (normal/reduced/minimal/paused).
-
-All subsystems connected via **IntelligenceBus** — a typed, synchronous, in-process event emitter (<5ms per message). Context assembled by **PromptAssembler** into structured sections (arcs, goals, proactive insights, cross-channel, trigger flags, health hints) injected into every system prompt.
-
-### CLI Tools
-
-Sandboxed integration with local CLI binaries. Config-driven: declare a binary, its subcommands, and which arguments each action accepts. The executor validates against a whitelist before spawning (execFile, not exec -- no shell injection). Always appends `--json --no-input`.
-
-Currently wraps `gog` (Google Calendar, Gmail, Contacts, Tasks, Drive). Extensible to any CLI that outputs JSON (bird, himalaya, etc.).
-
-### Memory Vault
-
-SQLite database at `~/.iris/vault.db`. FTS5 full-text search on memory content. Tables: `memories`, `memories_fts`, `profiles`, `profile_signals`, `audit_log`, `governance_log`, `usage_log`, `heartbeat_log`, `heartbeat_actions`, `heartbeat_dedup`, `derived_signals`, `inference_log`, `proactive_outcomes`, `memory_arcs`, `arc_entries`, `goals`.
-
-The `experimental.chat.system.transform` hook auto-injects user profile and relevant memories into every system prompt.
-
-### Enforcement Hierarchy
-
-Three layers checked on every tool call:
-
-1. **Master Policy** (ceiling) -- what tools/modes/permissions CAN exist. Config-driven, immutable at runtime.
-2. **Governance Rules** (behavioral) -- constraints, rate limits, audit logging.
-3. **Agent Config** (per-agent) -- tool/permission restrictions (always a subset of policy).
-
-Each layer narrows. Never widens.
-
-## Security
-
-Four DM policy modes per channel:
-
-| Mode | Behavior |
-|------|----------|
-| `open` | Anyone can talk |
-| `pairing` | New users get a code, owner approves via CLI (default) |
-| `allowlist` | Pre-approved senders only |
-| `disabled` | Channel rejects all DMs |
-
-Rate limiting: 30/min, 300/hr per user per channel (configurable).
-
-Groups: optional mention-gating (`requireMention: true`).
+---
 
 ## CLI
 
-```
-iris gateway run [--config path]    Start the gateway
-iris doctor                         Diagnostic checks
-iris status                         Gateway status
-iris pairing list|approve|revoke    Manage pairing codes
-iris session list|reset             Manage sessions
-iris config show|validate           Configuration
-iris security allowlist list|add    Allowlist management
-iris cron list|add|remove           Scheduled jobs
-iris send <channel> <to> <text>     One-shot message
-iris scan [path]                    Scan directory for security issues
+```bash
+iris gateway run          # Start the gateway
+iris doctor               # Diagnostic checks
+iris status               # Gateway status
+iris pairing list|approve # Manage pairing codes
+iris session list|reset   # Manage sessions
+iris config validate      # Validate config
+iris send <ch> <to> <msg> # One-shot message
 ```
 
-## Project Structure
-
-```
-src/
-  index.ts              Entry point
-  config/               Config loading, Zod schema, types
-  channels/             Channel adapters (ChannelAdapter interface)
-    telegram/           grammy
-    whatsapp/           baileys
-    discord/            discord.js
-    slack/              @slack/bolt
-    webchat/            Hono WebSocket (Canvas integration)
-    registry.ts         Runtime adapter registry
-    message-cache.ts    Cross-adapter message dedup
-  bridge/               OpenCode integration
-    opencode-client.ts  SDK wrapper (spawn, connect, queue tracking)
-    session-map.ts      channelId:chatType:chatId -> OpenCode session
-    message-router.ts   Inbound routing pipeline + first-contact detection
-    event-handler.ts    SSE stream processing
-    stream-coalescer.ts Text delta coalescing with break detection
-    tool-server.ts      Hono HTTP server (port 19877) -- all tool endpoints
-    message-queue.ts    Delivery queue with retry
-  vault/                Persistent memory (SQLite + FTS5)
-    db.ts               Connection, schema migration
-    store.ts            CRUD: memories, profiles, audit, governance
-    search.ts           FTS5 full-text search
-  governance/           Rule engine + master policy
-    engine.ts           Evaluate rules against tool calls
-    policy.ts           Structural ceiling enforcement
-  security/             DM policy, pairing, allowlist, rate limiter, code scanner
-  plugins/              Plugin SDK (discovery, loading, security scan, hook bus)
-  onboarding/           Two-layer user profiling
-    enricher.ts         tinyld language + Unicode script + active hours + response style
-    signals.ts          Signal store (SQLite)
-  heartbeat/            Health monitoring with self-healing
-    engine.ts           Multi-agent orchestrator (adaptive intervals, empty-check, coalescing)
-    checkers.ts         Bridge, Channel, Vault, Session, Memory checkers
-    store.ts            SQLite (heartbeat_log, heartbeat_actions, heartbeat_dedup)
-    active-hours.ts     Timezone-aware window gating
-    visibility.ts       Per-channel alert visibility
-    empty-check.ts      Hash-based skip + exponential backoff
-    coalesce.ts         Debounce + queue-aware gate
-    activity.ts         User activity tracking for dormancy
-  cli/                  CLI tool integration + Iris CLI commands
-    executor.ts         Sandboxed child_process.execFile runner
-    registry.ts         Config-driven tool -> command mapper
-    types.ts            CliConfig, CliToolDef, CliExecResult
-    program.ts          Iris CLI (clipanion)
-    commands/           CLI command implementations
-  intelligence/         Intelligence layer (v0.2 — all deterministic, zero AI cost)
-    types.ts            All interfaces (signals, outcomes, arcs, goals, health, events)
-    bus.ts              Typed synchronous event bus
-    store.ts            SQLite store (6 new tables)
-    prompt-assembler.ts Structured prompt builder
-    inference/          Signal inference engine + 5 rules
-    triggers/           Event-driven trigger evaluator + builtin rules
-    outcomes/           Category-segmented engagement tracking
-    arcs/               Narrative arc detection + lifecycle
-    goals/              Goal state machine + lifecycle
-    cross-channel/      Unified presence/preference resolver
-    health/             Trend detector + health gate
-  proactive/            Proactive follow-up system
-    engine.ts           Pulse engine (poll, scan, quiet hours)
-    store.ts            Intent/trigger persistence (SQLite)
-  auto-reply/           Template-based auto-reply engine
-  usage/                Usage and cost tracking
-  canvas/               Canvas UI (A2UI) -- Hono + WebSocket + Chart.js
-  cron/                 Scheduled jobs (croner)
-  media/                Image/audio processing (sharp)
-  logging/              Structured logging (pino)
-  utils/                Shared utilities
-
-.opencode/
-  plugin/iris.ts        THE plugin (40+ tools, 5 hooks, dynamic CLI/plugin tools, goal/arc tools)
-  opencode.json         Model config, MCP servers, permissions
-  agents/               chat.md (primary), moderator.md (subagent)
-  skills/               greeting, help, moderation, onboarding, summarize, web-search,
-                        gmail-email, google-calendar-events, google-contacts-lookup,
-                        google-tasks-manager, google-drive-files
-
-test/
-  unit/                 57 test files
-  integration/          13 test files (pipeline, plugin SDK, streaming, auto-reply)
-```
-
-## Docker
-
-```
-docker build -t iris .
-docker run -d --name iris --env-file .env -v iris-state:/root/.iris -p 19876:19876 iris
-```
+---
 
 ## Documentation
 
-- `docs/configuration.md` -- Full config reference with all options
-- `docs/cookbook.md` -- Patterns for policy, governance, vault, hooks, agents, skills, onboarding, heartbeat, CLI tools, proactive system
-- `docs/deployment.md` -- Docker, systemd, nginx, monitoring, Prometheus
+- [docs/configuration.md](docs/configuration.md) — Full config reference with all options
+- [docs/cookbook.md](docs/cookbook.md) — Patterns for policy, governance, vault, hooks, skills
+- [docs/deployment.md](docs/deployment.md) — Docker, systemd, nginx, monitoring, Prometheus
 
 ## License
 

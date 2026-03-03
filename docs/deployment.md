@@ -567,3 +567,49 @@ ERROR Fatal: WhatsApp session logged out — re-auth required
 ### First-Run QR Code
 
 On first run (or after clearing auth), a QR code is printed to stdout. Scan it with the WhatsApp mobile app under **Linked Devices**.
+
+## Prometheus Metrics Integration
+
+Iris provides comprehensive Prometheus-compatible metrics for monitoring and observability.
+
+### Available Metrics
+
+**Message Processing**:
+- `iris_messages_received_total` - Total messages received per channel
+- `iris_messages_sent_total` - Total messages sent per channel
+- `iris_messages_errors_total` - Message processing errors by type
+- `iris_message_processing_seconds` - Message processing latency histogram
+
+**Intelligence Pipeline**:
+- `iris_intelligence_pipeline_seconds` - Intelligence processing latency by stage
+- `iris_arcs_detected_total` - Behavioral arcs detected
+- `iris_outcomes_logged_total` - Outcomes recorded by type
+- `iris_intents_triggered_total` - Intents triggered by ID
+
+**System Health**:
+- `iris_active_connections` - Active channel connections
+- `iris_queue_depth` - Current message queue depth
+- `iris_system_health` - Component health status (1=healthy, 0.5=degraded, 0=unhealthy)
+- `iris_uptime_seconds` - Gateway uptime
+
+### Integration with Application
+
+The metrics library is available at `src/gateway/metrics.js`. To track custom metrics:
+
+```typescript
+import { metrics } from "./gateway/metrics.js";
+
+// Increment a counter
+metrics.messagesReceived.inc({ channel: "telegram" });
+
+// Observe a histogram
+metrics.messageProcessingLatency.observe(
+  { channel: "telegram", stage: "parsing" },
+  0.025
+);
+
+// Set a gauge
+metrics.activeConnections.set({ channel: "telegram" }, 5);
+```
+
+The `/metrics` endpoint is available at `http://127.0.0.1:19876/metrics` in Prometheus text format.

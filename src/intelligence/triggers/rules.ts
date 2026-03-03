@@ -25,6 +25,10 @@ const TOMORROW_FALLBACK = new Set([
   "พรุ่งนี้", "holnap", "huomenna", "αύριο", "jutro", "明日",
 ]);
 
+// Past-tense markers — if the matched date reference is preceded by these,
+// it is a past event, not a future commitment.
+const PAST_MARKERS = /\b(last|did|was|had|ago|yesterday|finished|completed|done|told|said)\b/i;
+
 function isTomorrowReference(text: string): boolean {
   const now = new Date();
   const tomorrowStart = new Date(now);
@@ -33,10 +37,21 @@ function isTomorrowReference(text: string): boolean {
   const tomorrowEnd = new Date(now);
   tomorrowEnd.setDate(now.getDate() + 2);
   tomorrowEnd.setHours(0, 0, 0, 0);
+
   for (const parser of CHRONO_PARSERS) {
-    const parsed = parser.parseDate(text);
-    if (parsed && parsed >= tomorrowStart && parsed < tomorrowEnd) return true;
+    const results = parser.parse(text);
+    for (const result of results) {
+      const parsed = result.date();
+      if (!parsed || parsed < tomorrowStart || parsed >= tomorrowEnd) continue;
+      // Check context window around the match for past-tense markers
+      const start = Math.max(0, result.index - 30);
+      const context = text.slice(start, result.index + result.text.length + 10);
+      if (PAST_MARKERS.test(context)) continue;
+      return true;
+    }
   }
+
+  // Fallback: exact word match for languages not covered by chrono
   const lower = text.toLowerCase();
   const words = lower.split(/[\s,.:;!?()+\-]+/);
   return words.some((w) => TOMORROW_FALLBACK.has(w));

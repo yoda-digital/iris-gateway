@@ -1,3 +1,14 @@
+## [1.6.0](https://github.com/yoda-digital/iris-gateway/compare/v1.5.0...v1.6.0) (2026-03-03)
+
+### Features
+
+* **goals:** inject user language into goal context for AI goal creation in user language ([45d13f3](https://github.com/yoda-digital/iris-gateway/commit/45d13f3645a35bc048b1863cdbcd02fe4b224523))
+* **triggers:** replace TOMORROW_WORDS with chrono-node + fallback set (issue [#30](https://github.com/yoda-digital/iris-gateway/issues/30)) ([3690f99](https://github.com/yoda-digital/iris-gateway/commit/3690f993e26035b14d93d575661d6c8628c44aa4))
+
+### Bug Fixes
+
+* **triggers:** exclude past-tense context from tomorrow detection ([a39abe3](https://github.com/yoda-digital/iris-gateway/commit/a39abe343ec9f9b22ae280386680a19d282a9467))
+
 ## [1.5.0](https://github.com/yoda-digital/iris-gateway/compare/v1.4.0...v1.5.0) (2026-03-03)
 
 ### Features

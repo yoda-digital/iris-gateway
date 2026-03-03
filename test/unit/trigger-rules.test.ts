@@ -70,6 +70,26 @@ describe("tomorrowIntent rule", () => {
     expect(result).not.toBeNull();
     expect(result!.payload.confidence).toBe(0.65);
   });
+
+  it("detects German morgen", () => {
+    const result = rule.evaluate("Das mache ich morgen fertig", msg, noSignals);
+    expect(result).not.toBeNull();
+  });
+
+  it("detects French demain", () => {
+    const result = rule.evaluate("Je le ferai demain matin", msg, noSignals);
+    expect(result).not.toBeNull();
+  });
+
+  it("detects Italian domani", () => {
+    const result = rule.evaluate("Lo faccio domani", msg, noSignals);
+    expect(result).not.toBeNull();
+  });
+
+  it("does NOT trigger on past dates", () => {
+    const result = rule.evaluate("I did it last week on Monday", msg, noSignals);
+    expect(result).toBeNull();
+  });
 });
 
 describe("timeMention rule", () => {

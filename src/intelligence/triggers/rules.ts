@@ -1,3 +1,4 @@
+import * as chrono from "chrono-node";
 import type { InboundMessage } from "../../channels/adapter.js";
 import type { DerivedSignal, TriggerResult } from "../types.js";
 
@@ -14,30 +15,55 @@ export interface TriggerRule {
 
 // ── Built-in trigger rules ──
 
-/**
- * "Tomorrow" words covering ~95% of global population by native speakers.
- * Single-concept lookup — does NOT grow with features or categories.
- */
-const TOMORROW_WORDS = new Set([
-  "tomorrow", "maine", "mîine", "завтра", "morgen", "demain", "mañana",
-  "domani", "amanhã", "amanha", "yarın", "yarin", "明天", "明日", "내일",
-  "कल", "غدا", "พรุ่งนี้", "holnap", "huomenna", "αύριο", "jutro",
+const CHRONO_PARSERS = [
+  chrono.en, chrono.de, chrono.fr, chrono.es, chrono.pt,
+  chrono.it, chrono.nl, chrono.sv, chrono.ru, chrono.uk, chrono.zh, chrono.ja,
+].filter(Boolean);
+
+const TOMORROW_FALLBACK = new Set([
+  "maine", "mîine", "yarın", "yarin", "내일", "कल", "غدا", "غداً",
+  "พรุ่งนี้", "holnap", "huomenna", "αύριο", "jutro", "明日",
 ]);
+
+// Past-tense markers — if the matched date reference is preceded by these,
+// it is a past event, not a future commitment.
+const PAST_MARKERS = /\b(last|did|was|had|ago|yesterday|finished|completed|done|told|said)\b/i;
+
+function isTomorrowReference(text: string): boolean {
+  const now = new Date();
+  const tomorrowStart = new Date(now);
+  tomorrowStart.setDate(now.getDate() + 1);
+  tomorrowStart.setHours(0, 0, 0, 0);
+  const tomorrowEnd = new Date(now);
+  tomorrowEnd.setDate(now.getDate() + 2);
+  tomorrowEnd.setHours(0, 0, 0, 0);
+
+  for (const parser of CHRONO_PARSERS) {
+    const results = parser.parse(text);
+    for (const result of results) {
+      const parsed = result.date();
+      if (!parsed || parsed < tomorrowStart || parsed >= tomorrowEnd) continue;
+      // Check context window around the match for past-tense markers
+      const start = Math.max(0, result.index - 30);
+      const context = text.slice(start, result.index + result.text.length + 10);
+      if (PAST_MARKERS.test(context)) continue;
+      return true;
+    }
+  }
+
+  // Fallback: exact word match for languages not covered by chrono
+  const lower = text.toLowerCase();
+  const words = lower.split(/[\s,.:;!?()+\-]+/);
+  return words.some((w) => TOMORROW_FALLBACK.has(w));
+}
 
 const tomorrowIntent: TriggerRule = {
   id: "tomorrow_intent",
   enabled: true,
   priority: 50,
   evaluate(text, _msg) {
-    const lower = text.toLowerCase();
-    const words = lower.split(/[\s,.:;!?]+/);
-
-    // Check if any word matches "tomorrow" in any language
-    const hasTomorrow = words.some((w) => TOMORROW_WORDS.has(w));
-    if (!hasTomorrow) return null;
-
-    // Skip questions — universal structural check
     if (text.includes("?")) return null;
+    if (!isTomorrowReference(text)) return null;
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);

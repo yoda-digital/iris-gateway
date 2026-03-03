@@ -1,3 +1,13 @@
+## [1.0.5](https://github.com/yoda-digital/iris-gateway/compare/v1.0.4...v1.0.5) (2026-03-03)
+
+### Bug Fixes
+
+* **whatsapp:** document and harden reconnect strategy ([41e5cd1](https://github.com/yoda-digital/iris-gateway/commit/41e5cd136215aa4a2c360cbe4cd2a004eee7c2ce)), closes [#10](https://github.com/yoda-digital/iris-gateway/issues/10)
+
+### Refactoring
+
+* **intelligence:** split IntelligenceStore into domain stores ([2732942](https://github.com/yoda-digital/iris-gateway/commit/273294254d5a4f18acfaa6ee250005ad034dcab3)), closes [#9](https://github.com/yoda-digital/iris-gateway/issues/9)
+
 ## [1.0.4](https://github.com/yoda-digital/iris-gateway/compare/v1.0.3...v1.0.4) (2026-03-03)
 
 ### Refactoring

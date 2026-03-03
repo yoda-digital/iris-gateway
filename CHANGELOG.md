@@ -1,3 +1,13 @@
+## [1.1.0](https://github.com/yoda-digital/iris-gateway/compare/v1.0.5...v1.1.0) (2026-03-03)
+
+### Features
+
+* **metrics:** add Prometheus metrics infrastructure ([4777f02](https://github.com/yoda-digital/iris-gateway/commit/4777f023b2564c79dee94288419502119a4269f2))
+
+### Bug Fixes
+
+* **metrics:** add prom-client to package.json dependencies ([415d744](https://github.com/yoda-digital/iris-gateway/commit/415d7443767a2f492e3932fcf45c331c0ba9bd71))
+
 ## [1.0.5](https://github.com/yoda-digital/iris-gateway/compare/v1.0.4...v1.0.5) (2026-03-03)
 
 ### Bug Fixes

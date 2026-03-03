@@ -1,3 +1,13 @@
+## [1.5.0](https://github.com/yoda-digital/iris-gateway/compare/v1.4.0...v1.5.0) (2026-03-03)
+
+### Features
+
+* **arcs:** per-language stop word filtering via stopword library (issue [#33](https://github.com/yoda-digital/iris-gateway/issues/33)) ([26932d3](https://github.com/yoda-digital/iris-gateway/commit/26932d3c9a8c427489239a3ccad284c0bc0afe92))
+
+### Bug Fixes
+
+* resolve merge conflicts — arc-titles + stopwords merged correctly ([7fe1daf](https://github.com/yoda-digital/iris-gateway/commit/7fe1dafe81c75ec28f171059f040b74af638218f))
+
 ## [1.4.0](https://github.com/yoda-digital/iris-gateway/compare/v1.3.0...v1.4.0) (2026-03-03)
 
 ### Features

@@ -529,3 +529,41 @@ For human-readable logs during development, pipe through `pino-pretty`:
 ```bash
 npm run dev | npx pino-pretty
 ```
+
+## WhatsApp Reconnect Behavior
+
+WhatsApp connectivity is provided via the [Baileys](https://github.com/WhiskeySockets/Baileys) library.
+
+### Connection States
+
+| State | Description |
+|-------|-------------|
+| `connecting` | Initial socket creation in progress |
+| `connected` | Socket open and receiving messages |
+| `reconnecting` | Connection dropped; Baileys is attempting to reconnect automatically |
+| `failed` | Session invalidated (logged out) — manual re-auth required |
+
+### Reconnect Strategy
+
+**Automatic reconnect** (Baileys-managed):
+- Connection dropped, timed out, or server-side close
+- Baileys recreates the socket and reconnects without intervention
+- The adapter emits `disconnected` transiently and `connected` when the socket reopens
+
+**No reconnect** (terminal failure):
+- Status code `401` (loggedOut): The phone session was explicitly unlinked
+- Auth state is invalid — reconnecting would fail
+- The adapter transitions to `failed` state and stays there
+- **Recovery**: Delete `~/.iris/whatsapp-auth/` and restart the gateway to re-scan the QR code
+
+### Logs to Watch
+
+```
+WARN  Channel disconnected { channel: "whatsapp", reason: "connection closed" }
+INFO  Channel connected { channel: "whatsapp" }   # normal reconnect
+ERROR Fatal: WhatsApp session logged out — re-auth required
+```
+
+### First-Run QR Code
+
+On first run (or after clearing auth), a QR code is printed to stdout. Scan it with the WhatsApp mobile app under **Linked Devices**.

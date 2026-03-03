@@ -236,8 +236,13 @@ export class InitCommand extends Command {
         try {
           execSync("npm install -g opencode-ai", { stdio: "pipe" });
           spin.stop("✓ OpenCode CLI installed");
-        } catch {
-          spin.stop("⚠ Install failed — run manually: npm i -g opencode-ai");
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const hint =
+            msg.includes("EACCES") || msg.includes("permission")
+              ? "Permission denied. Try: sudo npm i -g opencode-ai"
+              : "Run manually: npm i -g opencode-ai";
+          spin.stop(`⚠ Install failed — ${hint}`);
         }
       } else {
         p.note("Install later with: npm i -g opencode-ai", "Skipped");

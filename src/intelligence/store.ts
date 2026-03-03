@@ -97,6 +97,9 @@ export class IntelligenceStore {
   getStaleArcs(defaultStaleDays?: number): MemoryArc[] {
     return this.arcs.getStaleArcs(defaultStaleDays);
   }
+  updateArcTitle(arcId: string, title: string): void {
+    return this.arcs.updateArcTitle(arcId, title);
+  }
   updateArcStatus(arcId: string, status: ArcStatus): void {
     return this.arcs.updateArcStatus(arcId, status);
   }

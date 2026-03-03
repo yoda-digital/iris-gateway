@@ -12,6 +12,7 @@ import { builtinInferenceRules } from "../intelligence/inference/rules/index.js"
 import { TriggerEvaluator } from "../intelligence/triggers/evaluator.js";
 import { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
 import { ArcDetector } from "../intelligence/arcs/detector.js";
+import type { TitleGeneratorFn } from "../intelligence/arcs/detector.js";
 import { ArcLifecycle } from "../intelligence/arcs/lifecycle.js";
 import { GoalLifecycle } from "../intelligence/goals/lifecycle.js";
 import { CrossChannelResolver } from "../intelligence/cross-channel/resolver.js";
@@ -44,6 +45,8 @@ export function initIntelligence(
   intentStore: IntentStore | null,
   heartbeatStore: HeartbeatStore | null,
   logger: Logger,
+  titleGenerator?: TitleGeneratorFn,
+  userLanguage?: string,
 ): IntelligenceComponents {
   const intelligenceBus = new IntelligenceBus();
   const intelligenceStore = new IntelligenceStore(vaultDb);
@@ -56,7 +59,7 @@ export function initIntelligence(
 
   // Phase 2: Outcomes + arcs
   const outcomeAnalyzer = new OutcomeAnalyzer(intelligenceStore, intelligenceBus, logger);
-  const arcDetector = new ArcDetector(intelligenceStore, intelligenceBus, logger);
+  const arcDetector = new ArcDetector(intelligenceStore, intelligenceBus, logger, titleGenerator, userLanguage);
   const arcLifecycle = new ArcLifecycle(intelligenceStore, intelligenceBus, logger);
 
   // Phase 3: Goals + cross-channel

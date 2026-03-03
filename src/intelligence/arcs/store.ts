@@ -117,6 +117,12 @@ export class ArcsStore {
     ).run(status, now, resolvedAt, arcId);
   }
 
+  updateArcTitle(arcId: string, title: string): void {
+    this.db.prepare(
+      "UPDATE memory_arcs SET title = ?, updated_at = ? WHERE id = ?",
+    ).run(title, Date.now(), arcId);
+  }
+
   findArcByKeywords(senderId: string, keywords: string[]): MemoryArc | null {
     const arcs = this.getActiveArcs(senderId);
     for (const arc of arcs) {

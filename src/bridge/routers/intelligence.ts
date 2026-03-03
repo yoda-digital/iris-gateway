@@ -57,7 +57,8 @@ export function intelligenceRouter(deps: IntelligenceDeps): Hono {
     if (promptAssembler && sessionMap && body.sessionID) {
       const resolvedEntry = await sessionMap.findBySessionId(body.sessionID);
       if (resolvedEntry) {
-        intelligenceContext = promptAssembler.render(resolvedEntry.senderId);
+        const profile2 = vaultStore?.getProfile(resolvedEntry.senderId, resolvedEntry.channelId);
+        intelligenceContext = promptAssembler.render(resolvedEntry.senderId, undefined, profile2?.language ?? undefined);
       }
     }
 

@@ -93,13 +93,16 @@ export class GoalLifecycle {
   /**
    * Get goal context formatted for prompt injection.
    */
-  getGoalContext(senderId: string): string | null {
+  getGoalContext(senderId: string, userLanguage?: string): string | null {
     const active = this.store.getActiveGoals(senderId);
     const paused = this.store.getPausedGoals(senderId);
 
     if (active.length === 0 && paused.length === 0) return null;
 
     const lines: string[] = ["[USER GOALS]"];
+    if (userLanguage) {
+      lines.push(`[LANGUAGE: Always create and update goals in ${userLanguage}. User communicates in ${userLanguage}. Never use English for goals unless user writes in English.]`);
+    }
 
     if (active.length > 0) {
       lines.push("Active:");

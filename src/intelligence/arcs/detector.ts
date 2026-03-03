@@ -2,6 +2,8 @@ import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { Logger } from "../../logging/logger.js";
 
+export type TitleGeneratorFn = (keywords: string[], content: string) => Promise<string>;
+
 /**
  * Memory arc detector.
  * When new vault facts (memories) are stored, this checks whether they
@@ -17,6 +19,7 @@ export class ArcDetector {
     private readonly store: IntelligenceStore,
     private readonly bus: IntelligenceBus,
     private readonly logger: Logger,
+    private readonly titleGenerator?: TitleGeneratorFn,
   ) {}
 
   /**
@@ -75,6 +78,20 @@ export class ArcDetector {
 
       this.bus.emit({ type: "arc_created", senderId, arc });
       this.logger.info({ arcId: arc.id, title }, "New memory arc created");
+
+      if (this.titleGenerator) {
+        this.titleGenerator(keywords, content)
+          .then((aiTitle) => {
+            const cleaned = aiTitle.trim().replace(/^["']+|["']+$/g, "");
+            if (cleaned) {
+              this.store.updateArcTitle(arc.id, cleaned);
+              this.logger.debug({ arcId: arc.id, aiTitle: cleaned }, "Arc title improved by AI");
+            }
+          })
+          .catch((err: unknown) => {
+            this.logger.warn({ err, arcId: arc.id }, "AI title generation failed — keeping fallback");
+          });
+      }
     }
   }
 

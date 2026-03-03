@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/yoda-digital/iris-gateway/compare/v1.3.0...v1.4.0) (2026-03-03)
+
+### Features
+
+* **arcs:** async AI title generation via TitleGeneratorFn callback (issue [#31](https://github.com/yoda-digital/iris-gateway/issues/31)) ([37c1ec3](https://github.com/yoda-digital/iris-gateway/commit/37c1ec3317352cf07452a4231d6306f134faa2a0))
+
 ## [1.3.0](https://github.com/yoda-digital/iris-gateway/compare/v1.2.0...v1.3.0) (2026-03-03)
 
 ### Features

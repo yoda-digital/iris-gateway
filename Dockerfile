@@ -48,4 +48,7 @@ USER iris
 # Expose gateway ports: health/API, tool-server, media-server
 EXPOSE 19876 19877 19878
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -sf http://localhost:19876/health || exit 1
+
 CMD ["node", "dist/index.js", "gateway", "run"]

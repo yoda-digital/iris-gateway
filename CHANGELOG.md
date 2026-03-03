@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/yoda-digital/iris-gateway/compare/v1.0.2...v1.0.3) (2026-03-03)
+
+### Refactoring
+
+* **plugin:** decompose iris.ts into domain modules ([ce2bb27](https://github.com/yoda-digital/iris-gateway/commit/ce2bb27325310f159be64f29983fd98ea9e148c8)), closes [#6](https://github.com/yoda-digital/iris-gateway/issues/6)
+
 ## [1.0.2](https://github.com/yoda-digital/iris-gateway/compare/v1.0.1...v1.0.2) (2026-03-03)
 
 ### Refactoring

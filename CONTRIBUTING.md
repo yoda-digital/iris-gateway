@@ -169,3 +169,32 @@ pnpm start
 ---
 
 *This file is law. If you think something here should change, open an issue. Don't just ignore it.*
+
+## Model Configuration — Never in Code
+
+Model identifiers (LLM model names/IDs) are configured in **`.opencode/opencode.json`** only.
+
+### Rules
+
+- **Never** hardcode model identifiers in TypeScript files
+- **Never** change models via a code commit — edit config and restart
+- The single source of truth for model selection: `.opencode/opencode.json` keys `"model"` and `"small_model"`
+
+### How to Switch Models
+
+1. Edit `.opencode/opencode.json`:
+   ```json
+   {
+     "model": "openrouter/your-new-model",
+     "small_model": "openrouter/your-small-model"
+   }
+   ```
+2. Restart the gateway — no code change, no commit needed.
+
+### Reference Config
+
+See `iris.config.example.json` → `"models"` section for the canonical list of model roles and their current assignments.
+
+### Why This Matters
+
+The git log shows 8+ commits that are just `fix(model): switch to X`. These clutter history, make bisects harder, and mix infrastructure concerns with code changes. Config belongs in config files, not in commits.

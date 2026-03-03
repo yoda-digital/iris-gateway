@@ -57,14 +57,19 @@
         "description": "Limit message text to 4000 characters",
         "tool": "send_message",
         "type": "constraint",
-        "params": { "field": "text", "maxLength": 4000 }
+        "params": {
+          "field": "text",
+          "maxLength": 4000
+        }
       },
       {
         "id": "audit-all",
         "description": "Log all tool executions",
         "tool": "*",
         "type": "audit",
-        "params": { "level": "info" }
+        "params": {
+          "level": "info"
+        }
       }
     ],
     "directives": [
@@ -73,7 +78,7 @@
       "D3: Respect per-channel rules (NSFW policies, language requirements)",
       "D4: Never attempt to access filesystems, execute code, or bypass sandboxing",
       "D5: Never reveal which AI model or provider is processing a request",
-      "D6: If a tool call fails or returns an error, retry once then inform the user gracefully — never expose raw error payloads",
+      "D6: If a tool call fails or returns an error, retry once then inform the user gracefully \u2014 never expose raw error payloads",
       "D7: When rate-limited by the model provider, fall back to shorter responses rather than failing silently",
       "D8: Do not store raw API responses, error traces, or model metadata in the vault"
     ]
@@ -81,8 +86,21 @@
   "mcp": {
     "enabled": true,
     "servers": {
-      "sequential-thinking": { "enabled": true },
-      "tavily": { "enabled": false }
+      "sequential-thinking": {
+        "enabled": true
+      },
+      "tavily": {
+        "enabled": false
+      }
     }
+  },
+  "models": {
+    "_comment": "Model selection \u2014 change here only, never in .ts files or via git commits",
+    "primary": "openrouter/arcee-ai/trinity-large-preview:free",
+    "small": "openrouter/arcee-ai/trinity-mini:free",
+    "reasoning": "openrouter/deepseek/deepseek-r1-0528:free",
+    "tool_call": "openrouter/arcee-ai/trinity-large-preview:free",
+    "subagent": "openrouter/z-ai/glm-4.5-air:free",
+    "_note": "These map to opencode.json model/small_model fields. Edit opencode.json to apply changes."
   }
 }

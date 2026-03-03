@@ -20,7 +20,7 @@ pnpm run build
 pnpm test
 ```
 
-503 tests across 70 test files. 6 known failures in pipeline/message-router mocks -- unrelated to functionality.
+531 tests across 73 test files. All passing.
 
 ## Configure
 

@@ -1,3 +1,13 @@
+## [1.3.0](https://github.com/yoda-digital/iris-gateway/compare/v1.2.0...v1.3.0) (2026-03-03)
+
+### Features
+
+* iris init — interactive setup wizard ([#24](https://github.com/yoda-digital/iris-gateway/issues/24)) ([cb7c9ad](https://github.com/yoda-digital/iris-gateway/commit/cb7c9ad6a7f72a370dc84b976a379910ff3042c3))
+
+### Bug Fixes
+
+* **init:** surface EACCES error with actionable hint for sudo ([b85ef62](https://github.com/yoda-digital/iris-gateway/commit/b85ef62c594164d5a36e0ec1fd5d1c5507385932))
+
 ## [1.2.0](https://github.com/yoda-digital/iris-gateway/compare/v1.1.0...v1.2.0) (2026-03-03)
 
 ### Features

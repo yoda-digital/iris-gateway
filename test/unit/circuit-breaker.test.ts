@@ -54,4 +54,13 @@ describe("CircuitBreaker", () => {
   it("has a default unavailableMessage", () => {
     expect(cb.unavailableMessage).toMatch(/temporarily unavailable/i);
   });
+
+  it("getState() is read-only — does not reset halfOpenInFlight while probe is in flight", () => {
+    cb.onFailure(); cb.onFailure(); cb.onFailure();
+    vi.advanceTimersByTime(101);
+    expect(cb.allowRequest()).toBe(true);  // probe in flight
+    expect(cb.allowRequest()).toBe(false); // second request blocked
+    cb.getState();                         // must not reset halfOpenInFlight
+    expect(cb.allowRequest()).toBe(false); // still blocked after getState()
+  });
 });

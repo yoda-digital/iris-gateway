@@ -76,13 +76,8 @@ export class CircuitBreaker {
     }
   }
 
+  /** Pure read-only — no side effects. Transition logic lives in allowRequest(). */
   getState(): CircuitState {
-    if (this.state === "OPEN" && this.openedAt !== null) {
-      if (Date.now() - this.openedAt >= this.recoveryTimeoutMs) {
-        this.state = "HALF_OPEN";
-        this.halfOpenInFlight = false;
-      }
-    }
     return this.state;
   }
 

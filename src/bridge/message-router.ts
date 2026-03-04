@@ -258,6 +258,19 @@ export class MessageRouter {
     }
 
     // ── Step 9: OpenCode bridge ──
+    // Circuit breaker: notify user immediately if bridge is OPEN, then still queue
+    const cb = this.bridge.getCircuitBreaker();
+    if (!cb.allowRequest()) {
+      log.warn("  9 ▸ Bridge        ✗ circuit OPEN — sending unavailability notice to user");
+      if (adapter) {
+        await adapter.sendText({
+          to: msg.chatId,
+          text: cb.unavailableMessage,
+          replyToId: msg.id,
+        }).catch(() => {});
+      }
+    }
+
     log.info("  9 ▸ Bridge        → prompt_async to OpenCode");
     log.info("  ── HOOKS ── system.transform → vault context + profile learning + proactive awareness");
     log.info("  ── MODEL ── thinking + tool calls (see ⚡ below) + response generation");

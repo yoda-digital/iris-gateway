@@ -8,6 +8,9 @@ import {
 } from "@opencode-ai/sdk";
 import type { OpenCodeConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
+import { CircuitBreaker } from "./circuit-breaker.js";
+export { CircuitBreaker };
+export type { CircuitState } from "./circuit-breaker.js";
 
 export type { OpenCodeEvent, Part, TextPart };
 
@@ -17,21 +20,62 @@ export interface SessionInfo {
   readonly createdAt: number;
 }
 
+export interface SupervisorOptions {
+  /** Max restart attempts before giving up. Default: 5 */
+  maxRestarts?: number;
+  /** Initial backoff ms. Doubles each retry up to maxBackoffMs. Default: 1000 */
+  initialBackoffMs?: number;
+  /** Maximum backoff ms. Default: 30_000 */
+  maxBackoffMs?: number;
+  /** Health check interval ms. Default: 5000 */
+  healthIntervalMs?: number;
+  /** Max queued messages during restart window. Default: 50 */
+  maxQueueSize?: number;
+  /** Called when max restarts are exceeded (use for owner alerting). */
+  onMaxRestartsExceeded?: () => void;
+}
+
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
   private readonly projectDir: string;
   private inFlightCount = 0;
 
+  // Supervisor state
+  private readonly circuitBreaker: CircuitBreaker;
+  private healthTimer: ReturnType<typeof setInterval> | null = null;
+  private restartAttempts = 0;
+  private isRestarting = false;
+  private readonly pendingQueue: Array<() => void> = [];
+
+  private readonly maxRestarts: number;
+  private readonly initialBackoffMs: number;
+  private readonly maxBackoffMs: number;
+  private readonly healthIntervalMs: number;
+  private readonly maxQueueSize: number;
+  private readonly onMaxRestartsExceeded?: () => void;
+
   constructor(
     private readonly config: OpenCodeConfig,
     private readonly logger: Logger,
+    supervisorOpts: SupervisorOptions = {},
   ) {
-    // Resolve project directory: explicit config, or cwd (where .opencode/ lives)
     this.projectDir = config.projectDir ?? process.cwd();
+    this.maxRestarts = supervisorOpts.maxRestarts ?? 5;
+    this.initialBackoffMs = supervisorOpts.initialBackoffMs ?? 1_000;
+    this.maxBackoffMs = supervisorOpts.maxBackoffMs ?? 30_000;
+    this.healthIntervalMs = supervisorOpts.healthIntervalMs ?? 5_000;
+    this.maxQueueSize = supervisorOpts.maxQueueSize ?? 50;
+    this.onMaxRestartsExceeded = supervisorOpts.onMaxRestartsExceeded;
+    this.circuitBreaker = new CircuitBreaker({ recoveryTimeoutMs: 15_000 });
   }
 
   async start(): Promise<void> {
+    await this._doStart();
+    this._startHealthMonitor();
+  }
+
+  private async _doStart(): Promise<void> {
     if (this.config.autoSpawn) {
       this.logger.info("Spawning OpenCode server...");
       const { client, server } = await createOpencode({
@@ -51,12 +95,113 @@ export class OpenCodeBridge {
   }
 
   async stop(): Promise<void> {
+    this._stopHealthMonitor();
     if (this.serverHandle) {
       this.serverHandle.close();
       this.serverHandle = null;
       this.logger.info("OpenCode server stopped");
     }
     this.client = null;
+  }
+
+  private _startHealthMonitor(): void {
+    if (this.healthTimer) return;
+    this.healthTimer = setInterval(() => {
+      this._healthTick().catch((err) => {
+        this.logger.warn({ err }, "Health tick error");
+      });
+    }, this.healthIntervalMs);
+    this.healthTimer.unref?.();
+  }
+
+  private _stopHealthMonitor(): void {
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = null;
+    }
+  }
+
+  private async _healthTick(): Promise<void> {
+    if (this.isRestarting) return;
+    const healthy = await this.checkHealth();
+    if (healthy) {
+      if (this.circuitBreaker.getState() !== "CLOSED") {
+        this.logger.info("OpenCode health restored — closing circuit");
+        this.circuitBreaker.onSuccess();
+        this.restartAttempts = 0;
+        this._drainQueue();
+      }
+    } else {
+      this.logger.warn("OpenCode health check failed — triggering supervisor restart");
+      this.circuitBreaker.onFailure();
+      this._scheduleRestart(0);
+    }
+  }
+
+  private _scheduleRestart(attempt: number): void {
+    if (this.isRestarting) return;
+    if (attempt >= this.maxRestarts) {
+      this.logger.error({ maxRestarts: this.maxRestarts }, "Max restarts exceeded — giving up");
+      this.onMaxRestartsExceeded?.();
+      return;
+    }
+
+    this.isRestarting = true;
+    const backoff = Math.min(
+      this.initialBackoffMs * Math.pow(2, attempt),
+      this.maxBackoffMs,
+    );
+    this.restartAttempts = attempt + 1;
+    this.logger.info({ attempt: attempt + 1, backoffMs: backoff }, "Scheduling OpenCode restart");
+
+    setTimeout(async () => {
+      try {
+        this.logger.info("Restarting OpenCode...");
+        if (this.serverHandle) {
+          try { this.serverHandle.close(); } catch { /* ignore */ }
+          this.serverHandle = null;
+        }
+        this.client = null;
+        await this._doStart();
+        const healthy = await this.checkHealth();
+        if (healthy) {
+          this.logger.info("OpenCode restart succeeded");
+          this.circuitBreaker.onSuccess();
+          this.restartAttempts = 0;
+          this._drainQueue();
+        } else {
+          this.logger.warn("OpenCode restart did not restore health");
+          this._scheduleRestart(attempt + 1);
+        }
+      } catch (err) {
+        this.logger.error({ err }, "OpenCode restart failed");
+        this._scheduleRestart(attempt + 1);
+      } finally {
+        this.isRestarting = false;
+      }
+    }, backoff);
+  }
+
+  private _drainQueue(): void {
+    const pending = this.pendingQueue.splice(0);
+    this.logger.info({ count: pending.length }, "Draining pending message queue");
+    for (const resume of pending) {
+      try { resume(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Returns the circuit breaker for external inspection (e.g., heartbeat checkers).
+   */
+  getCircuitBreaker(): CircuitBreaker {
+    return this.circuitBreaker;
+  }
+
+  /**
+   * Returns true if the bridge is currently accepting requests.
+   */
+  isAvailable(): boolean {
+    return this.circuitBreaker.allowRequest();
   }
 
   private getClient(): OpencodeClient {
@@ -85,7 +230,6 @@ export class OpenCodeBridge {
       throwOnError: true,
     });
     const parts = response.data.parts ?? [];
-    // Prefer text parts; fall back to reasoning if model only produced reasoning
     const textParts = parts.filter((p: Part) => p.type === "text") as TextPart[];
     if (textParts.length > 0) {
       return textParts.map((p) => p.text).join("");
@@ -101,12 +245,10 @@ export class OpenCodeBridge {
 
   /**
    * Send a message and poll for the assistant response.
-   * Uses raw fetch to POST /prompt_async (bypasses SDK which may serialize
-   * differently from what the server expects).
    *
-   * OpenCode creates an empty assistant message (hasParts=false) as a
-   * placeholder while the model generates. Subsequent polls will show
-   * hasParts=true with text once the model finishes.
+   * If the circuit breaker is OPEN, the message is queued (up to maxQueueSize)
+   * and this method awaits recovery before proceeding. Callers should independently
+   * handle the OPEN state for user-visible feedback before calling this.
    */
   async sendAndWait(
     sessionId: string,
@@ -114,100 +256,118 @@ export class OpenCodeBridge {
     timeoutMs = 120_000,
     pollMs = 2_000,
   ): Promise<string> {
+    // If circuit is OPEN, queue this request and wait for recovery
+    if (!this.circuitBreaker.allowRequest()) {
+      if (this.pendingQueue.length >= this.maxQueueSize) {
+        this.logger.warn("Pending queue full — dropping message");
+        return "";
+      }
+      this.logger.info("Circuit OPEN — queuing message for later delivery");
+      await new Promise<void>((resolve) => {
+        this.pendingQueue.push(resolve);
+      });
+      // Re-check after queue drain; if still not healthy, bail
+      if (!this.circuitBreaker.allowRequest()) return "";
+    }
+
     this.inFlightCount++;
     try {
-      const before = await this.listMessages(sessionId);
-      const knownCount = before.length;
-
-      const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
-      const body = JSON.stringify({
-        agent: "chat",
-        parts: [{ type: "text", text }],
-      });
-      this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
-      this.logger.info({ status: res.status }, "prompt_async response");
-
-      const deadline = Date.now() + timeoutMs;
-      let lastNewCount = 0;
-      let stablePolls = 0;
-      while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, pollMs));
-        try {
-          const msgs = await this.listMessages(sessionId);
-          const newMsgs = msgs.slice(knownCount);
-
-          // Log poll state for debugging
-          if (newMsgs.length > 0) {
-            const details = newMsgs.map((m) => {
-              const parts = m.hasParts ? "✓" : "○";
-              const text = m.text ? ` "${m.text.substring(0, 80)}${m.text.length > 80 ? "…" : ""}"` : "";
-              return `  ${m.role}${parts}${text}`;
-            });
-            this.logger.info(
-              { newMsgs: newMsgs.length },
-              `🔄 Poll\n${details.join("\n")}`,
-            );
-          }
-
-          // Primary: look for the final assistant response.
-          // Only extract text when the model is done — if the last message
-          // is an assistant placeholder (hasParts=false), the model is still
-          // generating (tool calls in progress, or composing the real reply).
-          // Returning early would grab intermediate status text like
-          // "[Checking your Gmail...]" instead of the actual answer.
-          const lastMsg = newMsgs[newMsgs.length - 1];
-          const stillGenerating = lastMsg.role === "assistant" && !lastMsg.hasParts;
-
-          if (!stillGenerating) {
-            for (let i = newMsgs.length - 1; i >= 0; i--) {
-              const msg = newMsgs[i];
-              if (msg.role === "assistant" && msg.text && msg.text !== "[user interrupted]") {
-                this.logger.info(
-                  { textLen: msg.text.length },
-                  "✅ Got response",
-                );
-                return msg.text;
-              }
-            }
-          }
-
-          // Secondary: detect model completion without text response.
-          if (newMsgs.length > 0) {
-            if (!stillGenerating && lastMsg.role === "assistant" && lastMsg.hasParts) {
-              // Model finished WITH parts but no text → tool calls only
-              if (newMsgs.length === lastNewCount) {
-                stablePolls++;
-              } else {
-                stablePolls = 0;
-                lastNewCount = newMsgs.length;
-              }
-              if (stablePolls >= 5) {
-                this.logger.info(
-                  { sessionId, newMessages: newMsgs.length },
-                  "Model completed with tool calls only (no text response)",
-                );
-                return "";
-              }
-            } else if (!stillGenerating) {
-              stablePolls = 0;
-              lastNewCount = newMsgs.length;
-            } else {
-              lastNewCount = newMsgs.length;
-            }
-          }
-        } catch {
-          // Retry on transient errors
-        }
-      }
-      return "";
+      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs);
+      this.circuitBreaker.onSuccess();
+      return result;
+    } catch (err) {
+      this.logger.error({ err }, "sendAndWait failed — circuit breaker notified");
+      this.circuitBreaker.onFailure();
+      this._scheduleRestart(this.restartAttempts);
+      throw err;
     } finally {
       this.inFlightCount--;
     }
+  }
+
+  private async _sendAndWaitInternal(
+    sessionId: string,
+    text: string,
+    timeoutMs: number,
+    pollMs: number,
+  ): Promise<string> {
+    const before = await this.listMessages(sessionId);
+    const knownCount = before.length;
+
+    const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
+    const body = JSON.stringify({
+      agent: "chat",
+      parts: [{ type: "text", text }],
+    });
+    this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    this.logger.info({ status: res.status }, "prompt_async response");
+
+    const deadline = Date.now() + timeoutMs;
+    let lastNewCount = 0;
+    let stablePolls = 0;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      try {
+        const msgs = await this.listMessages(sessionId);
+        const newMsgs = msgs.slice(knownCount);
+
+        if (newMsgs.length > 0) {
+          const details = newMsgs.map((m) => {
+            const parts = m.hasParts ? "\u2713" : "\u25cb";
+            const txt = m.text ? ` "${m.text.substring(0, 80)}${m.text.length > 80 ? "\u2026" : ""}"` : "";
+            return `  ${m.role}${parts}${txt}`;
+          });
+          this.logger.info(
+            { newMsgs: newMsgs.length },
+            `\ud83d\udd04 Poll\n${details.join("\n")}`,
+          );
+        }
+
+        const lastMsg = newMsgs[newMsgs.length - 1];
+        const stillGenerating = lastMsg?.role === "assistant" && !lastMsg.hasParts;
+
+        if (!stillGenerating) {
+          for (let i = newMsgs.length - 1; i >= 0; i--) {
+            const msg = newMsgs[i];
+            if (msg.role === "assistant" && msg.text && msg.text !== "[user interrupted]") {
+              this.logger.info({ textLen: msg.text.length }, "\u2705 Got response");
+              return msg.text;
+            }
+          }
+        }
+
+        if (newMsgs.length > 0) {
+          if (!stillGenerating && lastMsg?.role === "assistant" && lastMsg.hasParts) {
+            if (newMsgs.length === lastNewCount) {
+              stablePolls++;
+            } else {
+              stablePolls = 0;
+              lastNewCount = newMsgs.length;
+            }
+            if (stablePolls >= 5) {
+              this.logger.info(
+                { sessionId, newMessages: newMsgs.length },
+                "Model completed with tool calls only (no text response)",
+              );
+              return "";
+            }
+          } else if (!stillGenerating) {
+            stablePolls = 0;
+            lastNewCount = newMsgs.length;
+          } else {
+            lastNewCount = newMsgs.length;
+          }
+        }
+      } catch {
+        // Retry on transient errors
+      }
+    }
+    return "";
   }
 
   async subscribeEvents(
@@ -220,7 +380,6 @@ export class OpenCodeBridge {
         }
       },
     });
-    // Consume the stream to keep the connection alive
     const stream = result.stream as AsyncIterable<unknown> | undefined;
     if (stream) {
       for await (const _ of stream) {
@@ -259,13 +418,7 @@ export class OpenCodeBridge {
     }));
   }
 
-  /**
-   * Strip leaked thinking/reasoning tags from model output.
-   * Some models (DeepSeek, GLM, etc.) leak <think>...</think> blocks
-   * into their text content. Strip them before delivering to users.
-   */
   private stripThinking(text: string): string {
-    // Strip <think>...</think> and <reasoning>...</reasoning> blocks
     return text
       .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
@@ -282,12 +435,10 @@ export class OpenCodeBridge {
       const parts = msg.parts ?? [];
       const textParts = parts.filter((p: Part) => p.type === "text") as TextPart[];
       let text = textParts.map((p) => p.text).join("");
-      // Fallback: if no text parts, try reasoning parts
       if (!text) {
         const reasoningParts = parts.filter((p: Part) => p.type === "reasoning") as Array<{ text: string }>;
         text = reasoningParts.map((p) => p.text).join("");
       }
-      // Strip leaked thinking tags from model output
       text = this.stripThinking(text);
       return {
         role,

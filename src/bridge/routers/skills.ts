@@ -428,9 +428,8 @@ export function skillsRouter(deps: SkillsDeps): Hono {
       `  parameters: z.object({`,
       ...argLines,
       `  }),`,
-      `  async execute(args) {`,
-      `    // TODO: Implement ${name} tool logic`,
-      `    return JSON.stringify({ ok: true, args });`,
+      `  async execute(_args) {`,
+      `    throw new Error(\`Tool '${name}' was scaffolded but not implemented. Edit ${name}.ts to add logic.\`);`,
       `  },`,
       `});`, ``,
     ].join("\n");

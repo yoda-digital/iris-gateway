@@ -5,6 +5,9 @@ import { execSync, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import * as os from "node:os";
 
+
+// ─── constants ───────────────────────────────────────────────────────────────
+const DEFAULT_ANTHROPIC_MODEL = "anthropic/claude-sonnet-4-6";
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function detectOpenCode(): string | null {
@@ -181,7 +184,7 @@ export class InitCommand extends Command {
         },
         { value: "openai/gpt-4o", label: "OpenAI GPT-4o", hint: "requires OPENAI_API_KEY" },
         {
-          value: "anthropic/claude-sonnet-4-5",
+          value: DEFAULT_ANTHROPIC_MODEL,
           label: "Anthropic Claude",
           hint: "requires ANTHROPIC_API_KEY",
         },

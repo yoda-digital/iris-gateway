@@ -76,8 +76,18 @@ export class CircuitBreaker {
     }
   }
 
-  /** Pure read-only — no side effects. Transition logic lives in allowRequest(). */
+  /**
+   * Returns the effective circuit state.
+   * Pure — no mutations. If OPEN and recovery timeout has elapsed,
+   * returns HALF_OPEN to reflect that a probe would be allowed,
+   * but does NOT set halfOpenInFlight (that happens in allowRequest()).
+   */
   getState(): CircuitState {
+    if (this.state === "OPEN" && this.openedAt !== null) {
+      if (Date.now() - this.openedAt >= this.recoveryTimeoutMs) {
+        return "HALF_OPEN";
+      }
+    }
     return this.state;
   }
 

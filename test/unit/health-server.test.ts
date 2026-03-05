@@ -156,28 +156,24 @@ describe("HealthServer", () => {
   });
 
   describe("GET /metrics", () => {
-    it("returns Prometheus text format", async () => {
+    it("returns Prometheus text format with correct Content-Type", async () => {
       const res = await fetch(`${base}/metrics`);
       expect(res.status).toBe(200);
 
       const contentType = res.headers.get("content-type");
       expect(contentType).toContain("text/plain");
+      expect(contentType).toContain("version=0.0.4");
 
       const text = await res.text();
       expect(text).toContain("# HELP");
       expect(text).toContain("# TYPE");
     });
 
-    it("includes iris_uptime_seconds and iris_channels_connected", async () => {
-      registry.list.mockReturnValue([fakeAdapter]);
-
+    it("includes iris_uptime_seconds from MetricsRegistry", async () => {
       const res = await fetch(`${base}/metrics`);
       const text = await res.text();
 
       expect(text).toContain("iris_uptime_seconds");
-      expect(text).toContain("iris_channels_connected 1");
-      expect(text).toContain("iris_memory_rss_bytes");
-      expect(text).toContain("iris_memory_heap_used_bytes");
     });
   });
 });

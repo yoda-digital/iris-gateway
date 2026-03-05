@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { metrics } from "../../src/gateway/metrics.js";
+import { HealthServer } from "../../src/gateway/health.js";
 
 describe("Prometheus Metrics", () => {
   it("exports metrics instance", () => {
@@ -78,5 +79,40 @@ describe("Prometheus Metrics", () => {
   it("provides registry for Prometheus", () => {
     const registry = metrics.getRegistry();
     expect(typeof registry.metrics).toBe("function");
+  });
+});
+
+describe("/metrics HTTP endpoint", () => {
+  let server: HealthServer;
+  let port: number;
+  let base: string;
+
+  beforeEach(async () => {
+    const registry = {
+      list: vi.fn().mockReturnValue([]),
+      get: vi.fn().mockReturnValue(null),
+      has: vi.fn().mockReturnValue(false),
+      register: vi.fn(),
+    } as any;
+    const bridge = { checkHealth: vi.fn().mockResolvedValue(true) } as any;
+    port = 19800 + Math.floor(Math.random() * 100);
+    server = new HealthServer(registry, bridge, port, "127.0.0.1");
+    await server.start();
+    base = `http://127.0.0.1:${port}`;
+  });
+
+  afterEach(async () => {
+    await server.stop();
+  });
+
+  it("returns valid Prometheus text format with iris_uptime_seconds", async () => {
+    const res = await fetch(`${base}/metrics`);
+    expect(res.status).toBe(200);
+
+    const contentType = res.headers.get("content-type");
+    expect(contentType).toContain("text/plain");
+
+    const text = await res.text();
+    expect(text).toContain("iris_uptime_seconds");
   });
 });

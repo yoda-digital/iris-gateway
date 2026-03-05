@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { OpenCodeBridge } from "../bridge/opencode-client.js";
+import { metrics } from "./metrics.js";
 
 interface ChannelStatus {
   id: string;
@@ -72,25 +73,11 @@ export class HealthServer {
       return c.json({ channels: this.getChannelStatuses() });
     });
 
-    this.app.get("/metrics", (c) => {
-      const mem = process.memoryUsage();
-      const channels = this.registry.list();
-      const lines = [
-        `# HELP iris_uptime_seconds Gateway uptime in seconds`,
-        `# TYPE iris_uptime_seconds gauge`,
-        `iris_uptime_seconds ${Math.round((Date.now() - this.startedAt) / 1000)}`,
-        `# HELP iris_channels_connected Number of connected channels`,
-        `# TYPE iris_channels_connected gauge`,
-        `iris_channels_connected ${channels.length}`,
-        `# HELP iris_memory_rss_bytes RSS memory in bytes`,
-        `# TYPE iris_memory_rss_bytes gauge`,
-        `iris_memory_rss_bytes ${mem.rss}`,
-        `# HELP iris_memory_heap_used_bytes Heap used in bytes`,
-        `# TYPE iris_memory_heap_used_bytes gauge`,
-        `iris_memory_heap_used_bytes ${mem.heapUsed}`,
-      ];
-      c.header("Content-Type", "text/plain; charset=utf-8");
-      return c.text(lines.join("\n") + "\n");
+    this.app.get("/metrics", async (c) => {
+      metrics.uptime.set(Math.round((Date.now() - this.startedAt) / 1000));
+      const metricsText = await metrics.metrics();
+      c.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+      return c.body(metricsText);
     });
   }
 

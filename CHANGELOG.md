@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/yoda-digital/iris-gateway/compare/v1.7.0...v1.7.1) (2026-03-05)
+
+### Bug Fixes
+
+* **metrics:** wire MetricsRegistry into HealthServer /metrics endpoint ([18881d0](https://github.com/yoda-digital/iris-gateway/commit/18881d0f0986609dcf5c08aeed85f3374ff17658)), closes [#27](https://github.com/yoda-digital/iris-gateway/issues/27)
+* **triggers:** guard dormancyRecovery JSON.parse against malformed evidence ([ff5b1a6](https://github.com/yoda-digital/iris-gateway/commit/ff5b1a642a9322c703a5fccdbee819184628ad9d)), closes [#43](https://github.com/yoda-digital/iris-gateway/issues/43)
+
 ## [1.7.0](https://github.com/yoda-digital/iris-gateway/compare/v1.6.0...v1.7.0) (2026-03-05)
 
 ### Features

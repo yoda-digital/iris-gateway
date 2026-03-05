@@ -258,14 +258,37 @@ export class MessageRouter {
     }
 
     // ── Step 9: OpenCode bridge ──
+    const cb = this.bridge.getCircuitBreaker();
+    if (!cb.allowRequest()) {
+      // Fix #1: circuit OPEN → reject immediately, do NOT fall through to sendAndWait
+      log.warn("  9 ▸ Bridge        ✗ circuit OPEN — rejecting, notifying user");
+      if (adapter) {
+        await adapter.sendText({
+          to: msg.chatId,
+          text: cb.unavailableMessage,
+          replyToId: msg.id,
+        }).catch(() => {});
+      }
+      this.pendingResponses.delete(entry.openCodeSessionId);
+      return;
+    }
+
     log.info("  9 ▸ Bridge        → prompt_async to OpenCode");
     log.info("  ── HOOKS ── system.transform → vault context + profile learning + proactive awareness");
     log.info("  ── MODEL ── thinking + tool calls (see ⚡ below) + response generation");
 
-    const response = await this.bridge.sendAndWait(
-      entry.openCodeSessionId,
-      messageText,
-    );
+    // Fix #2: wrap in try/catch and call onSuccess()/onFailure() for feedback loop
+    let response: string | null = null;
+    try {
+      response = await this.bridge.sendAndWait(
+        entry.openCodeSessionId,
+        messageText,
+      );
+    } catch (err) {
+      cb.onFailure();
+      log.error({ err }, "  9 ▸ Bridge        ✗ sendAndWait threw");
+      throw err;
+    }
 
     // Clean up streaming coalescer (not used in polling path)
     const coalescer = this.activeCoalescers.get(entry.openCodeSessionId);
@@ -278,12 +301,14 @@ export class MessageRouter {
     // ── Step 10: Response delivery ──
     const elapsed = Date.now() - startTime;
     if (response) {
+      cb.onSuccess(); // Fix #2: feedback loop — close circuit on success
       const responsePreview = `"${response.substring(0, 80)}${response.length > 80 ? "…" : ""}"`;
       log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);
       log.info(` 11 ▸ Deliver       → ${msg.channelId} ${responsePreview}`);
       await this.sendResponse(msg.channelId, msg.chatId, response, msg.id);
       log.info(`──── DONE ──── ${elapsed}ms total ────`);
     } else {
+      cb.onFailure(); // Fix #2: null response = bridge failure
       log.warn(` 10 ▸ Response      ✗ empty (${elapsed}ms) — model may be unavailable`);
       log.info(`──── DONE ──── ${elapsed}ms total (no response) ────`);
     }

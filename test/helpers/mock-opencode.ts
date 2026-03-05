@@ -48,6 +48,8 @@ export class MockOpenCodeBridge {
     return [...this.sessions.values()];
   }
 
+  getCircuitBreaker() { return { allowRequest: () => true, onSuccess: () => {}, onFailure: () => {}, getState: () => 'CLOSED' as const, unavailableMessage: 'temporarily unavailable', reset: () => {} }; }
+
   async deleteSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
   }

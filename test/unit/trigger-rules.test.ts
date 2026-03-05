@@ -140,3 +140,42 @@ describe("dateMention rule", () => {
     expect(result!.payload.flag).toContain("15/03/2026");
   });
 });
+
+describe("dormancyRecovery rule", () => {
+  const rule = findRule("dormancy_recovery");
+
+  const risingTrend = (evidence: string | null) => ({
+    signalType: "engagement_trend",
+    value: "rising",
+    evidence,
+  });
+
+  it("fires when trend is rising with valid evidence showing no prior week activity", () => {
+    const signals = [risingTrend(JSON.stringify({ previousWeek: 0, current: 5 }))];
+    const result = rule.evaluate("hey", msg, signals as any);
+    expect(result).not.toBeNull();
+    expect(result!.ruleId).toBe("dormancy_recovery");
+  });
+
+  it("does not fire when trend is not rising", () => {
+    const signals = [{ signalType: "engagement_trend", value: "falling", evidence: JSON.stringify({ previousWeek: 0 }) }];
+    expect(rule.evaluate("hey", msg, signals as any)).toBeNull();
+  });
+
+  it("does not fire when user had prior week activity", () => {
+    const signals = [risingTrend(JSON.stringify({ previousWeek: 3 }))];
+    expect(rule.evaluate("hey", msg, signals as any)).toBeNull();
+  });
+
+  it("does NOT crash on malformed evidence JSON — returns null gracefully", () => {
+    const signals = [risingTrend("not-valid-json{{{")];
+    expect(() => rule.evaluate("hey", msg, signals as any)).not.toThrow();
+    expect(rule.evaluate("hey", msg, signals as any)).toBeNull();
+  });
+
+  it("handles null evidence without crash", () => {
+    const signals = [risingTrend(null)];
+    expect(() => rule.evaluate("hey", msg, signals as any)).not.toThrow();
+    expect(rule.evaluate("hey", msg, signals as any)).toBeNull();
+  });
+});

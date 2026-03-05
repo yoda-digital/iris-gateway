@@ -122,7 +122,15 @@ const dormancyRecovery: TriggerRule = {
     if (!trend || trend.value !== "rising") return null;
 
     // Check if there's evidence of previous decline
-    const evidence = trend.evidence ? JSON.parse(trend.evidence) : null;
+    let evidence: Record<string, number> | null = null;
+    if (trend.evidence) {
+      try {
+        evidence = JSON.parse(trend.evidence);
+      } catch {
+        // malformed evidence — skip dormancy check
+        return null;
+      }
+    }
     if (!evidence || evidence.previousWeek > 0) return null; // Had activity last week — not a real recovery
 
     return {

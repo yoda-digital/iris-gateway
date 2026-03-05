@@ -1,3 +1,15 @@
+## [1.7.0](https://github.com/yoda-digital/iris-gateway/compare/v1.6.0...v1.7.0) (2026-03-05)
+
+### Features
+
+* two-process reliability — circuit breaker + auto-restart ([#25](https://github.com/yoda-digital/iris-gateway/issues/25)) ([106e333](https://github.com/yoda-digital/iris-gateway/commit/106e33324eaff7b19320cc18391902d7a3d98c4b))
+
+### Bug Fixes
+
+* **bridge:** circuit breaker actually breaks the circuit ([b93e0a5](https://github.com/yoda-digital/iris-gateway/commit/b93e0a5e89fa5daf9c787edc253386d808fae249)), closes [#39](https://github.com/yoda-digital/iris-gateway/issues/39) [#1](https://github.com/yoda-digital/iris-gateway/issues/1) [#2](https://github.com/yoda-digital/iris-gateway/issues/2) [#3](https://github.com/yoda-digital/iris-gateway/issues/3)
+* **bridge:** replace silent TODO stub with not-implemented throw in tool scaffold ([ea8de37](https://github.com/yoda-digital/iris-gateway/commit/ea8de37239bf25ff1bc53189ba214dad83d4b98b)), closes [#29](https://github.com/yoda-digital/iris-gateway/issues/29)
+* **circuit-breaker:** getState() returns computed HALF_OPEN without mutating ([e2e391a](https://github.com/yoda-digital/iris-gateway/commit/e2e391ab279cb1a5744482a9e5cf3f5169a03134))
+
 ## [1.6.0](https://github.com/yoda-digital/iris-gateway/compare/v1.5.0...v1.6.0) (2026-03-03)
 
 ### Features

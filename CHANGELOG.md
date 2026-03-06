@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/yoda-digital/iris-gateway/compare/v1.7.3...v1.8.0) (2026-03-06)
+
+### Features
+
+* **bridge:** make sendAndWait timeout configurable per channel via sendAndWaitTimeoutMs ([#51](https://github.com/yoda-digital/iris-gateway/issues/51)) ([d58dd29](https://github.com/yoda-digital/iris-gateway/commit/d58dd2974845852d8c510907afdb1b7232c4c15a)), closes [#48](https://github.com/yoda-digital/iris-gateway/issues/48)
+
 ## [1.7.3](https://github.com/yoda-digital/iris-gateway/compare/v1.7.2...v1.7.3) (2026-03-06)
 
 ### Bug Fixes

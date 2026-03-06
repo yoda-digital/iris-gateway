@@ -1,3 +1,9 @@
+## [1.7.2](https://github.com/yoda-digital/iris-gateway/compare/v1.7.1...v1.7.2) (2026-03-06)
+
+### Bug Fixes
+
+* **health:** read version dynamically from package.json ([#49](https://github.com/yoda-digital/iris-gateway/issues/49)) ([17f324a](https://github.com/yoda-digital/iris-gateway/commit/17f324a30821888965d4337efe81486ae0ec80ee)), closes [#47](https://github.com/yoda-digital/iris-gateway/issues/47)
+
 ## [1.7.1](https://github.com/yoda-digital/iris-gateway/compare/v1.7.0...v1.7.1) (2026-03-05)
 
 ### Bug Fixes

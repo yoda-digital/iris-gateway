@@ -45,14 +45,18 @@ export class ArcDetector {
    * @param content  - The memory content (fact text)
    * @param memoryId - Optional vault memory ID to link
    * @param source   - Where this came from (conversation, compaction, etc.)
+   * @param language - Per-sender detected language code (e.g. "ro", "ru", "en").
+   *                   Overrides the constructor-level userLanguage when provided,
+   *                   enabling correct per-sender stopword filtering in multi-user deployments.
    */
   processMemory(
     senderId: string,
     content: string,
     memoryId?: string,
     source: "conversation" | "compaction" | "proactive" | "tool" = "conversation",
+    language?: string,
   ): void {
-    const keywords = this.extractKeywords(content);
+    const keywords = this.extractKeywords(content, language);
 
     // Need at least 2 keywords to be meaningful
     if (keywords.length < 2) return;
@@ -129,16 +133,21 @@ export class ArcDetector {
   /**
    * Extract meaningful keywords from text.
    * Filters out stop words and short tokens.
+   *
+   * @param text     - The text to extract keywords from.
+   * @param language - Optional language code for stopword filtering.
+   *                   Falls back to constructor-level userLanguage, then English.
    */
-  private extractKeywords(text: string): string[] {
+  private extractKeywords(text: string, language?: string): string[] {
     const tokens = text
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s-]/gu, " ")
       .split(/\s+/)
       .filter((w) => w.length >= 3);
 
-    const stopwords = this.userLanguage
-      ? (ArcDetector.STOPWORD_MAP[this.userLanguage] ?? eng)
+    const lang = language ?? this.userLanguage;
+    const stopwords = lang
+      ? (ArcDetector.STOPWORD_MAP[lang] ?? eng)
       : eng;
 
     return removeStopwords(tokens, stopwords);

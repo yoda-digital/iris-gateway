@@ -1,8 +1,12 @@
+import { createRequire } from "module";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { OpenCodeBridge } from "../bridge/opencode-client.js";
 import { metrics } from "./metrics.js";
+
+const require = createRequire(import.meta.url);
+const { version: pkgVersion } = require("../../package.json") as { version: string };
 
 interface ChannelStatus {
   id: string;
@@ -38,7 +42,7 @@ export class HealthServer {
       const mem = process.memoryUsage();
       return c.json({
         status: opencodeHealthy && channels.length > 0 ? "ok" : "degraded",
-        version: "0.2.0",
+        version: pkgVersion,
         uptime: Date.now() - this.startedAt,
         uptimeHuman: formatUptime(Date.now() - this.startedAt),
         channels,

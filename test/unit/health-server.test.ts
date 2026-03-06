@@ -1,3 +1,6 @@
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { version: pkgVersion } = require("../../package.json") as { version: string };
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { HealthServer } from "../../src/gateway/health.js";
 
@@ -55,7 +58,7 @@ describe("HealthServer", () => {
 
       const body = await res.json();
       expect(body).toHaveProperty("status");
-      expect(body).toHaveProperty("version", "0.2.0");
+      expect(body).toHaveProperty("version", pkgVersion);
       expect(body).toHaveProperty("uptime");
       expect(body).toHaveProperty("uptimeHuman");
       expect(body).toHaveProperty("system");

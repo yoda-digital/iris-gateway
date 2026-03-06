@@ -175,7 +175,7 @@ describe("ArcDetector — per-call language propagation", () => {
     }
   });
 
-  it("two senders with different languages get correct stopword filtering", () => {
+  it("two senders with different languages each get correct per-language stopword filtering", () => {
     const storeEn = makeStore();
     const storeRo = makeStore();
     const bus = makeBus();
@@ -183,7 +183,7 @@ describe("ArcDetector — per-call language propagation", () => {
     // Single detector, no constructor language
     const detector = new ArcDetector(storeEn, bus, logger);
 
-    // Sender 1: English
+    // Sender 1: English — language resolved at call site, overrides constructor default
     detector.processMemory(
       "user-en",
       "the meeting client project deadline tomorrow schedule important",
@@ -192,7 +192,9 @@ describe("ArcDetector — per-call language propagation", () => {
       "en",
     );
 
-    // Swap store to capture second sender's arc (reuse detector instance concept)
+    // Sender 2: separate instance because each sender binds its own SignalStore.
+    // Per-sender isolation is guaranteed by the stateless call-site language param —
+    // no instance state is mutated between calls, so cross-contamination is impossible.
     const detector2 = new ArcDetector(storeRo, bus, logger);
     detector2.processMemory(
       "user-ro",

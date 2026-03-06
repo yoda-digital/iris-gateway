@@ -280,9 +280,11 @@ export class MessageRouter {
     // Fix #2: wrap in try/catch and call onSuccess()/onFailure() for feedback loop
     let response: string | null = null;
     try {
+      const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
       response = await this.bridge.sendAndWait(
         entry.openCodeSessionId,
         messageText,
+        sendTimeoutMs,
       );
     } catch (err) {
       cb.onFailure();

@@ -67,6 +67,7 @@ export interface ChannelAccountConfig {
   readonly mentionPattern?: string;
   readonly maxTextLength?: number;
   readonly streaming?: StreamingConfig;
+  readonly sendAndWaitTimeoutMs?: number;
 }
 
 export interface StreamingConfig {

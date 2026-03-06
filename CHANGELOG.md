@@ -1,3 +1,9 @@
+## [1.7.3](https://github.com/yoda-digital/iris-gateway/compare/v1.7.2...v1.7.3) (2026-03-06)
+
+### Bug Fixes
+
+* **arcs:** resolve stopword language per-sender at call site ([#50](https://github.com/yoda-digital/iris-gateway/issues/50)) ([ebcfbb9](https://github.com/yoda-digital/iris-gateway/commit/ebcfbb9bd2034861e6441c65b261b2073d897daf)), closes [#40](https://github.com/yoda-digital/iris-gateway/issues/40)
+
 ## [1.7.2](https://github.com/yoda-digital/iris-gateway/compare/v1.7.1...v1.7.2) (2026-03-06)
 
 ### Bug Fixes

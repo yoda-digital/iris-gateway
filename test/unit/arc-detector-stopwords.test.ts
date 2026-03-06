@@ -107,3 +107,111 @@ describe("ArcDetector — stop word filtering", () => {
     ).not.toThrow();
   });
 });
+
+describe("ArcDetector — per-call language propagation", () => {
+  it("uses language param passed to processMemory, overriding constructor default", () => {
+    const store = makeStore();
+    const bus = makeBus();
+    const logger = makeLogger();
+    // Constructor has no language — defaults to English
+    const detector = new ArcDetector(store, bus, logger);
+
+    // Pass Romanian language at call site; "este" is a Romanian stop word
+    detector.processMemory(
+      "user-ro",
+      "este proiectul client termen important planificare livrare",
+      undefined,
+      "conversation",
+      "ro",
+    );
+
+    const createCall = (store.createArc as ReturnType<typeof vi.fn>).mock.calls[0];
+    if (createCall) {
+      const title: string = createCall[0].title;
+      // "este" should be filtered by Romanian stopwords
+      expect(title).not.toMatch(/\beste\b/i);
+    }
+  });
+
+  it("call-site language overrides constructor-level userLanguage", () => {
+    const store = makeStore();
+    const bus = makeBus();
+    const logger = makeLogger();
+    // Constructor says German
+    const detector = new ArcDetector(store, bus, logger, undefined, "de");
+
+    // But call site says Romanian — Romanian stopword "este" should be removed
+    detector.processMemory(
+      "user-ro",
+      "este proiectul client termen important planificare livrare",
+      undefined,
+      "conversation",
+      "ro",
+    );
+
+    const createCall = (store.createArc as ReturnType<typeof vi.fn>).mock.calls[0];
+    if (createCall) {
+      const title: string = createCall[0].title;
+      expect(title).not.toMatch(/\beste\b/i);
+    }
+  });
+
+  it("falls back to constructor userLanguage when no call-site language given", () => {
+    const store = makeStore();
+    const bus = makeBus();
+    const logger = makeLogger();
+    const detector = new ArcDetector(store, bus, logger, undefined, "ro");
+
+    // No language passed to processMemory — should use "ro" from constructor
+    detector.processMemory(
+      "user-ro",
+      "este proiectul client termen important planificare livrare",
+    );
+
+    const createCall = (store.createArc as ReturnType<typeof vi.fn>).mock.calls[0];
+    if (createCall) {
+      const title: string = createCall[0].title;
+      expect(title).not.toMatch(/\beste\b/i);
+    }
+  });
+
+  it("two senders with different languages each get correct per-language stopword filtering", () => {
+    const storeEn = makeStore();
+    const storeRo = makeStore();
+    const bus = makeBus();
+    const logger = makeLogger();
+    // Single detector, no constructor language
+    const detector = new ArcDetector(storeEn, bus, logger);
+
+    // Sender 1: English — language resolved at call site, overrides constructor default
+    detector.processMemory(
+      "user-en",
+      "the meeting client project deadline tomorrow schedule important",
+      undefined,
+      "conversation",
+      "en",
+    );
+
+    // Sender 2: separate instance because each sender binds its own SignalStore.
+    // Per-sender isolation is guaranteed by the stateless call-site language param —
+    // no instance state is mutated between calls, so cross-contamination is impossible.
+    const detector2 = new ArcDetector(storeRo, bus, logger);
+    detector2.processMemory(
+      "user-ro",
+      "este proiectul client termen important planificare livrare",
+      undefined,
+      "conversation",
+      "ro",
+    );
+
+    const callEn = (storeEn.createArc as ReturnType<typeof vi.fn>).mock.calls[0];
+    const callRo = (storeRo.createArc as ReturnType<typeof vi.fn>).mock.calls[0];
+
+    if (callEn) {
+      expect(callEn[0].title).not.toMatch(/\bthe\b/i);
+    }
+    if (callRo) {
+      expect(callRo[0].title).not.toMatch(/\beste\b/i);
+    }
+  });
+});

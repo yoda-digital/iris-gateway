@@ -296,6 +296,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   await startChannelAdapters({
     config, logger, registry, messageCache, canvasServer, vaultStore, router,
     activityTracker, inferenceEngine, outcomeAnalyzer, arcDetector, profileEnricher,
+    signalStore,
     pluginRegistry, abortController,
   });
 

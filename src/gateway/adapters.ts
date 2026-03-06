@@ -11,6 +11,7 @@ import type { InferenceEngine } from "../intelligence/inference/engine.js";
 import type { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
 import type { ArcDetector } from "../intelligence/arcs/detector.js";
 import type { ProfileEnricher } from "../onboarding/enricher.js";
+import type { SignalStore } from "../onboarding/signals.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { TelegramAdapter } from "../channels/telegram/index.js";
 import { WhatsAppAdapter } from "../channels/whatsapp/index.js";
@@ -40,6 +41,7 @@ export interface AdapterWiringDeps {
   outcomeAnalyzer: OutcomeAnalyzer | null;
   arcDetector: ArcDetector | null;
   profileEnricher: ProfileEnricher | null;
+  signalStore: SignalStore | null;
   pluginRegistry: IrisPluginRegistry;
   abortController: AbortController;
 }
@@ -52,7 +54,7 @@ export async function startChannelAdapters(deps: AdapterWiringDeps): Promise<voi
   const {
     config, logger, registry, messageCache, canvasServer, vaultStore,
     router, activityTracker, inferenceEngine, outcomeAnalyzer, arcDetector,
-    profileEnricher, pluginRegistry, abortController,
+    profileEnricher, signalStore, pluginRegistry, abortController,
   } = deps;
 
   for (const [id, channelConfig] of Object.entries(config.channels)) {
@@ -101,7 +103,13 @@ export async function startChannelAdapters(deps: AdapterWiringDeps): Promise<voi
 
       if (outcomeAnalyzer) outcomeAnalyzer.recordEngagement(msg.senderId);
 
-      if (arcDetector && msg.text) arcDetector.processMemory(msg.senderId, msg.text, undefined, "conversation");
+      if (arcDetector && msg.text) {
+        // Resolve per-sender language from onboarding signals for correct stopword filtering.
+        // Falls back gracefully to English inside ArcDetector if language is unknown.
+        const detectedLanguage = signalStore
+          ?.getLatestSignal(msg.senderId, msg.channelId, "language")?.value;
+        arcDetector.processMemory(msg.senderId, msg.text, undefined, "conversation", detectedLanguage);
+      }
 
       router.handleInbound(msg).catch((err) => {
         logger.error({ err, channel: id }, "Failed to handle message");

@@ -4,37 +4,79 @@ This guide covers deploying Iris in production environments, including Docker, m
 
 ## Docker Deployment
 
+> **Recommended:** Use `docker-compose.yml` (included in the repo root) for zero-friction deployment — it already encodes all production defaults including non-root user, healthcheck, and correct port mappings.
+
 ### Dockerfile
 
-Create a `Dockerfile` in the project root:
+The canonical `Dockerfile` is in the repo root. Key characteristics:
+
+| Feature | Production `Dockerfile` |
+|---|---|
+| Package manager | `pnpm` (via corepack) |
+| Multi-stage build | ✅ build → runtime |
+| Non-root user | ✅ `iris` system user |
+| State directory | `/home/iris/.iris` (non-root) |
+| Healthcheck | ✅ `curl -sf http://localhost:19876/health` |
+| Exposed ports | 19876 (API/health), 19877 (tool-server), 19878 (media-server) |
 
 ```dockerfile
-FROM node:22-slim AS builder
+# ---- Build stage ----
+FROM node:22-slim AS build
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+
+# Copy dependency manifests first for better layer caching
+COPY package.json pnpm-lock.yaml ./
+
+# Install all dependencies (including devDependencies for building)
+RUN pnpm install --frozen-lockfile
+
+# Copy source code and TypeScript config
+COPY src/ src/
 COPY tsconfig.json ./
-COPY src/ ./src/
-RUN npm run build
 
-FROM node:22-slim
+# Build TypeScript
+RUN pnpm build
+
+# Prune devDependencies for the runtime image
+RUN pnpm prune --prod
+
+# ---- Runtime stage ----
+FROM node:22-slim AS runtime
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd --system iris && useradd --system --gid iris --create-home iris
+
 WORKDIR /app
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm ci --production
+# Copy built artifacts and production dependencies from build stage
+COPY --from=build --chown=iris:iris /app/dist/ dist/
+COPY --from=build --chown=iris:iris /app/node_modules/ node_modules/
+COPY --from=build --chown=iris:iris /app/package.json package.json
 
-# Copy compiled output and config
-COPY --from=builder /app/dist/ ./dist/
-COPY iris.config.json ./
+# Create state directory
+RUN mkdir -p /home/iris/.iris && chown -R iris:iris /home/iris/.iris
 
-# State directory for persistent data (sessions, allowlists, pairing codes)
-VOLUME /root/.iris
+# Switch to non-root user
+USER iris
 
-EXPOSE 19876
+# Expose gateway ports: health/API, tool-server, media-server
+EXPOSE 19876 19877 19878
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -sf http://localhost:19876/health || exit 1
 
 CMD ["node", "dist/index.js", "gateway", "run"]
 ```
+
+> **Note:** The `Dockerfile` in the repo root is always the authoritative source. If in doubt, refer to it directly.
 
 ### Docker Compose
 

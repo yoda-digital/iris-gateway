@@ -1,3 +1,9 @@
+## [1.8.2](https://github.com/yoda-digital/iris-gateway/compare/v1.8.1...v1.8.2) (2026-03-07)
+
+### Bug Fixes
+
+* **system-router:** add tick() to HeartbeatEngine interface, remove as any cast ([#61](https://github.com/yoda-digital/iris-gateway/issues/61)) ([7a55fcb](https://github.com/yoda-digital/iris-gateway/commit/7a55fcb8958d5acd958d93e99093e4f8de23abda)), closes [#58](https://github.com/yoda-digital/iris-gateway/issues/58)
+
 ## [1.8.1](https://github.com/yoda-digital/iris-gateway/compare/v1.8.0...v1.8.1) (2026-03-07)
 
 ### Bug Fixes

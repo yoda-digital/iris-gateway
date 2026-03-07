@@ -181,9 +181,9 @@ export class InitCommand extends Command {
         },
         { value: "openai/gpt-4o", label: "OpenAI GPT-4o", hint: "requires OPENAI_API_KEY" },
         {
-          value: "anthropic/claude-sonnet-4-5",
-          label: "Anthropic Claude",
-          hint: "requires ANTHROPIC_API_KEY",
+          value: "openrouter/arcee-ai/trinity-large-preview:free",
+          label: "Free (OpenRouter — arcee-ai/trinity-large-preview)",
+          hint: "no API key required",
         },
         { value: "__custom__", label: "Custom", hint: "enter model identifier manually" },
       ],

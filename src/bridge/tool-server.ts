@@ -28,7 +28,7 @@ import { systemRouter } from "./routers/system.js";
 import { skillsRouter } from "./routers/skills.js";
 import { cliRouter } from "./routers/cli.js";
 
-export type HeartbeatEngine = { getStatus(): Array<{ agentId: string; component: string; status: string }> };
+export type HeartbeatEngine = { getStatus(): Array<{ agentId: string; component: string; status: string }>; tick(): Promise<void> };
 
 export interface ToolServerDeps {
   registry: ChannelRegistry;

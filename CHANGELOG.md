@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/yoda-digital/iris-gateway/compare/v1.8.0...v1.8.1) (2026-03-07)
+
+### Bug Fixes
+
+* **heartbeat:** add isConnected to ChannelAdapter interface and all adapters ([#60](https://github.com/yoda-digital/iris-gateway/issues/60)) ([7ee4c98](https://github.com/yoda-digital/iris-gateway/commit/7ee4c98dc098e2465cffd566af7f26a8d3b53823)), closes [#57](https://github.com/yoda-digital/iris-gateway/issues/57)
+
 ## [1.8.0](https://github.com/yoda-digital/iris-gateway/compare/v1.7.3...v1.8.0) (2026-03-06)
 
 ### Features

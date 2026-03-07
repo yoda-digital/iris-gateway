@@ -33,6 +33,9 @@ export class WhatsAppAdapter implements ChannelAdapter {
   readonly capabilities = CAPABILITIES;
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
+  private _isConnected = false;
+  get isConnected(): boolean { return this._isConnected; }
+
   private socket: WASocket | null = null;
 
   async start(
@@ -46,9 +49,11 @@ export class WhatsAppAdapter implements ChannelAdapter {
 
     onConnectionUpdate((update) => {
       if (update.connection === "open") {
+        this._isConnected = true;
         this.events.emit("connected");
       }
       if (update.connection === "close") {
+        this._isConnected = false;
         this.events.emit("disconnected", "connection closed");
       }
     });
@@ -68,6 +73,7 @@ export class WhatsAppAdapter implements ChannelAdapter {
   async stop(): Promise<void> {
     this.socket?.end(undefined);
     this.socket = null;
+    this._isConnected = false;
     this.events.emit("disconnected", "stopped");
   }
 

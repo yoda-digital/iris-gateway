@@ -55,7 +55,7 @@ export class ChannelChecker implements HealthChecker {
       };
     }
 
-    const connected = adapters.filter((a) => (a as any).isConnected).length;
+    const connected = adapters.filter((a) => a.isConnected).length;
     const total = adapters.length;
 
     let status: HealthResult["status"];

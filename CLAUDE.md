@@ -183,3 +183,15 @@ Versioning is fully automated via semantic-release. **Never manually edit the `v
 - `docs:`, `test:`, `chore:`, `ci:`, `style:` — no release
 
 The release pipeline (`.github/workflows/release.yml`) runs after CI passes on `main`, generates CHANGELOG.md, tags the release, and creates a GitHub Release. Configuration lives in `.releaserc.json`.
+
+## ⚠️ Model Policy — MANDATORY
+
+Iris uses **ONLY free OpenRouter models**. No exceptions.
+
+- ✅ `openrouter/arcee-ai/trinity-large-preview:free`
+- ✅ `openrouter/arcee-ai/trinity-mini:free`
+- ✅ `openrouter/meta-llama/llama-3.3-70b-instruct:free`
+- ❌ `anthropic/claude-*` — NEVER. Requires paid API key.
+- ❌ `openai/gpt-4o` — NEVER. Requires paid API key.
+
+When updating model references, default presets, or wizard options: **always use free OpenRouter models only**.

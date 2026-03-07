@@ -6,7 +6,10 @@ import type { SignalStore } from "../../onboarding/signals.js";
 import type { VaultStore } from "../../vault/store.js";
 import type { SessionMap } from "../session-map.js";
 
-type HeartbeatEngine = { getStatus(): Array<{ agentId: string; component: string; status: string }> };
+type HeartbeatEngine = {
+  getStatus(): Array<{ agentId: string; component: string; status: string }>;
+  tick(): Promise<void>;
+};
 
 export interface SystemDeps {
   logger: Logger;
@@ -139,7 +142,7 @@ export function systemRouter(deps: SystemDeps): Hono {
     const engine = heartbeatRef.engine;
     if (!engine) return c.json({ error: "Heartbeat not enabled" }, 503);
     try {
-      await (engine as any).tick();
+      await engine.tick();
       return c.json({ ok: true, components: engine.getStatus() });
     } catch (_err) {
       return c.json({ error: "Trigger failed" }, 500);

@@ -50,11 +50,11 @@ export class WhatsAppAdapter implements ChannelAdapter {
     onConnectionUpdate((update) => {
       if (update.connection === "open") {
         this._isConnected = true;
-    this.events.emit("connected");
+        this.events.emit("connected");
       }
       if (update.connection === "close") {
         this._isConnected = false;
-    this.events.emit("disconnected", "connection closed");
+        this.events.emit("disconnected", "connection closed");
       }
     });
 

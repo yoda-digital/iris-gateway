@@ -54,7 +54,7 @@ export class DiscordAdapter implements ChannelAdapter {
 
     this.client.on("ready", () => {
       this._isConnected = true;
-    this.events.emit("connected");
+      this.events.emit("connected");
     });
 
     this.client.on("messageCreate", (discordMsg) => {

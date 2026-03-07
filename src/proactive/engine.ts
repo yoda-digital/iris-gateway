@@ -217,7 +217,7 @@ export class PulseEngine {
       params.senderId,
       params.chatId,
       params.chatType,
-      this.bridge as any,
+      this.bridge,
     );
 
     const response = await this.bridge.sendAndWait(

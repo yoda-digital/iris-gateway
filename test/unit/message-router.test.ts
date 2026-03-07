@@ -148,4 +148,19 @@ describe("MessageRouter", () => {
 
     expect(capturedTimeoutMs).toBe(30_000);
   });
+
+  it("passes undefined to bridge.sendAndWait when sendAndWaitTimeoutMs is not configured", async () => {
+    let capturedTimeoutMs: number | undefined = 99999;
+    const origSendAndWait = bridge.sendAndWait.bind(bridge);
+    bridge.sendAndWait = async (sessionId: string, text: string, timeoutMs?: number) => {
+      capturedTimeoutMs = timeoutMs;
+      return origSendAndWait(sessionId, text, timeoutMs);
+    };
+
+    // router (created in beforeEach) has no channelConfigs — timeout should be undefined
+    const msg = makeInboundMessage({ channelId: 'mock' });
+    await router.handleInbound(msg);
+
+    expect(capturedTimeoutMs).toBeUndefined();
+  });
 })

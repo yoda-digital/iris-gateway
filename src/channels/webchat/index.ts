@@ -27,6 +27,9 @@ export class WebChatAdapter implements ChannelAdapter {
   };
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
+  private _isConnected = false;
+  get isConnected(): boolean { return this._isConnected; }
+
   private canvasServer: CanvasServer | null = null;
 
   setCanvasServer(server: CanvasServer): void {
@@ -34,10 +37,12 @@ export class WebChatAdapter implements ChannelAdapter {
   }
 
   async start(_config: ChannelAccountConfig, _signal: AbortSignal): Promise<void> {
+    this._isConnected = true;
     this.events.emit("connected");
   }
 
   async stop(): Promise<void> {
+    this._isConnected = false;
     this.events.emit("disconnected", "stopped");
   }
 

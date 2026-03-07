@@ -34,6 +34,9 @@ export class DiscordAdapter implements ChannelAdapter {
   readonly capabilities = CAPABILITIES;
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
+  private _isConnected = false;
+  get isConnected(): boolean { return this._isConnected; }
+
   private client: Client | null = null;
   private messageCache: MessageCache | null = null;
 
@@ -50,7 +53,8 @@ export class DiscordAdapter implements ChannelAdapter {
     this.client = createDiscordClient();
 
     this.client.on("ready", () => {
-      this.events.emit("connected");
+      this._isConnected = true;
+    this.events.emit("connected");
     });
 
     this.client.on("messageCreate", (discordMsg) => {
@@ -72,6 +76,7 @@ export class DiscordAdapter implements ChannelAdapter {
   async stop(): Promise<void> {
     this.client?.destroy();
     this.client = null;
+    this._isConnected = false;
     this.events.emit("disconnected", "stopped");
   }
 

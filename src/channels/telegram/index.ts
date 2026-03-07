@@ -33,6 +33,9 @@ export class TelegramAdapter implements ChannelAdapter {
   readonly capabilities = CAPABILITIES;
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
+  private _isConnected = false;
+  get isConnected(): boolean { return this._isConnected; }
+
   private bot: Bot | null = null;
   private botUserId: string | null = null;
   private messageCache: MessageCache | null = null;
@@ -69,12 +72,14 @@ export class TelegramAdapter implements ChannelAdapter {
     this.bot.start({ drop_pending_updates: true }).catch((err) => {
       this.events.emit("error", err instanceof Error ? err : new Error(String(err)));
     });
+    this._isConnected = true;
     this.events.emit("connected");
   }
 
   async stop(): Promise<void> {
     this.bot?.stop();
     this.bot = null;
+    this._isConnected = false;
     this.events.emit("disconnected", "stopped");
   }
 

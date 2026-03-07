@@ -33,6 +33,9 @@ export class SlackAdapter implements ChannelAdapter {
   readonly capabilities = CAPABILITIES;
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
+  private _isConnected = false;
+  get isConnected(): boolean { return this._isConnected; }
+
   private app: App | null = null;
   private messageCache: MessageCache | null = null;
 
@@ -71,12 +74,14 @@ export class SlackAdapter implements ChannelAdapter {
     });
 
     await this.app.start();
+    this._isConnected = true;
     this.events.emit("connected");
   }
 
   async stop(): Promise<void> {
     await this.app?.stop();
     this.app = null;
+    this._isConnected = false;
     this.events.emit("disconnected", "stopped");
   }
 

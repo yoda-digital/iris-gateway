@@ -67,6 +67,7 @@ export interface ChannelAdapter {
   readonly label: string;
   readonly capabilities: ChannelCapabilities;
   readonly events: TypedEventEmitter<ChannelEvents>;
+  readonly isConnected: boolean;
 
   start(config: ChannelAccountConfig, signal: AbortSignal): Promise<void>;
   stop(): Promise<void>;

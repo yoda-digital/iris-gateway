@@ -1,6 +1,6 @@
 {
   "name": "@yoda-digital/iris-gateway",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "Multi-channel AI messaging gateway powered by OpenCode CLI",
   "homepage": "https://github.com/yoda-digital/iris-gateway",
   "repository": {

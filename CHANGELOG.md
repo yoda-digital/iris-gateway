@@ -1,3 +1,9 @@
+## [1.8.3](https://github.com/yoda-digital/iris-gateway/compare/v1.8.2...v1.8.3) (2026-03-07)
+
+### Bug Fixes
+
+* **proactive:** remove unnecessary as any cast in executeProactive (Closes [#59](https://github.com/yoda-digital/iris-gateway/issues/59)) ([#62](https://github.com/yoda-digital/iris-gateway/issues/62)) ([e98b6f9](https://github.com/yoda-digital/iris-gateway/commit/e98b6f9481ca905714c6c25819fadabfca436ef3))
+
 ## [1.8.2](https://github.com/yoda-digital/iris-gateway/compare/v1.8.1...v1.8.2) (2026-03-07)
 
 ### Bug Fixes

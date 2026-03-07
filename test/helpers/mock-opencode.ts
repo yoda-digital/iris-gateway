@@ -26,7 +26,7 @@ export class MockOpenCodeBridge {
     return this.responseText;
   }
 
-  async sendAndWait(_sessionId: string, _text: string): Promise<string> {
+  async sendAndWait(_sessionId: string, _text: string, _timeoutMs?: number): Promise<string> {
     return this.responseText;
   }
 

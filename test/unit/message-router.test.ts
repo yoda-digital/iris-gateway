@@ -113,4 +113,39 @@ describe("MessageRouter", () => {
     expect(sendCalls.length).toBe(1);
     expect((sendCalls[0]!.args[0] as any).text).toContain("disabled");
   });
-});
+  it("forwards sendAndWaitTimeoutMs from channel config to bridge.sendAndWait", async () => {
+    // Spy on sendAndWait to capture the timeoutMs argument
+    let capturedTimeoutMs: number | undefined;
+    const origSendAndWait = bridge.sendAndWait.bind(bridge);
+    bridge.sendAndWait = async (sessionId, text, timeoutMs) => {
+      capturedTimeoutMs = timeoutMs;
+      return origSendAndWait(sessionId, text, timeoutMs);
+    };
+
+    // Build a router with sendAndWaitTimeoutMs configured for "mock" channel
+    const pairingStore2 = new PairingStore(tempDir);
+    const allowlistStore2 = new AllowlistStore(tempDir);
+    const rateLimiter2 = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate2 = new SecurityGate(pairingStore2, allowlistStore2, rateLimiter2, {
+      defaultDmPolicy: "open",
+      pairingCodeTtlMs: 3_600_000,
+      pairingCodeLength: 8,
+      rateLimitPerMinute: 30,
+      rateLimitPerHour: 300,
+    });
+
+    const routerWithTimeout = new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      securityGate2,
+      registry,
+      pino({ level: "silent" }),
+      { mock: { sendAndWaitTimeoutMs: 30_000 } },
+    );
+
+    const msg = makeInboundMessage({ channelId: "mock" });
+    await routerWithTimeout.handleInbound(msg);
+
+    expect(capturedTimeoutMs).toBe(30_000);
+  });
+})

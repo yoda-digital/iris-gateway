@@ -1,4 +1,5 @@
 import { type Bot, InputFile } from "grammy";
+import type { ReactionTypeEmoji } from "grammy/types";
 import type { SendMediaParams } from "../adapter.js";
 
 export async function sendText(
@@ -79,6 +80,6 @@ export async function sendReaction(
   emoji: string,
 ): Promise<void> {
   await bot.api.setMessageReaction(chatId, Number(messageId), [
-    { type: "emoji", emoji } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    { type: "emoji", emoji: emoji as ReactionTypeEmoji["emoji"] },
   ]);
 }

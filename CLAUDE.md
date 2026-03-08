@@ -16,7 +16,7 @@ pnpm run dev                        # Dev mode (tsx + .env hot reload)
 pnpm run build && pnpm start        # Production
 ```
 
-Coverage thresholds: 70% statements/branches/functions/lines.
+Coverage thresholds: 75% statements/branches/functions/lines.
 
 ## Architecture
 
@@ -148,9 +148,7 @@ Iris plugins (`src/plugins/types.ts`) can register tools, channels, services, an
 
 ## Testing
 
-503 tests across 70 files in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline (no mock files). Common pattern: create temp directory with `mkdtempSync`, clean up in `afterEach`. SQLite tests use in-memory or temp-dir databases.
-
-Known: 6 pre-existing test failures in `pipeline.test.ts` and `message-router.test.ts` related to `sendAndWait` mock — these predate current work.
+Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline (no mock files). Common pattern: create temp directory with `mkdtempSync`, clean up in `afterEach`. SQLite tests use in-memory or temp-dir databases.
 
 ## Important Files
 

@@ -1,3 +1,9 @@
+## [1.8.5](https://github.com/yoda-digital/iris-gateway/compare/v1.8.4...v1.8.5) (2026-03-08)
+
+### Bug Fixes
+
+* **telegram:** replace as any cast in setMessageReaction with typed ReactionTypeEmoji ([#84](https://github.com/yoda-digital/iris-gateway/issues/84)) ([b8d4c3a](https://github.com/yoda-digital/iris-gateway/commit/b8d4c3a3c5db664ad14ff2af3171649ef12a9f37)), closes [#79](https://github.com/yoda-digital/iris-gateway/issues/79)
+
 ## [1.8.4](https://github.com/yoda-digital/iris-gateway/compare/v1.8.3...v1.8.4) (2026-03-08)
 
 ### Bug Fixes

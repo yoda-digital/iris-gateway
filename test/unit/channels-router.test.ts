@@ -141,7 +141,7 @@ describe("POST /tool/send-media", () => {
   it("returns 400 when adapter does not support sendMedia", async () => {
     // Create adapter without sendMedia
     const noMedia = new MockAdapter("nomedia", "No Media");
-    delete (noMedia as any).sendMedia;
+    (noMedia as any).sendMedia = undefined;
     registry.register(noMedia);
     const app = makeApp({ registry, logger });
     const res = await post(app, "/tool/send-media", {
@@ -198,7 +198,7 @@ describe("POST /tool/channel-action", () => {
 
   it("typing action — returns 400 when adapter does not support typing", async () => {
     const noTyping = new MockAdapter("nt", "No Typing");
-    delete (noTyping as any).sendTyping;
+    (noTyping as any).sendTyping = undefined;
     registry.register(noTyping);
     const app = makeApp({ registry, logger });
     const res = await post(app, "/tool/channel-action", { channel: "nt", action: "typing", chatId: "c" });

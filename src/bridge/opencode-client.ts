@@ -406,7 +406,7 @@ export class OpenCodeBridge {
   }
 
   getQueueSize(): number {
-    return this.inFlightCount;
+    return this.pendingQueue.length;
   }
 
   async listSessions(): Promise<SessionInfo[]> {

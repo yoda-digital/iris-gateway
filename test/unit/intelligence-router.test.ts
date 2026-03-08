@@ -531,3 +531,30 @@ describe("POST /arcs/add-memory", () => {
     expect(arcDetector.processMemory).toHaveBeenCalledWith("user-1", "Some memory", undefined, "tool");
   });
 });
+
+// ── Combined happy-path: all deps present for /session/system-context ────────
+describe("POST /session/system-context — combined happy path", () => {
+  it("returns both userContext and intelligenceContext when all deps are provided", async () => {
+    const sessionMap = makeSessionMap(); // returns entry with senderId="user-1"
+    const vaultStore = makeVaultStore({ name: "Alice", timezone: "UTC", language: "en" });
+    const vaultSearch = makeVaultSearch([{ content: "User likes TypeScript" }]);
+    const promptAssembler = makePromptAssembler();
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap, promptAssembler });
+
+    const res = await post(app, "/session/system-context", { sessionID: "sess-1" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+
+    // userContext branch: vaultStore + vaultSearch + sessionMap all present
+    expect(body.userContext).toBeTruthy();
+    expect(body.userContext).toContain("Alice");
+
+    // intelligenceContext branch: promptAssembler + sessionMap both present
+    expect(body.intelligenceContext).toBe("[Intelligence: active goals: 1]");
+    expect(promptAssembler.render).toHaveBeenCalled();
+
+    // both branches used the same sessionMap — called twice
+    expect(sessionMap.findBySessionId).toHaveBeenCalledTimes(2);
+    expect(sessionMap.findBySessionId).toHaveBeenCalledWith("sess-1");
+  });
+});

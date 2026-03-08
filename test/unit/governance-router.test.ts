@@ -252,8 +252,8 @@ describe("POST /usage/summary", () => {
       headers: { "Content-Type": "application/json" },
       body: "not-json",
     });
-    // should not throw — catches and uses empty object
-    expect([200, 400, 500]).toContain(res.status);
+    // source uses .catch(() => ({})) — always returns 200 deterministically
+    expect(res.status).toBe(200);
   });
 });
 

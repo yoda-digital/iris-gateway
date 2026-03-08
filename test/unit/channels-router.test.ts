@@ -432,3 +432,70 @@ describe("GET /tool/plugin-manifest", () => {
     expect(body.tools["tool-b"].description).toBe("Does B");
   });
 });
+
+// ── Success paths for react, edit, delete (previously missing) ─────────────────
+describe("POST /tool/channel-action — success paths", () => {
+  let registry: ChannelRegistry;
+  let logger: ReturnType<typeof makeLogger>;
+
+  beforeEach(() => {
+    registry = new ChannelRegistry();
+    logger = makeLogger();
+  });
+
+  it("react action — calls sendReaction and returns { ok: true }", async () => {
+    const adapter = new MockAdapter("tg", "Telegram");
+    const sendReaction = vi.fn().mockResolvedValue(undefined);
+    (adapter as any).sendReaction = sendReaction;
+    registry.register(adapter);
+    const app = makeApp({ registry, logger });
+    const res = await post(app, "/tool/channel-action", {
+      channel: "tg",
+      action: "react",
+      chatId: "c1",
+      messageId: "m1",
+      emoji: "👍",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.ok).toBe(true);
+    expect(sendReaction).toHaveBeenCalledWith({ messageId: "m1", emoji: "👍", chatId: "c1" });
+  });
+
+  it("edit action — calls editMessage and returns { ok: true }", async () => {
+    const adapter = new MockAdapter("tg", "Telegram");
+    const editMessage = vi.fn().mockResolvedValue(undefined);
+    (adapter as any).editMessage = editMessage;
+    registry.register(adapter);
+    const app = makeApp({ registry, logger });
+    const res = await post(app, "/tool/channel-action", {
+      channel: "tg",
+      action: "edit",
+      chatId: "c1",
+      messageId: "m1",
+      text: "updated text",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.ok).toBe(true);
+    expect(editMessage).toHaveBeenCalledWith({ messageId: "m1", text: "updated text", chatId: "c1" });
+  });
+
+  it("delete action — calls deleteMessage and returns { ok: true }", async () => {
+    const adapter = new MockAdapter("tg", "Telegram");
+    const deleteMessage = vi.fn().mockResolvedValue(undefined);
+    (adapter as any).deleteMessage = deleteMessage;
+    registry.register(adapter);
+    const app = makeApp({ registry, logger });
+    const res = await post(app, "/tool/channel-action", {
+      channel: "tg",
+      action: "delete",
+      chatId: "c1",
+      messageId: "m1",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.ok).toBe(true);
+    expect(deleteMessage).toHaveBeenCalledWith({ messageId: "m1", chatId: "c1" });
+  });
+});

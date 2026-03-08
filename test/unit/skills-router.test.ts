@@ -15,7 +15,7 @@ import { skillsRouter } from "../../src/bridge/routers/skills.js";
 
 function makeApp(baseDir: string, policyEngine?: unknown) {
   const app = new Hono();
-  app.route("/", skillsRouter({ baseDir, policyEngine: policyEngine as any }));
+  app.route("/", skillsRouter({ workingDir: baseDir, policyEngine: policyEngine as any }));
   return app;
 }
 
@@ -304,7 +304,7 @@ describe("GET /agents/list", () => {
     const app = makeApp(baseDir);
     const res = await get(app, "/agents/list");
     expect(res.status).toBe(200);
-    const body = await res.json() as { agents: Array<{ name: string; mode: string; description: string; disabled: boolean; hidden: boolean }> };
+    const body = await res.json() as { agents: Array<{ name: string; mode: string; description: string; disabled: boolean; hidden: boolean; skillCount: number; toolCount: number }> };
     expect(body.agents).toHaveLength(1);
     const a = body.agents[0];
     expect(a.name).toBe("test-bot");
@@ -312,6 +312,10 @@ describe("GET /agents/list", () => {
     expect(a.description).toBe("A test bot");
     expect(a.disabled).toBe(false);
     expect(a.hidden).toBe(false);
+    // skillCount: /^\s*- (\S+)/gm matches "  - my-skill" => 1
+    expect(a.skillCount).toBe(1);
+    // toolCount: /^\s+(\w+):\s*true/gm matches "  skill: true" => 1
+    expect(a.toolCount).toBe(1);
   });
 });
 
@@ -441,8 +445,8 @@ describe("POST /rules/update", () => {
 describe("POST /rules/append", () => {
   /**
    * Edge case 1: empty file.
-   * separator = existing.endsWith("\n") || !existing ? "" : "\n"
-   * When existing = "", !existing is true => separator = ""
+   * !existing is true => separator = ""
+   * Written: "" + "" + section + "\n" = "## New Section\n" (no leading newline)
    */
   it("appends to empty file with no separator", async () => {
     writeFileSync(join(baseDir, "AGENTS.md"), "");
@@ -450,15 +454,14 @@ describe("POST /rules/append", () => {
     const res = await post(app, "/rules/append", { section: "## New Section" });
     expect(res.status).toBe(200);
     const c = readFileSync(join(baseDir, "AGENTS.md"), "utf-8");
-    expect(c).toContain("## New Section");
-    // Empty string + "" + "\n" + section — should not start with double newline
-    expect(c).not.toMatch(/^\n\n/);
+    expect(c).toBe("## New Section\n");
   });
 
   /**
-   * Edge case 2: file ends with \n => separator = ""
+   * Edge case 2: file ends with \n => separator = "\n"
+   * Written: "...\n" + "\n" + section + "\n" => one blank line before section
    */
-  it("appends to file with trailing newline -- no extra separator", async () => {
+  it("appends to file with trailing newline -- one blank line before section", async () => {
     writeFileSync(join(baseDir, "AGENTS.md"), "# Existing\nContent\n");
     const app = makeApp(baseDir);
     const res = await post(app, "/rules/append", { section: "## Appended" });
@@ -466,15 +469,16 @@ describe("POST /rules/append", () => {
     const c = readFileSync(join(baseDir, "AGENTS.md"), "utf-8");
     expect(c).toContain("# Existing");
     expect(c).toContain("## Appended");
-    // existing ends with \n, separator="", so: "...\n" + "" + "\n" + section
+    // existing ends with \n, separator="\n", so: "...\n" + "\n" + section
     const idx = c.indexOf("## Appended");
     expect(c.slice(idx - 1, idx)).toBe("\n");
   });
 
   /**
-   * Edge case 3: file does NOT end with \n => separator = "\n"
+   * Edge case 3: file does NOT end with \n => separator = "\n\n"
+   * Written: existing + "\n\n" + section + "\n" => two \n before section
    */
-  it("appends to file without trailing newline -- adds separator \\n", async () => {
+  it("appends to file without trailing newline -- adds double newline separator", async () => {
     writeFileSync(join(baseDir, "AGENTS.md"), "# Existing\nNo trailing newline");
     const app = makeApp(baseDir);
     const res = await post(app, "/rules/append", { section: "## Appended" });
@@ -482,7 +486,7 @@ describe("POST /rules/append", () => {
     const c = readFileSync(join(baseDir, "AGENTS.md"), "utf-8");
     expect(c).toContain("# Existing");
     expect(c).toContain("## Appended");
-    // separator="\n", so: existing + "\n" + "\n" + section => two \n before section
+    // separator="\n\n", so: existing + "\n\n" + section => two \n before section
     const idx = c.indexOf("## Appended");
     expect(c.slice(idx - 2, idx)).toBe("\n\n");
   });
@@ -552,6 +556,14 @@ describe("POST /tools/create", () => {
     const res = await post(app, "/tools/create", { name: "Bad Tool", description: "bad" });
     expect(res.status).toBe(400);
   });
+
+  it("returns 400 when description is missing", async () => {
+    const app = makeApp(baseDir);
+    const res = await post(app, "/tools/create", { name: "my-tool" });
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/description/i);
+  });
 });
 
 // ─── buildIrisContext (via /agents/create) ───────────────────────────────────
@@ -574,5 +586,82 @@ describe("buildIrisContext (via /agents/create)", () => {
     expect(body.ok).toBe(true);
     const c = readFileSync(join(agentsDir, "no-skills-agent.md"), "utf-8");
     expect(c).not.toContain("## Available Skills");
+  });
+
+  it("uses explicit prompt field, skipping buildIrisContext", async () => {
+    const app = makeApp(baseDir);
+    const res = await post(app, "/agents/create", {
+      name: "custom-prompt-agent",
+      description: "Agent with custom prompt",
+      prompt: "You are a custom agent. Do exactly this.",
+    });
+    expect(res.status).toBe(200);
+    const c = readFileSync(join(agentsDir, "custom-prompt-agent.md"), "utf-8");
+    expect(c).toContain("You are a custom agent. Do exactly this.");
+    // buildIrisContext inserts "Iris Architecture" — must be absent when prompt is explicit
+    expect(c).not.toContain("Iris Architecture");
+  });
+});
+
+// ─── POST /skills/suggest ─────────────────────────────────────────────────────
+
+describe("POST /skills/suggest", () => {
+  it("returns empty suggestions when skills dir missing", async () => {
+    const app = makeApp(baseDir);
+    const res = await post(app, "/skills/suggest", { text: "find me something" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: unknown[] };
+    expect(body.suggestions).toHaveLength(0);
+  });
+
+  it("returns empty when no skill has a matching trigger", async () => {
+    // skill exists but has no triggers metadata
+    mkSkill("no-triggers-skill", "A skill without triggers");
+    const app = makeApp(baseDir);
+    const res = await post(app, "/skills/suggest", { text: "find me something" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: unknown[] };
+    expect(body.suggestions).toHaveLength(0);
+  });
+
+  it("returns matching skill when text contains a trigger keyword", async () => {
+    mkdirSync(join(skillsDir, "weather"), { recursive: true });
+    writeFileSync(join(skillsDir, "weather", "SKILL.md"), [
+      "---",
+      "name: weather",
+      "description: Gets weather info",
+      "metadata:",
+      `  triggers: "weather, forecast, temperature"`,
+      "---",
+      "",
+      "Weather skill body.",
+    ].join("\n"));
+    const app = makeApp(baseDir);
+    const res = await post(app, "/skills/suggest", { text: "what is the forecast today?" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: Array<{ name: string; description: string }> };
+    expect(body.suggestions).toHaveLength(1);
+    expect(body.suggestions[0].name).toBe("weather");
+    expect(body.suggestions[0].description).toBe("Gets weather info");
+  });
+
+  it("trigger matching is case-insensitive", async () => {
+    mkdirSync(join(skillsDir, "news"), { recursive: true });
+    writeFileSync(join(skillsDir, "news", "SKILL.md"), [
+      "---",
+      "name: news",
+      "description: Gets latest news",
+      "metadata:",
+      `  triggers: "news, headlines"`,
+      "---",
+      "",
+      "News skill body.",
+    ].join("\n"));
+    const app = makeApp(baseDir);
+    const res = await post(app, "/skills/suggest", { text: "Show me the LATEST NEWS please" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { suggestions: Array<{ name: string }> };
+    expect(body.suggestions).toHaveLength(1);
+    expect(body.suggestions[0].name).toBe("news");
   });
 });

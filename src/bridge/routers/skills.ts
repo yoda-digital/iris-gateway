@@ -5,8 +5,8 @@ import type { PolicyEngine } from "../../governance/policy.js";
 import type { CliToolRegistry } from "../../cli/registry.js";
 
 export interface SkillsDeps {
-  /** Override base directory (defaults to process.cwd()). Used in tests for isolation. */
-  baseDir?: string;
+  /** Working directory for skills, agents, rules, and tools (defaults to process.cwd()). */
+  workingDir?: string;
   policyEngine?: PolicyEngine | null;
   cliRegistry?: CliToolRegistry | null;
 }
@@ -39,8 +39,8 @@ const IRIS_TOOL_CATALOG = [
 
 export function skillsRouter(deps: SkillsDeps): Hono {
   const app = new Hono();
-  const { policyEngine, cliRegistry, baseDir: _baseDir } = deps;
-  const _cwd = _baseDir ?? process.cwd();
+  const { policyEngine, cliRegistry, workingDir } = deps;
+  const _cwd = workingDir ?? process.cwd();
 
   const skillsDir = resolve(_cwd, ".opencode", "skills");
   const agentsDir = resolve(_cwd, ".opencode", "agents");
@@ -388,8 +388,8 @@ export function skillsRouter(deps: SkillsDeps): Hono {
     const section = body.section as string;
     if (!section?.trim()) return c.json({ error: "section (string) is required" }, 400);
     const existing = existsSync(rulesFile) ? readFileSync(rulesFile, "utf-8") : "";
-    const separator = existing.endsWith("\n") || !existing ? "" : "\n";
-    writeFileSync(rulesFile, `${existing}${separator}\n${section}\n`);
+    const separator = !existing ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+    writeFileSync(rulesFile, `${existing}${separator}${section}\n`);
     return c.json({ ok: true, path: rulesFile });
   });
 

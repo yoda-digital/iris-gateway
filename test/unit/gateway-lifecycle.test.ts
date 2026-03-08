@@ -419,21 +419,4 @@ describe("GatewayContext type contract", () => {
     expect(typeof mod.startGateway).toBe("function");
   });
 
-  it("all nullable context fields accept null — optional subsystems are null-safe by design", () => {
-    const nullableFields = [
-      "intentStore", "pulseEngine", "signalStore", "profileEnricher",
-      "heartbeatEngine", "activityTracker", "intelligenceBus", "intelligenceStore",
-      "inferenceEngine", "triggerEvaluator", "outcomeAnalyzer", "arcDetector",
-      "arcLifecycle", "goalLifecycle", "crossChannelResolver", "healthGate",
-      "promptAssembler",
-    ] as const;
-
-    const ctx: Record<string, unknown> = {};
-    for (const field of nullableFields) {
-      ctx[field] = null;
-    }
-    for (const field of nullableFields) {
-      expect(ctx[field]).toBeNull();
-    }
-  });
 });

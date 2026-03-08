@@ -5,6 +5,8 @@ import type { PolicyEngine } from "../../governance/policy.js";
 import type { CliToolRegistry } from "../../cli/registry.js";
 
 export interface SkillsDeps {
+  /** Override base directory (defaults to process.cwd()). Used in tests for isolation. */
+  baseDir?: string;
   policyEngine?: PolicyEngine | null;
   cliRegistry?: CliToolRegistry | null;
 }
@@ -37,12 +39,13 @@ const IRIS_TOOL_CATALOG = [
 
 export function skillsRouter(deps: SkillsDeps): Hono {
   const app = new Hono();
-  const { policyEngine, cliRegistry } = deps;
+  const { policyEngine, cliRegistry, baseDir: _baseDir } = deps;
+  const _cwd = _baseDir ?? process.cwd();
 
-  const skillsDir = resolve(process.cwd(), ".opencode", "skills");
-  const agentsDir = resolve(process.cwd(), ".opencode", "agents");
-  const rulesFile = resolve(process.cwd(), "AGENTS.md");
-  const customToolsDir = resolve(process.cwd(), ".opencode", "tools");
+  const skillsDir = resolve(_cwd, ".opencode", "skills");
+  const agentsDir = resolve(_cwd, ".opencode", "agents");
+  const rulesFile = resolve(_cwd, "AGENTS.md");
+  const customToolsDir = resolve(_cwd, ".opencode", "tools");
 
   // Build tool catalog with CLI tools
   const irisToolCatalog = [...IRIS_TOOL_CATALOG];

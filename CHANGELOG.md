@@ -1,3 +1,9 @@
+## [1.8.4](https://github.com/yoda-digital/iris-gateway/compare/v1.8.3...v1.8.4) (2026-03-08)
+
+### Bug Fixes
+
+* **cli:** replace `as any` cast in executor.ts with typed error guard ([#77](https://github.com/yoda-digital/iris-gateway/issues/77)) ([dcb8ec1](https://github.com/yoda-digital/iris-gateway/commit/dcb8ec1f8dea26712d57224275daa1f4f16690ca)), closes [#74](https://github.com/yoda-digital/iris-gateway/issues/74)
+
 ## [1.8.3](https://github.com/yoda-digital/iris-gateway/compare/v1.8.2...v1.8.3) (2026-03-07)
 
 ### Bug Fixes

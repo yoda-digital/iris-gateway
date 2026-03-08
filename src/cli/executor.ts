@@ -2,10 +2,6 @@ import { execFile } from "node:child_process";
 import type { CliExecResult } from "./types.js";
 import type { Logger } from "../logging/logger.js";
 
-function isTimedOutError(err: unknown): err is { killed: boolean; code: string } {
-  return typeof err === "object" && err !== null && "code" in err;
-}
-
 export interface CliExecutorOpts {
   allowedBinaries: string[];
   timeout: number;
@@ -41,7 +37,7 @@ export class CliExecutor {
           const output = stdout.trim();
 
           if (error) {
-            if (error.killed || (isTimedOutError(error) && error.code === "ETIMEDOUT")) {
+            if (error.killed || error.code === "ETIMEDOUT") {
               resolve({
                 ok: false,
                 error: `Command timed out after ${this.timeout}ms`,

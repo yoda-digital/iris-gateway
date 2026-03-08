@@ -79,6 +79,7 @@ export async function sendReaction(
   messageId: string,
   emoji: string,
 ): Promise<void> {
-  const reaction: ReactionTypeEmoji = { type: "emoji", emoji: emoji as ReactionTypeEmoji["emoji"] };
-  await bot.api.setMessageReaction(chatId, Number(messageId), [reaction]);
+  await bot.api.setMessageReaction(chatId, Number(messageId), [
+    { type: "emoji", emoji: emoji as ReactionTypeEmoji["emoji"] },
+  ]);
 }

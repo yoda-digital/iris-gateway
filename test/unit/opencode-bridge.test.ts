@@ -156,7 +156,7 @@ describe("OpenCodeBridge", () => {
       cb.onFailure(); cb.onFailure(); cb.onFailure(); // OPEN
 
       // Fill queue to max
-      (bridge as any).pendingQueue.length = 2;
+      (bridge as any).pendingQueue.push(() => {}, () => {});
 
       const result = await bridge.sendAndWait("s1", "hello");
       expect(result).toBe("");
@@ -190,7 +190,7 @@ describe("OpenCodeBridge", () => {
   /* ── _scheduleRestart backoff ─────────────────────────────────── */
 
   describe("_scheduleRestart backoff", () => {
-    it("fires after initialBackoffMs at attempt 0", () => {
+    it("fires after initialBackoffMs at attempt 0", async () => {
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
         initialBackoffMs: 500,
         maxBackoffMs: 10_000,
@@ -207,11 +207,11 @@ describe("OpenCodeBridge", () => {
       expect(doStart).not.toHaveBeenCalled();
 
       // Fire at 500ms
-      vi.advanceTimersByTime(1);
+      await vi.advanceTimersByTimeAsync(1);
       expect(doStart).toHaveBeenCalledOnce();
     });
 
-    it("caps backoff at maxBackoffMs", () => {
+    it("caps backoff at maxBackoffMs", async () => {
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
         initialBackoffMs: 1_000,
         maxBackoffMs: 4_000,
@@ -225,7 +225,7 @@ describe("OpenCodeBridge", () => {
       (bridge as any)._scheduleRestart(3);
       vi.advanceTimersByTime(3_999);
       expect(doStart).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(1);
+      await vi.advanceTimersByTimeAsync(1);
       expect(doStart).toHaveBeenCalledOnce();
     });
 
@@ -251,7 +251,7 @@ describe("OpenCodeBridge", () => {
       expect(exceeded).toHaveBeenCalledOnce();
     });
 
-    it("cleans serverHandle before restart", () => {
+    it("cleans serverHandle before restart", async () => {
       const closeFn = vi.fn();
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
         initialBackoffMs: 100,
@@ -262,7 +262,7 @@ describe("OpenCodeBridge", () => {
       (bridge as any).checkHealth = vi.fn().mockResolvedValue(true);
 
       (bridge as any)._scheduleRestart(0);
-      vi.advanceTimersByTime(100);
+      await vi.advanceTimersByTimeAsync(100);
 
       expect(closeFn).toHaveBeenCalledOnce();
       expect((bridge as any).serverHandle).toBeNull();
@@ -406,6 +406,51 @@ describe("OpenCodeBridge", () => {
       await vi.advanceTimersByTimeAsync(100); // poll 3: done
       const result = await promise;
       expect(result).toBe("done thinking");
+    });
+  });
+
+  /* ── circuit breaker onFailure on error ───────────────────────── */
+
+  describe("sendAndWait error path — circuit breaker onFailure", () => {
+    it("calls circuitBreaker.onFailure() and schedules restart when _sendAndWaitInternal throws", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
+        initialBackoffMs: 100,
+        maxRestarts: 5,
+      });
+
+      // Mock _sendAndWaitInternal to throw
+      (bridge as any)._sendAndWaitInternal = vi.fn().mockRejectedValue(new Error("network failure"));
+
+      // Spy on circuitBreaker and _scheduleRestart
+      const cb = bridge.getCircuitBreaker();
+      const onFailureSpy = vi.spyOn(cb, "onFailure");
+      const scheduleRestartSpy = vi.spyOn(bridge as any, "_scheduleRestart");
+      // sendAndWait re-throws after notifying circuit breaker
+      await expect(bridge.sendAndWait("s1", "hello")).rejects.toThrow("network failure");
+      expect(onFailureSpy).toHaveBeenCalledOnce();
+      expect(scheduleRestartSpy).toHaveBeenCalled();
+    });
+  });
+
+  /* ── re-check after drain still OPEN ─────────────────────────── */
+
+  describe("sendAndWait re-check after drain still OPEN", () => {
+    it("returns empty string when queued message is drained but circuit is still OPEN", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), { maxQueueSize: 10 });
+      injectClient(bridge, makeMockClient());
+      const cb = bridge.getCircuitBreaker();
+      cb.onFailure(); cb.onFailure(); cb.onFailure(); // OPEN
+
+      // Do NOT mock _sendAndWaitInternal — circuit stays OPEN so it won't be called
+
+      // Start sendAndWait — it will queue and wait
+      const promise = bridge.sendAndWait("s1", "hi");
+
+      // Drain queue WITHOUT closing circuit (recovery failed)
+      (bridge as any)._drainQueue();
+
+      const result = await promise;
+      expect(result).toBe("");
     });
   });
 });

@@ -37,7 +37,7 @@ export class CliExecutor {
           const output = stdout.trim();
 
           if (error) {
-            if (error.killed || (error as any).code === "ETIMEDOUT") {
+            if (error.killed || error.code === "ETIMEDOUT") {
               resolve({
                 ok: false,
                 error: `Command timed out after ${this.timeout}ms`,

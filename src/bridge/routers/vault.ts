@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { VaultStore } from "../../vault/store.js";
 import type { VaultSearch } from "../../vault/search.js";
 import type { SessionMap } from "../session-map.js";
-import type { Memory, MemoryType } from '../../vault/types.js';
+import type { MemoryType } from '../../vault/types.js';
 
 export interface VaultDeps {
   vaultStore?: VaultStore | null;
@@ -79,7 +79,7 @@ export function vaultRouter(deps: VaultDeps): Hono {
       });
       ids.push(id);
     }
-    return c.json({ facts: ids });
+    return c.json({ ids });
   });
 
   app.post("/vault/store-batch", async (c) => {

@@ -1,3 +1,9 @@
+## [1.8.6](https://github.com/yoda-digital/iris-gateway/compare/v1.8.5...v1.8.6) (2026-03-09)
+
+### Bug Fixes
+
+* **vault-router:** implement /vault/extract — was silent stub returning empty facts ([#89](https://github.com/yoda-digital/iris-gateway/issues/89)) ([94f2d1e](https://github.com/yoda-digital/iris-gateway/commit/94f2d1e813b03e879ab5af7cf074bdc8f210fd2b)), closes [#86](https://github.com/yoda-digital/iris-gateway/issues/86) [#86](https://github.com/yoda-digital/iris-gateway/issues/86)
+
 ## [1.8.5](https://github.com/yoda-digital/iris-gateway/compare/v1.8.4...v1.8.5) (2026-03-08)
 
 ### Bug Fixes

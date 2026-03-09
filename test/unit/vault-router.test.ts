@@ -6,28 +6,42 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { vaultRouter } from "../../src/bridge/routers/vault.js";
 import type { VaultDeps } from "../../src/bridge/routers/vault.js";
+import type { VaultStore } from "../../src/vault/store.js";
+import type { VaultSearch } from "../../src/vault/search.js";
+import type { SessionMap } from "../../src/bridge/session-map.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeVaultStore() {
+function makeVaultStore(): vi.Mocked<VaultStore> {
   return {
     addMemory: vi.fn().mockReturnValue("mem-1"),
+    getMemory: vi.fn().mockReturnValue(null),
+    listMemories: vi.fn().mockReturnValue([]),
     deleteMemory: vi.fn().mockReturnValue(true),
-    getProfile: vi.fn().mockReturnValue({ name: "Alice", language: "en" }),
+    purgeExpired: vi.fn().mockReturnValue(0),
     upsertProfile: vi.fn(),
-  } as any;
+    getProfile: vi.fn().mockReturnValue({ name: "Alice", language: "en" }),
+    logAudit: vi.fn(),
+    listAuditLog: vi.fn().mockReturnValue([]),
+    logGovernance: vi.fn(),
+    listGovernanceLog: vi.fn().mockReturnValue([]),
+  } as unknown as vi.Mocked<VaultStore>;
 }
 
-function makeVaultSearch() {
+function makeVaultSearch(): vi.Mocked<VaultSearch> {
   return {
     search: vi.fn().mockReturnValue([{ id: "m1", content: "hello" }]),
-  } as any;
+  } as unknown as vi.Mocked<VaultSearch>;
 }
 
-function makeSessionMap() {
+function makeSessionMap(): vi.Mocked<SessionMap> {
   return {
+    buildKey: vi.fn().mockReturnValue("ch:dm:user"),
+    resolve: vi.fn().mockResolvedValue(null),
+    reset: vi.fn().mockResolvedValue(undefined),
     findBySessionId: vi.fn().mockResolvedValue(null),
-  } as any;
+    list: vi.fn().mockResolvedValue([]),
+  } as unknown as vi.Mocked<SessionMap>;
 }
 
 function makeApp(deps: VaultDeps) {
@@ -48,9 +62,9 @@ async function del(app: Hono, path: string) {
   return app.request(path, { method: "DELETE" });
 }
 
-let vaultStore: ReturnType<typeof makeVaultStore>;
-let vaultSearch: ReturnType<typeof makeVaultSearch>;
-let sessionMap: ReturnType<typeof makeSessionMap>;
+let vaultStore: vi.Mocked<VaultStore>;
+let vaultSearch: vi.Mocked<VaultSearch>;
+let sessionMap: vi.Mocked<SessionMap>;
 
 beforeEach(() => {
   vaultStore = makeVaultStore();
@@ -69,7 +83,7 @@ describe("POST /vault/search", () => {
       channelId: "ch1",
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { results: Array<{ id: string }> };
     expect(body.results).toHaveLength(1);
     expect(body.results[0].id).toBe("m1");
     expect(vaultSearch.search).toHaveBeenCalledWith("hello", {
@@ -90,7 +104,7 @@ describe("POST /vault/search", () => {
     const app = makeApp({ vaultStore, vaultSearch: null, sessionMap });
     const res = await post(app, "/vault/search", { query: "hi" });
     expect(res.status).toBe(503);
-    const body = await res.json() as any;
+    const body = await res.json() as { error: string };
     expect(body.error).toMatch(/vault/i);
   });
 });
@@ -110,7 +124,7 @@ describe("POST /vault/store", () => {
       confidence: 0.9,
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { id: string };
     expect(body.id).toBe("mem-1");
     expect(vaultStore.addMemory).toHaveBeenCalledWith({
       sessionId: "s1",
@@ -142,7 +156,7 @@ describe("POST /vault/store", () => {
     const app = makeApp({ vaultStore: null, vaultSearch, sessionMap });
     const res = await post(app, "/vault/store", { content: "hello" });
     expect(res.status).toBe(503);
-    const body = await res.json() as any;
+    const body = await res.json() as { error: string };
     expect(body.error).toMatch(/vault/i);
   });
 });
@@ -154,7 +168,7 @@ describe("DELETE /vault/memory/:id", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await del(app, "/vault/memory/mem-42");
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { deleted: boolean };
     expect(body.deleted).toBe(true);
     expect(vaultStore.deleteMemory).toHaveBeenCalledWith("mem-42");
   });
@@ -164,7 +178,7 @@ describe("DELETE /vault/memory/:id", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await del(app, "/vault/memory/nonexistent");
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { deleted: boolean };
     expect(body.deleted).toBe(false);
   });
 
@@ -172,7 +186,7 @@ describe("DELETE /vault/memory/:id", () => {
     const app = makeApp({ vaultStore: null, vaultSearch, sessionMap });
     const res = await del(app, "/vault/memory/mem-1");
     expect(res.status).toBe(503);
-    const body = await res.json() as any;
+    const body = await res.json() as { error: string };
     expect(body.error).toMatch(/vault/i);
   });
 });
@@ -187,7 +201,7 @@ describe("POST /vault/context", () => {
       channelId: "ch1",
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: unknown; memories: unknown[] };
     expect(body.profile).toEqual({ name: "Alice", language: "en" });
     expect(body.memories).toHaveLength(1);
     expect(vaultStore.getProfile).toHaveBeenCalledWith("u1", "ch1");
@@ -196,13 +210,18 @@ describe("POST /vault/context", () => {
 
   it("resolves senderId via sessionMap when senderId missing but sessionID provided", async () => {
     sessionMap.findBySessionId.mockResolvedValue({
+      openCodeSessionId: "sess-123",
       senderId: "resolved-user",
       channelId: "resolved-ch",
+      chatId: "chat-1",
+      chatType: "dm",
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
     });
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/context", { sessionID: "sess-123" });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: unknown };
     expect(body.profile).toBeDefined();
     expect(sessionMap.findBySessionId).toHaveBeenCalledWith("sess-123");
     expect(vaultStore.getProfile).toHaveBeenCalledWith("resolved-user", "resolved-ch");
@@ -219,16 +238,16 @@ describe("POST /vault/context", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/context", {});
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: null; memories: unknown[] };
     expect(body.profile).toBeNull();
     expect(body.memories).toEqual([]);
   });
 
   it("returns { profile: null, memories: [] } when vaultStore is null", async () => {
-    const app = makeApp({ vaultStore: null, vaultSearch: null, sessionMap });
+    const app = makeApp({ vaultStore: null, vaultSearch, sessionMap });
     const res = await post(app, "/vault/context", { senderId: "u1" });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: null; memories: unknown[] };
     expect(body.profile).toBeNull();
     expect(body.memories).toEqual([]);
   });
@@ -237,7 +256,7 @@ describe("POST /vault/context", () => {
     const app = makeApp({ vaultStore, vaultSearch: null, sessionMap });
     const res = await post(app, "/vault/context", { senderId: "u1" });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: null; memories: unknown[] };
     expect(body.profile).toBeNull();
     expect(body.memories).toEqual([]);
   });
@@ -246,7 +265,7 @@ describe("POST /vault/context", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap: null });
     const res = await post(app, "/vault/context", { sessionID: "sess-1" });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { profile: null; memories: unknown[] };
     expect(body.profile).toBeNull();
     expect(body.memories).toEqual([]);
   });
@@ -255,20 +274,47 @@ describe("POST /vault/context", () => {
 // ── POST /vault/extract ─────────────────────────────────────────────────────
 
 describe("POST /vault/extract", () => {
-  it("always returns empty facts (stub)", async () => {
+  it("stores each fact via addMemory and returns their ids", async () => {
+    let counter = 0;
+    vaultStore.addMemory.mockImplementation(() => `fact-${++counter}`);
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
-    const res = await post(app, "/vault/extract", { text: "some conversation" });
+    const res = await post(app, "/vault/extract", {
+      sessionId: "s1",
+      senderId: "u1",
+      channelId: "ch1",
+      facts: ["User likes cats", "User is in Berlin"],
+    });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.facts).toEqual([]);
+    const body = await res.json() as { facts: string[] };
+    expect(body.facts).toEqual(["fact-1", "fact-2"]);
+    expect(vaultStore.addMemory).toHaveBeenCalledTimes(2);
+    expect(vaultStore.addMemory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "s1",
+        senderId: "u1",
+        channelId: "ch1",
+        type: "fact",
+        source: "extracted",
+        content: "User likes cats",
+      }),
+    );
   });
 
-  it("returns empty facts even with no deps", async () => {
-    const app = makeApp({ vaultStore: null, vaultSearch: null, sessionMap: null });
+  it("returns { facts: [] } when no facts provided", async () => {
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/extract", {});
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { facts: string[] };
     expect(body.facts).toEqual([]);
+    expect(vaultStore.addMemory).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when vaultStore is null", async () => {
+    const app = makeApp({ vaultStore: null, vaultSearch, sessionMap });
+    const res = await post(app, "/vault/extract", { facts: ["a fact"] });
+    expect(res.status).toBe(503);
+    const body = await res.json() as { error: string };
+    expect(body.error).toMatch(/vault/i);
   });
 });
 
@@ -288,7 +334,7 @@ describe("POST /vault/store-batch", () => {
       ],
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { ids: string[] };
     expect(body.ids).toEqual(["mem-1", "mem-2", "mem-3"]);
     expect(vaultStore.addMemory).toHaveBeenCalledTimes(3);
   });
@@ -322,7 +368,7 @@ describe("POST /vault/store-batch", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/store-batch", {});
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { ids: string[] };
     expect(body.ids).toEqual([]);
     expect(vaultStore.addMemory).not.toHaveBeenCalled();
   });
@@ -333,7 +379,7 @@ describe("POST /vault/store-batch", () => {
       memories: [{ content: "ignored" }],
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { ids: string[] };
     expect(body.ids).toEqual([]);
   });
 });
@@ -352,7 +398,7 @@ describe("POST /vault/profile", () => {
       preferences: { theme: "dark" },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { ok: boolean };
     expect(body.ok).toBe(true);
     expect(vaultStore.upsertProfile).toHaveBeenCalledWith({
       senderId: "u1",
@@ -380,7 +426,7 @@ describe("POST /vault/profile", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/profile", { channelId: "ch1" });
     expect(res.status).toBe(400);
-    const body = await res.json() as any;
+    const body = await res.json() as { error: string };
     expect(body.error).toMatch(/senderId/);
   });
 
@@ -388,7 +434,7 @@ describe("POST /vault/profile", () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/profile", { senderId: "u1" });
     expect(res.status).toBe(400);
-    const body = await res.json() as any;
+    const body = await res.json() as { error: string };
     expect(body.error).toMatch(/channelId/);
   });
 
@@ -405,7 +451,7 @@ describe("POST /vault/profile", () => {
       channelId: "ch1",
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { ok: boolean };
     expect(body.ok).toBe(false);
   });
 });

@@ -10,8 +10,6 @@ export default defineConfig({
       exclude: [
         // Entry points — no testable logic
         "src/index.ts",
-        // Bridge — tracked separately in #87
-        "src/bridge/opencode-client.ts",
         // Channel adapter bootstrap files without direct tests
         "src/channels/discord/client.ts",
         "src/channels/whatsapp/connection.ts",

@@ -8,22 +8,21 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
       exclude: [
+        // Entry points — no testable logic
         "src/index.ts",
+        // Bridge — tracked separately in #87
         "src/bridge/opencode-client.ts",
-        "src/channels/telegram/index.ts",
-        "src/channels/discord/index.ts",
+        // Channel adapter bootstrap files without direct tests
         "src/channels/discord/client.ts",
-        "src/channels/whatsapp/index.ts",
         "src/channels/whatsapp/connection.ts",
-        "src/channels/slack/index.ts",
-        "src/channels/adapter.ts",
+        // CLI — integration-tested via cli-integration.test.ts, not unit-testable
         "src/cli/banner.ts",
         "src/cli/program.ts",
         "src/cli/commands/gateway.ts",
         "src/cli/commands/doctor.ts",
         "src/cli/commands/send.ts",
         "src/cli/commands/session.ts",
-        "src/gateway/lifecycle.ts",
+        // Type-only files — no executable code
         "src/config/types.ts",
         "src/utils/types.ts",
       ],

@@ -1,3 +1,9 @@
+## [1.8.10](https://github.com/yoda-digital/iris-gateway/compare/v1.8.9...v1.8.10) (2026-03-09)
+
+### Bug Fixes
+
+* [#87](https://github.com/yoda-digital/iris-gateway/issues/87) — remove opencode-client.ts from coverage exclude list ([#98](https://github.com/yoda-digital/iris-gateway/issues/98)) ([94b7bf6](https://github.com/yoda-digital/iris-gateway/commit/94b7bf612c48f6c81b6e30f9b6039adaf4a58f94))
+
 ## [1.8.9](https://github.com/yoda-digital/iris-gateway/compare/v1.8.8...v1.8.9) (2026-03-09)
 
 ### Bug Fixes

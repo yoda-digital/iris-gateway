@@ -1,3 +1,9 @@
+## [1.8.7](https://github.com/yoda-digital/iris-gateway/compare/v1.8.6...v1.8.7) (2026-03-09)
+
+### Bug Fixes
+
+* **ci:** grant write permissions to claude.yml workflow for issue/PR comments ([#94](https://github.com/yoda-digital/iris-gateway/issues/94)) ([63c061b](https://github.com/yoda-digital/iris-gateway/commit/63c061bed263d4e6fb1723c7eb884c75eb8b4b32)), closes [#90](https://github.com/yoda-digital/iris-gateway/issues/90)
+
 ## [1.8.6](https://github.com/yoda-digital/iris-gateway/compare/v1.8.5...v1.8.6) (2026-03-09)
 
 ### Bug Fixes

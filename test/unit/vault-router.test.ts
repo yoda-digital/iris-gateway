@@ -272,49 +272,65 @@ describe("POST /vault/context", () => {
 });
 
 // ── POST /vault/extract ─────────────────────────────────────────────────────
+// Pure extraction — no storage, no vaultStore dependency.
+// Accepts { sessionID, context: string[] | Array<{content,type}> }
+// Returns { facts: Array<{ content: string; type: string }> }
 
 describe("POST /vault/extract", () => {
-  it("stores each fact via addMemory and returns their ids", async () => {
-    let counter = 0;
-    vaultStore.addMemory.mockImplementation(() => `fact-${++counter}`);
+  it("normalizes string context items into facts with default type 'fact'", async () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/extract", {
-      sessionId: "s1",
-      senderId: "u1",
-      channelId: "ch1",
-      facts: ["User likes cats", "User is in Berlin"],
+      sessionID: "s1",
+      context: ["User likes cats", "User is in Berlin"],
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { facts: string[] };
-    expect(body.facts).toEqual(["fact-1", "fact-2"]);
-    expect(vaultStore.addMemory).toHaveBeenCalledTimes(2);
-    expect(vaultStore.addMemory).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: "s1",
-        senderId: "u1",
-        channelId: "ch1",
-        type: "fact",
-        source: "extracted",
-        content: "User likes cats",
-      }),
-    );
+    const body = await res.json() as { facts: Array<{ content: string; type: string }> };
+    expect(body.facts).toEqual([
+      { content: "User likes cats", type: "fact" },
+      { content: "User is in Berlin", type: "fact" },
+    ]);
   });
 
-  it("returns { facts: [] } when no facts provided", async () => {
+  it("preserves content and type from object context items", async () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
-    const res = await post(app, "/vault/extract", {});
+    const res = await post(app, "/vault/extract", {
+      sessionID: "s1",
+      context: [
+        { content: "User is a developer", type: "insight" },
+        { content: "User lives in Berlin", type: "fact" },
+      ],
+    });
     expect(res.status).toBe(200);
-    const body = await res.json() as { facts: string[] };
-    expect(body.facts).toEqual([]);
-    expect(vaultStore.addMemory).not.toHaveBeenCalled();
+    const body = await res.json() as { facts: Array<{ content: string; type: string }> };
+    expect(body.facts).toEqual([
+      { content: "User is a developer", type: "insight" },
+      { content: "User lives in Berlin", type: "fact" },
+    ]);
   });
 
-  it("returns 503 when vaultStore is null", async () => {
-    const app = makeApp({ vaultStore: null, vaultSearch, sessionMap });
-    const res = await post(app, "/vault/extract", { facts: ["a fact"] });
-    expect(res.status).toBe(503);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/vault/i);
+  it("returns { facts: [] } when context is empty array", async () => {
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap });
+    const res = await post(app, "/vault/extract", { sessionID: "s1", context: [] });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { facts: Array<{ content: string; type: string }> };
+    expect(body.facts).toEqual([]);
+  });
+
+  it("returns { facts: [] } when context is missing (not an array)", async () => {
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap });
+    const res = await post(app, "/vault/extract", { sessionID: "s1" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { facts: Array<{ content: string; type: string }> };
+    expect(body.facts).toEqual([]);
+  });
+
+  it("does not call vaultStore (pure extraction — no storage)", async () => {
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap });
+    await post(app, "/vault/extract", {
+      sessionID: "s1",
+      context: ["A fact"],
+    });
+    expect(vaultStore.addMemory).not.toHaveBeenCalled();
   });
 });
 

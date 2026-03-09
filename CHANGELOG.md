@@ -1,3 +1,9 @@
+## [1.8.9](https://github.com/yoda-digital/iris-gateway/compare/v1.8.8...v1.8.9) (2026-03-09)
+
+### Bug Fixes
+
+* [#93](https://github.com/yoda-digital/iris-gateway/issues/93) — remove lifecycle.ts and channel adapters from coverage exclusions ([#97](https://github.com/yoda-digital/iris-gateway/issues/97)) ([1934fd3](https://github.com/yoda-digital/iris-gateway/commit/1934fd3415439f308193881a97c3b4d8d993140c))
+
 ## [1.8.8](https://github.com/yoda-digital/iris-gateway/compare/v1.8.7...v1.8.8) (2026-03-09)
 
 ### Bug Fixes

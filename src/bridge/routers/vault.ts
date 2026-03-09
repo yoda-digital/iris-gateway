@@ -61,8 +61,13 @@ export function vaultRouter(deps: VaultDeps): Hono {
     return c.json({ profile, memories });
   });
 
-  app.post("/vault/extract", async (_c) => {
-    return _c.json({ facts: [] });
+  app.post("/vault/extract", async (c) => {
+    const body = await c.req.json();
+    const context: unknown[] = Array.isArray(body.context) ? body.context : [];
+    const facts = context
+      .filter((line): line is string => typeof line === "string" && line.trim().length > 0)
+      .map(line => ({ content: line.trim(), type: "insight" as const }));
+    return c.json({ facts });
   });
 
   app.post("/vault/store-batch", async (c) => {

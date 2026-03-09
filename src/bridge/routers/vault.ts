@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { VaultStore } from "../../vault/store.js";
 import type { VaultSearch } from "../../vault/search.js";
 import type { SessionMap } from "../session-map.js";
+import type { Memory, MemoryType } from '../../vault/types.js';
 
 export interface VaultDeps {
   vaultStore?: VaultStore | null;
@@ -61,8 +62,24 @@ export function vaultRouter(deps: VaultDeps): Hono {
     return c.json({ profile, memories });
   });
 
-  app.post("/vault/extract", async (_c) => {
-    return _c.json({ facts: [] });
+  app.post("/vault/extract", async (c) => {
+    if (!vaultStore) return c.json({ error: "Vault not configured" }, 503);
+    const body = await c.req.json();
+    const facts: Array<{ type?: string; content: string }> = body.facts ?? [];
+    const sessionId = body.sessionId ?? body.sessionID ?? "unknown";
+    const ids: string[] = [];
+    for (const f of facts) {
+      const id = vaultStore.addMemory({
+        sessionId,
+        channelId: body.channelId ?? null,
+        senderId: body.senderId ?? null,
+        type: (f.type ?? "fact") as MemoryType,
+        content: f.content,
+        source: "extracted",
+      });
+      ids.push(id);
+    }
+    return c.json({ facts: ids });
   });
 
   app.post("/vault/store-batch", async (c) => {

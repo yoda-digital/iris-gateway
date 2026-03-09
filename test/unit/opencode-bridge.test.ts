@@ -107,10 +107,20 @@ describe("OpenCodeBridge", () => {
 
   /* ── getQueueSize / isAvailable ───────────────────────────────── */
 
-  describe("getQueueSize / isAvailable", () => {
-    it("getQueueSize returns 0 initially", () => {
+  describe("getQueueSize / getInFlightCount / getPendingQueueSize / isAvailable", () => {
+    it("getQueueSize returns 0 initially (backwards compat)", () => {
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
       expect(bridge.getQueueSize()).toBe(0);
+    });
+
+    it("getInFlightCount returns 0 initially", () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      expect(bridge.getInFlightCount()).toBe(0);
+    });
+
+    it("getPendingQueueSize returns 0 initially", () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      expect(bridge.getPendingQueueSize()).toBe(0);
     });
 
     it("isAvailable returns true when circuit is CLOSED", () => {

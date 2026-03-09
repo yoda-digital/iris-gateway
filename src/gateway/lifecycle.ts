@@ -324,7 +324,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       checkers: [new BridgeChecker(bridge), new ChannelChecker(registry), new VaultChecker(vaultDb), new SessionChecker(sessionMap), new MemoryChecker()],
       logger,
       config: config.heartbeat,
-      getQueueSize: () => bridge.getQueueSize(),
+      getInFlightCount: () => bridge.getInFlightCount(),
     });
     heartbeatEngine.start();
     toolServer.setHeartbeatEngine(heartbeatEngine);

@@ -405,8 +405,17 @@ export class OpenCodeBridge {
     }
   }
 
-  getQueueSize(): number {
+  getInFlightCount(): number {
+    return this.inFlightCount;
+  }
+
+  getPendingQueueSize(): number {
     return this.pendingQueue.length;
+  }
+
+  /** @deprecated Use getInFlightCount() for heartbeat suppression or getPendingQueueSize() for circuit-breaker queue depth */
+  getQueueSize(): number {
+    return this.inFlightCount;
   }
 
   async listSessions(): Promise<SessionInfo[]> {

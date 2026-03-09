@@ -16,7 +16,7 @@ export interface HeartbeatEngineDeps {
   checkers: HealthChecker[];
   logger: Logger;
   config: HeartbeatConfig;
-  getQueueSize?: () => number;
+  getInFlightCount?: () => number;
   userTimezone?: string;
 }
 
@@ -42,7 +42,7 @@ export class HeartbeatEngine {
   private readonly checkers: HealthChecker[];
   private readonly logger: Logger;
   private readonly config: HeartbeatConfig;
-  private readonly getQueueSize: () => number;
+  private readonly getInFlightCount: () => number;
 
   private readonly agents = new Map<string, AgentState>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -53,7 +53,7 @@ export class HeartbeatEngine {
     this.checkers = deps.checkers;
     this.logger = deps.logger;
     this.config = deps.config;
-    this.getQueueSize = deps.getQueueSize ?? (() => 0);
+    this.getInFlightCount = deps.getInFlightCount ?? (() => 0);
 
     // Initialize agents
     const agentConfigs = this.config.agents;
@@ -70,7 +70,7 @@ export class HeartbeatEngine {
       this.coalescer = new HeartbeatCoalescer({
         coalesceMs: this.config.coalesceMs,
         retryMs: this.config.retryMs ?? 1_000,
-        getQueueSize: this.getQueueSize,
+        getInFlightCount: this.getInFlightCount,
       });
     }
   }

@@ -1,19 +1,19 @@
 export interface CoalescerDeps {
   readonly coalesceMs: number;
   readonly retryMs: number;
-  readonly getQueueSize: () => number;
+  readonly getInFlightCount: () => number;
 }
 
 export class HeartbeatCoalescer {
   private readonly coalesceMs: number;
   private readonly retryMs: number;
-  private readonly getQueueSize: () => number;
+  private readonly getInFlightCount: () => number;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(deps: CoalescerDeps) {
     this.coalesceMs = deps.coalesceMs;
     this.retryMs = deps.retryMs;
-    this.getQueueSize = deps.getQueueSize;
+    this.getInFlightCount = deps.getInFlightCount;
   }
 
   requestRun(runner: () => Promise<void>): void {
@@ -33,7 +33,7 @@ export class HeartbeatCoalescer {
   }
 
   private tryRun(runner: () => Promise<void>): void {
-    if (this.getQueueSize() > 0) {
+    if (this.getInFlightCount() > 0) {
       this.debounceTimer = setTimeout(() => {
         this.debounceTimer = null;
         this.tryRun(runner);

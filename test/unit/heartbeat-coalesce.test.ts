@@ -7,7 +7,7 @@ describe("HeartbeatCoalescer", () => {
   it("debounces rapid requests", async () => {
     vi.useFakeTimers();
     const runner = vi.fn().mockResolvedValue(undefined);
-    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getQueueSize: () => 0 });
+    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getInFlightCount: () => 0 });
 
     coalescer.requestRun(runner);
     coalescer.requestRun(runner);
@@ -26,7 +26,7 @@ describe("HeartbeatCoalescer", () => {
     const coalescer = new HeartbeatCoalescer({
       coalesceMs: 250,
       retryMs: 1000,
-      getQueueSize: () => queueSize,
+      getInFlightCount: () => queueSize,
     });
 
     coalescer.requestRun(runner);
@@ -43,7 +43,7 @@ describe("HeartbeatCoalescer", () => {
   it("runs immediately when queue is empty", async () => {
     vi.useFakeTimers();
     const runner = vi.fn().mockResolvedValue(undefined);
-    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getQueueSize: () => 0 });
+    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getInFlightCount: () => 0 });
 
     coalescer.requestRun(runner);
     vi.advanceTimersByTime(250);
@@ -55,7 +55,7 @@ describe("HeartbeatCoalescer", () => {
   it("cancels pending debounce on dispose", () => {
     vi.useFakeTimers();
     const runner = vi.fn().mockResolvedValue(undefined);
-    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getQueueSize: () => 0 });
+    const coalescer = new HeartbeatCoalescer({ coalesceMs: 250, retryMs: 1000, getInFlightCount: () => 0 });
 
     coalescer.requestRun(runner);
     coalescer.dispose();

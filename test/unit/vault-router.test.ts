@@ -273,11 +273,12 @@ describe("POST /vault/context", () => {
 
 // ── POST /vault/extract ─────────────────────────────────────────────────────
 // Pure extraction — no storage, no vaultStore dependency.
-// Accepts { sessionID, context: string[] | Array<{content,type}> }
-// Returns { facts: Array<{ content: string; type: string }> }
+// Accepts { sessionID, context: string[] }
+// Returns { facts: Array<{ content: string; type: "insight" }> }
+// Non-string and empty-string items are filtered out.
 
 describe("POST /vault/extract", () => {
-  it("normalizes string context items into facts with default type 'fact'", async () => {
+  it("maps string context items to facts with type 'insight'", async () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/extract", {
       sessionID: "s1",
@@ -286,26 +287,37 @@ describe("POST /vault/extract", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { facts: Array<{ content: string; type: string }> };
     expect(body.facts).toEqual([
-      { content: "User likes cats", type: "fact" },
-      { content: "User is in Berlin", type: "fact" },
+      { content: "User likes cats", type: "insight" },
+      { content: "User is in Berlin", type: "insight" },
     ]);
   });
 
-  it("preserves content and type from object context items", async () => {
+  it("filters out non-string context items (objects are ignored)", async () => {
     const app = makeApp({ vaultStore, vaultSearch, sessionMap });
     const res = await post(app, "/vault/extract", {
       sessionID: "s1",
       context: [
         { content: "User is a developer", type: "insight" },
-        { content: "User lives in Berlin", type: "fact" },
+        "User lives in Berlin",
+        42,
       ],
     });
     expect(res.status).toBe(200);
     const body = await res.json() as { facts: Array<{ content: string; type: string }> };
     expect(body.facts).toEqual([
-      { content: "User is a developer", type: "insight" },
-      { content: "User lives in Berlin", type: "fact" },
+      { content: "User lives in Berlin", type: "insight" },
     ]);
+  });
+
+  it("filters out empty and whitespace-only strings", async () => {
+    const app = makeApp({ vaultStore, vaultSearch, sessionMap });
+    const res = await post(app, "/vault/extract", {
+      sessionID: "s1",
+      context: ["  ", "", "Valid fact"],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { facts: Array<{ content: string; type: string }> };
+    expect(body.facts).toEqual([{ content: "Valid fact", type: "insight" }]);
   });
 
   it("returns { facts: [] } when context is empty array", async () => {

@@ -15,7 +15,6 @@ export default defineConfig({
         // Channel adapter bootstrap files without direct tests
         "src/channels/discord/client.ts",
         "src/channels/whatsapp/connection.ts",
-        "src/channels/slack/index.ts",
         // CLI — integration-tested via cli-integration.test.ts, not unit-testable
         "src/cli/banner.ts",
         "src/cli/program.ts",

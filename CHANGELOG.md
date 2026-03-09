@@ -1,3 +1,10 @@
+## [1.8.8](https://github.com/yoda-digital/iris-gateway/compare/v1.8.7...v1.8.8) (2026-03-09)
+
+### Bug Fixes
+
+* [#92](https://github.com/yoda-digital/iris-gateway/issues/92) — expose getInFlightCount() for heartbeat suppression, getPendingQueueSize() for circuit-breaker queue depth ([#95](https://github.com/yoda-digital/iris-gateway/issues/95)) ([295e5eb](https://github.com/yoda-digital/iris-gateway/commit/295e5eb5ad3b8aca88822f83bd11b41971c3463d))
+* **ci:** replace broken plugin_marketplaces inputs with direct prompt in claude-code-review.yml ([#96](https://github.com/yoda-digital/iris-gateway/issues/96)) ([aa1b7af](https://github.com/yoda-digital/iris-gateway/commit/aa1b7afeebf2d68876bb0a4a37da008486602953)), closes [#88](https://github.com/yoda-digital/iris-gateway/issues/88)
+
 ## [1.8.7](https://github.com/yoda-digital/iris-gateway/compare/v1.8.6...v1.8.7) (2026-03-09)
 
 ### Bug Fixes

@@ -176,14 +176,23 @@ export class InitCommand extends Command {
       options: [
         {
           value: "openrouter/arcee-ai/arcee-spotlight:free",
-          label: "Free (OpenRouter — arcee-ai/arcee-spotlight)",
-          hint: "no API key required",
+          label: "Arcee Spotlight (free)",
+          hint: "OpenRouter — no API key required",
         },
-        { value: "openai/gpt-4o", label: "OpenAI GPT-4o", hint: "requires OPENAI_API_KEY" },
         {
           value: "openrouter/arcee-ai/trinity-large-preview:free",
-          label: "Free (OpenRouter — arcee-ai/trinity-large-preview)",
-          hint: "no API key required",
+          label: "Arcee Trinity Large (free)",
+          hint: "OpenRouter — no API key required",
+        },
+        {
+          value: "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+          label: "Llama 3.3 70B Instruct (free)",
+          hint: "OpenRouter — no API key required",
+        },
+        {
+          value: "openrouter/mistralai/mistral-7b-instruct:free",
+          label: "Mistral 7B Instruct (free)",
+          hint: "OpenRouter — no API key required",
         },
         { value: "__custom__", label: "Custom", hint: "enter model identifier manually" },
       ],

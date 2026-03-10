@@ -355,21 +355,22 @@ describe("startGateway()", () => {
   });
 
   it("emits gateway.ready hook after startup", async () => {
-    const hookBus = { emit: vi.fn().mockResolvedValue(undefined) };
-    vi.mocked(PluginLoader).mockImplementation(() => ({
+    // Use a shared hookBus spy accessible to both the mock and the assertion
+    const hookBusSpy = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(PluginLoader).mockImplementationOnce(() => ({
       loadAll: vi.fn().mockResolvedValue({
         tools: [],
         services: new Map(),
         channels: new Map(),
-        hookBus,
+        hookBus: { emit: hookBusSpy },
       }),
     }) as any);
 
     loadConfig.mockReturnValue(makeMinimalConfig());
-    const { startGateway } = await import("../../src/gateway/lifecycle.js");
-    await startGateway();
+    const lifecycle = await import("../../src/gateway/lifecycle.js");
+    await lifecycle.startGateway();
 
-    expect(hookBus.emit).toHaveBeenCalledWith("gateway.ready", expect.anything());
+    expect(hookBusSpy).toHaveBeenCalledWith("gateway.ready", expect.anything());
   });
 
   it("calls registerShutdownHandlers after startup", async () => {

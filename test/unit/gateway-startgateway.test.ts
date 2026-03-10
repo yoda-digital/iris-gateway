@@ -1,3 +1,4 @@
+import Database from "better-sqlite3";
 /**
  * Unit tests for src/gateway/lifecycle.ts — startGateway() function.
  * Mocks all heavy dependencies so no real network/file I/O occurs.
@@ -26,7 +27,7 @@ vi.mock("../../src/bridge/tool-server.js", () => ({
 }));
 vi.mock("../../src/channels/registry.js", () => ({ ChannelRegistry: vi.fn(() => ({})) }));
 vi.mock("../../src/channels/message-cache.js", () => ({ MessageCache: vi.fn(() => ({})) }));
-vi.mock("../../src/vault/db.js", () => ({ VaultDB: vi.fn(() => ({})) }));
+vi.mock("../../src/vault/db.js", () => ({ VaultDB: vi.fn(() => ({ close: vi.fn(), raw: vi.fn().mockReturnValue(new Database(":memory:")) })) }));
 vi.mock("../../src/vault/store.js", () => ({ VaultStore: vi.fn(() => ({ upsertProfile: vi.fn() })) }));
 vi.mock("../../src/vault/search.js", () => ({ VaultSearch: vi.fn(() => ({})) }));
 vi.mock("../../src/governance/engine.js", () => ({

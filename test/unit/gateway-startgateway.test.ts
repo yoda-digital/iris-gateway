@@ -355,7 +355,6 @@ describe("startGateway()", () => {
 
   it("emits gateway.ready hook after startup", async () => {
     const hookBus = { emit: vi.fn().mockResolvedValue(undefined) };
-    const { PluginLoader } = await import("../../src/plugins/loader.js");
     vi.mocked(PluginLoader).mockImplementation(() => ({
       loadAll: vi.fn().mockResolvedValue({
         tools: [],

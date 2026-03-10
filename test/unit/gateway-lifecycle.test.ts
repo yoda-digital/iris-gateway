@@ -6,6 +6,22 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+// ─── Module-level mocks for heavy transitive deps ────────────────────────────
+// lifecycle.ts imports channel adapters (grammy, discord.js, @slack/bolt, baileys)
+// which perform expensive SDK initialization at module load time, causing the
+// dynamic import in the GatewayContext type contract test to exceed the 5000ms
+// timeout. Mocking adapters.js isolates only the side-effectful dep while keeping
+// the real startGateway export verifiable.
+vi.mock("../../src/gateway/adapters.js", () => ({
+  startChannelAdapters: vi.fn().mockResolvedValue([]),
+}));
+vi.mock("../../src/bridge/opencode-client.js", () => ({
+  OpenCodeBridge: vi.fn().mockImplementation(() => ({
+    start: vi.fn(),
+    stop: vi.fn(),
+    checkHealth: vi.fn(),
+  })),
+}));
 
 // ─── Shared mock factories ────────────────────────────────────────────────────
 

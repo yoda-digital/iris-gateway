@@ -464,3 +464,53 @@ describe("POST /onboarding/enrich — with signalStore", () => {
     expect(res.status).toBe(400);
   });
 });
+
+// Issue #116: heartbeat endpoints coverage
+describe("Heartbeat endpoints", () => {
+  it("GET /heartbeat/status returns disabled when no engine", async () => {
+    const app = buildApp({ heartbeatRef: { engine: null } });
+    const res = await app.request("/heartbeat/status");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.enabled).toBe(false);
+    expect(body.components).toEqual([]);
+  });
+
+  it("GET /heartbeat/status calls getStatus when engine present", async () => {
+    const mockComponents = [{ agentId: "a1", component: "email", status: "ok" }];
+    const engine = { getStatus: vi.fn(() => mockComponents), tick: vi.fn() };
+    const app = buildApp({ heartbeatRef: { engine } });
+    const res = await app.request("/heartbeat/status");
+    expect(res.status).toBe(200);
+    expect(engine.getStatus).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.enabled).toBe(true);
+    expect(body.components).toEqual(mockComponents);
+  });
+
+  it("POST /heartbeat/trigger returns 503 when no engine", async () => {
+    const app = buildApp({ heartbeatRef: { engine: null } });
+    const res = await app.request("/heartbeat/trigger", { method: "POST" });
+    expect(res.status).toBe(503);
+  });
+
+  it("POST /heartbeat/trigger calls tick and returns ok with components", async () => {
+    const mockComponents = [{ agentId: "a1", component: "email", status: "ok" }];
+    const engine = { getStatus: vi.fn(() => mockComponents), tick: vi.fn().mockResolvedValue(undefined) };
+    const app = buildApp({ heartbeatRef: { engine } });
+    const res = await app.request("/heartbeat/trigger", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(engine.tick).toHaveBeenCalled();
+    expect(engine.getStatus).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.components).toEqual(mockComponents);
+  });
+
+  it("POST /heartbeat/trigger returns 500 on tick failure", async () => {
+    const engine = { getStatus: vi.fn(), tick: vi.fn().mockRejectedValue(new Error("fail")) };
+    const app = buildApp({ heartbeatRef: { engine } });
+    const res = await app.request("/heartbeat/trigger", { method: "POST" });
+    expect(res.status).toBe(500);
+  });
+});

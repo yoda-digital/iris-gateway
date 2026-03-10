@@ -48,6 +48,9 @@ vi.mock("../../src/plugins/loader.js", () => ({
   })),
 }));
 vi.mock("../../src/auto-reply/engine.js", () => ({ TemplateEngine: vi.fn(() => ({})) }));
+vi.mock("../../src/instance/coordinator.js", () => ({
+  InstanceCoordinator: vi.fn(() => ({ start: vi.fn(), stop: vi.fn(), leader: false, activeInstances: vi.fn(() => []) }))
+}));
 vi.mock("../../src/usage/tracker.js", () => ({ UsageTracker: vi.fn(() => ({})) }));
 vi.mock("../../src/proactive/store.js", () => ({ IntentStore: vi.fn(() => ({ start: vi.fn() })) }));
 vi.mock("../../src/proactive/engine.js", () => ({

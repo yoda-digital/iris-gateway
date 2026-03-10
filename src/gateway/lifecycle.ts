@@ -29,6 +29,7 @@ import { HeartbeatEngine } from "../heartbeat/engine.js";
 import { ActivityTracker } from "../heartbeat/activity.js";
 import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
 import { CliExecutor } from "../cli/executor.js";
+import { InstanceCoordinator } from "../instance/coordinator.js";
 import { CliToolRegistry } from "../cli/registry.js";
 import { initSecurity } from "./security-wiring.js";
 import { initIntelligence } from "./intelligence-wiring.js";
@@ -67,6 +68,7 @@ export interface GatewayContext {
   pluginRegistry: IrisPluginRegistry;
   intentStore: IntentStore | null;
   pulseEngine: PulseEngine | null;
+  coordinator: InstanceCoordinator;
   signalStore: SignalStore | null;
   profileEnricher: ProfileEnricher | null;
   heartbeatEngine: HeartbeatEngine | null;
@@ -285,7 +287,10 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   await toolServer.start();
 
   // 10. Health server
-  const healthServer = new HealthServer(registry, bridge, config.gateway.port, config.gateway.hostname);
+  const coordinator = new InstanceCoordinator(vaultDb.raw());
+  coordinator.start();
+
+  const healthServer = new HealthServer(registry, bridge, config.gateway.port, config.gateway.hostname, coordinator);
   await healthServer.start();
   logger.info({ port: config.gateway.port }, "Health server started");
 
@@ -312,7 +317,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
 
   // 12.6 Proactive pulse engine
   if (config.proactive?.enabled && intentStore) {
-    pulseEngine = new PulseEngine({ store: intentStore, bridge, router, sessionMap, vaultStore, registry, logger, config: config.proactive });
+    pulseEngine = new PulseEngine({ store: intentStore, bridge, router, sessionMap, vaultStore, registry, logger, config: config.proactive, coordinator });
     pulseEngine.start();
     logger.info("Proactive pulse engine started");
   }
@@ -345,7 +350,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   // 14. Graceful shutdown
   registerShutdownHandlers({
     logger, registry, router, messageCache, canvasServer, toolServer, healthServer,
-    bridge, vaultDb, pulseEngine, heartbeatEngine, intelligenceBus, pluginRegistry, abortController,
+    bridge, vaultDb, pulseEngine, heartbeatEngine, intelligenceBus, pluginRegistry, abortController, coordinator,
   });
 
   // Startup summary
@@ -378,7 +383,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   return {
     config, logger, bridge, sessionMap, router, toolServer, healthServer,
     registry, messageCache, abortController, vaultDb, vaultStore, vaultSearch,
-    governanceEngine, usageTracker, pluginRegistry, intentStore, pulseEngine,
+    governanceEngine, usageTracker, pluginRegistry, intentStore, pulseEngine, coordinator,
     signalStore, profileEnricher, heartbeatEngine, activityTracker,
     intelligenceBus, intelligenceStore, inferenceEngine, triggerEvaluator,
     outcomeAnalyzer, arcDetector, arcLifecycle, goalLifecycle,

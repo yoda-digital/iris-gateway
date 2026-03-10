@@ -6,6 +6,7 @@ import type { SessionMap } from "../bridge/session-map.js";
 import type { VaultStore } from "../vault/store.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { Logger } from "../logging/logger.js";
+import type { InstanceCoordinator } from "../instance/coordinator.js";
 
 interface PulseEngineDeps {
   store: IntentStore;
@@ -16,6 +17,7 @@ interface PulseEngineDeps {
   registry: ChannelRegistry;
   logger: Logger;
   config: ProactiveConfig;
+  coordinator?: InstanceCoordinator;
 }
 
 const SKIP_MARKER = "[SKIP]";
@@ -33,6 +35,7 @@ export class PulseEngine {
 
   private fastTimer: ReturnType<typeof setInterval> | null = null;
   private slowTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly coordinator?: InstanceCoordinator;
 
   constructor(deps: PulseEngineDeps) {
     this.store = deps.store;
@@ -43,6 +46,7 @@ export class PulseEngine {
     this.registry = deps.registry;
     this.logger = deps.logger;
     this.config = deps.config;
+    this.coordinator = deps.coordinator;
   }
 
   start(): void {
@@ -78,6 +82,7 @@ export class PulseEngine {
   }
 
   async tick(): Promise<void> {
+    if (this.coordinator && !this.coordinator.leader) return;
     const purged = this.store.purgeExpired(this.config.intentDefaults.maxAgeMs);
     if (purged > 0) {
       this.logger.info({ purged }, "Purged expired proactive items");
@@ -95,6 +100,7 @@ export class PulseEngine {
   }
 
   async passiveScan(): Promise<void> {
+    if (this.coordinator && !this.coordinator.leader) return;
     if (!this.config.dormancy.enabled) return;
 
     const dormant = this.store.listDormantUsers(

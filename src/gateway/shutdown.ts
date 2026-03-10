@@ -11,6 +11,7 @@ import type { PulseEngine } from "../proactive/engine.js";
 import type { HeartbeatEngine } from "../heartbeat/engine.js";
 import type { IntelligenceBus } from "../intelligence/bus.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
+import type { InstanceCoordinator } from "../instance/coordinator.js";
 
 export interface ShutdownDeps {
   logger: Logger;
@@ -27,6 +28,7 @@ export interface ShutdownDeps {
   intelligenceBus: IntelligenceBus | null;
   pluginRegistry: IrisPluginRegistry;
   abortController: AbortController;
+  coordinator?: InstanceCoordinator;
 }
 
 const SHUTDOWN_TIMEOUT_MS = 15_000;
@@ -53,6 +55,7 @@ export function registerShutdownHandlers(deps: ShutdownDeps): void {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
+    deps.coordinator?.stop();
     abortController.abort();
 
     if (pulseEngine) pulseEngine.stop();

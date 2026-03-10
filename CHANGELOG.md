@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/yoda-digital/iris-gateway/compare/v1.8.11...v1.9.0) (2026-03-10)
+
+### Features
+
+* [#101](https://github.com/yoda-digital/iris-gateway/issues/101) — multi-instance support with SQLite leader election ([#110](https://github.com/yoda-digital/iris-gateway/issues/110)) ([7535230](https://github.com/yoda-digital/iris-gateway/commit/7535230b18674ac85f2265df92a2cd045e5bf593))
+
 ## [1.8.11](https://github.com/yoda-digital/iris-gateway/compare/v1.8.10...v1.8.11) (2026-03-10)
 
 ### Bug Fixes

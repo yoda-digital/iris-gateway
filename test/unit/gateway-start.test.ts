@@ -390,29 +390,6 @@ describe("startGateway", () => {
     expect(bridge.deleteSession).toHaveBeenCalled();
   });
 
-  it("bridge warmup: logs warn when checkHealth never succeeds (timeout simulation)", async () => {
-    // Make checkHealth always return false so warmup times out
-    // But override timeout to 0 so test is fast
-    const logger = makeLogger();
-    vi.mocked(createLogger).mockReturnValue(logger as any);
-    const bridge = makeBridge();
-    bridge.checkHealth = vi.fn().mockResolvedValue(false);
-    vi.mocked(OpenCodeBridge).mockImplementation(() => bridge as any);
-
-    // Use short config to avoid actual timeout — we just check the warn path
-    // This test verifies the warn log path. Actual timeout would be 60s, so
-    // instead we test the path by making sendMessage throw (health=true but send fails)
-    bridge.checkHealth = vi.fn().mockResolvedValue(true);
-    bridge.sendMessage = vi.fn().mockRejectedValue(new Error("provider not ready"));
-    bridge.deleteSession = vi.fn().mockResolvedValue(undefined);
-
-    // With READY_TIMEOUT_MS=60000 and send always failing, this would loop.
-    // Skip the actual timeout test - just verify the function still resolves
-    // when warmup times out (mock a minimal config scenario).
-    // Since we can't easily override the constant, just verify normal path works.
-    expect(typeof startGateway).toBe("function");
-  });
-
   it("initializes intentStore when proactive.enabled=true", async () => {
     vi.mocked(loadConfig).mockReturnValue(makeMinimalConfig({ proactive: { enabled: true, rules: [] } }));
     const intentStore = {};
@@ -490,7 +467,6 @@ describe("startGateway", () => {
       },
     }));
     const pulseEngine = { start: vi.fn(), stop: vi.fn() };
-    vi.mocked(PulseEngine).mockImplementation(() => pulseEngine as any);
     vi.mocked(PulseEngine).mockImplementation(() => pulseEngine as any);
     vi.mocked(IntentStore).mockImplementation(() => ({}) as any);
 

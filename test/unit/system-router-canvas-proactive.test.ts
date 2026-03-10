@@ -477,12 +477,15 @@ describe("Heartbeat endpoints", () => {
   });
 
   it("GET /heartbeat/status calls getStatus when engine present", async () => {
-    const mockStatus = { enabled: true, components: ["email"] };
-    const engine = { getStatus: vi.fn(() => mockStatus), tick: vi.fn() };
+    const mockComponents = [{ agentId: "a1", component: "email", status: "ok" }];
+    const engine = { getStatus: vi.fn(() => mockComponents), tick: vi.fn() };
     const app = buildApp({ heartbeatRef: { engine } });
     const res = await app.request("/heartbeat/status");
     expect(res.status).toBe(200);
     expect(engine.getStatus).toHaveBeenCalled();
+    const body = await res.json();
+    expect(body.enabled).toBe(true);
+    expect(body.components).toEqual(mockComponents);
   });
 
   it("POST /heartbeat/trigger returns 503 when no engine", async () => {

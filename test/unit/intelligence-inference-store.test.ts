@@ -171,4 +171,45 @@ describe("InferenceEngine", () => {
     const results = await engine.evaluate("s1", "c1");
     expect(results).toHaveLength(2);
   });
+
+  // Additional coverage from @claude review on PR #118
+  it("filterSignals: only matching signals passed to evaluate (no extra signals leak)", async () => {
+    const rawSignals: ProfileSignal[] = [
+      { ...RAW_SIGNAL, signalType: "msg_freq" },
+      { ...RAW_SIGNAL, id: "r2", signalType: "other_type" },
+    ];
+    const ss = makeSignalStore(rawSignals);
+    const rule = makeRule({ inputSignals: ["msg_freq"], minSamples: 1 });
+    const engine = new InferenceEngine(store, ss, bus, [rule], logger);
+    await engine.evaluate("s1", "c1");
+    const callArg = (rule.evaluate as ReturnType<typeof vi.fn>).mock.calls[0][0] as ProfileSignal[];
+    expect(callArg).toHaveLength(1);
+    expect(callArg[0].signalType).toBe("msg_freq");
+  });
+
+  it("logInference details: insufficient_samples has non-null details, null-evaluate has null details", async () => {
+    // insufficient samples → details is JSON string
+    const rule1 = makeRule({ minSamples: 99 });
+    const engine1 = new InferenceEngine(store, signalStore, bus, [rule1], logger);
+    await engine1.evaluate("s1", "c1");
+    const call1 = (store.logInference as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call1.result).toBe("skipped");
+    expect(call1.details).not.toBeNull();
+
+    // null evaluate → details is null
+    vi.clearAllMocks();
+    const rule2 = makeRule({ evaluate: vi.fn(() => null) });
+    const engine2 = new InferenceEngine(makeStore(), signalStore, bus, [rule2], logger);
+    await engine2.evaluate("s1", "c1");
+    const call2 = (makeStore().logInference as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    // verify through the actual call on a fresh store
+    const freshStore = makeStore();
+    const engine3 = new InferenceEngine(freshStore, signalStore, bus, [rule2], logger);
+    await engine3.evaluate("s1", "c1");
+    const call3 = (freshStore.logInference as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call3.result).toBe("skipped");
+    expect(call3.details).toBeNull();
+  });
+
+
 });

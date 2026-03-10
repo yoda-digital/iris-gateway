@@ -135,4 +135,15 @@ describe("ArcsStore", () => {
     store.createArc({ senderId: "s1", title: "project-budget-review" });
     expect(store.findArcByKeywords("s1", ["project", "xyz"])).toBeNull();
   });
+
+  // Additional coverage from @claude review on PR #118
+  it("updateArcStatus COALESCE: resolved_at preserved when set to non-resolved status again", () => {
+    const arc = store.createArc({ senderId: "s1", title: "T" });
+    store.updateArcStatus(arc.id, "resolved");
+    const resolvedAt = store.getArc(arc.id)!.resolvedAt!;
+    store.updateArcStatus(arc.id, "stale"); // should not clear resolvedAt (COALESCE)
+    expect(store.getArc(arc.id)!.resolvedAt).toBe(resolvedAt);
+  });
+
+
 });

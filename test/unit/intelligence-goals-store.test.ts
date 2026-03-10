@@ -128,4 +128,19 @@ describe("GoalsStore", () => {
     store.createGoal({ senderId: "s1", channelId: "c1", description: "fresh" });
     expect(store.getStaleGoals()).toHaveLength(0);
   });
+
+  // Additional coverage from @claude review on PR #118
+  it("updateGoal status=abandoned does not set completedAt", () => {
+    const g = store.createGoal({ senderId: "s1", channelId: "c1", description: "g" });
+    store.updateGoal(g.id, { status: "abandoned" as any });
+    expect(store.getGoal(g.id)!.completedAt).toBeNull();
+  });
+
+  it("getDueGoals excludes paused goals even if past due", () => {
+    const g = store.createGoal({ senderId: "s1", channelId: "c1", description: "g", nextActionDue: Date.now() - 1000 });
+    store.updateGoal(g.id, { status: "paused" });
+    expect(store.getDueGoals().find(x => x.id === g.id)).toBeUndefined();
+  });
+
+
 });

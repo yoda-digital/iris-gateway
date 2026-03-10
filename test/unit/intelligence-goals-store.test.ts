@@ -132,7 +132,7 @@ describe("GoalsStore", () => {
   // Additional coverage from @claude review on PR #118
   it("updateGoal status=abandoned does not set completedAt", () => {
     const g = store.createGoal({ senderId: "s1", channelId: "c1", description: "g" });
-    store.updateGoal(g.id, { status: "abandoned" as any });
+    store.updateGoal(g.id, { status: "abandoned" });
     expect(store.getGoal(g.id)!.completedAt).toBeNull();
   });
 

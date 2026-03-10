@@ -197,12 +197,7 @@ describe("InferenceEngine", () => {
     expect(call1.details).not.toBeNull();
 
     // null evaluate → details is null
-    vi.clearAllMocks();
     const rule2 = makeRule({ evaluate: vi.fn(() => null) });
-    const engine2 = new InferenceEngine(makeStore(), signalStore, bus, [rule2], logger);
-    await engine2.evaluate("s1", "c1");
-    const call2 = (makeStore().logInference as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    // verify through the actual call on a fresh store
     const freshStore = makeStore();
     const engine3 = new InferenceEngine(freshStore, signalStore, bus, [rule2], logger);
     await engine3.evaluate("s1", "c1");

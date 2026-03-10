@@ -140,6 +140,7 @@ export class VaultDB {
   constructor(stateDir: string) {
     this.db = new Database(join(stateDir, "vault.db"));
     this.db.pragma("journal_mode = WAL");
+    this.db.pragma("busy_timeout = 5000");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA_SQL);
     this.migrate();

@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { OpenCodeBridge } from "../bridge/opencode-client.js";
 import { metrics } from "./metrics.js";
+import type { InstanceCoordinator } from "../instance/coordinator.js";
 
 const require = createRequire(import.meta.url);
 const { version: pkgVersion } = require("../../package.json") as { version: string };
@@ -29,6 +30,7 @@ export class HealthServer {
     private readonly bridge: OpenCodeBridge,
     private readonly port: number,
     private readonly hostname: string,
+    private readonly coordinator?: InstanceCoordinator,
   ) {
     this.app = new Hono();
     this.setupRoutes();
@@ -47,6 +49,11 @@ export class HealthServer {
         uptimeHuman: formatUptime(Date.now() - this.startedAt),
         channels,
         opencode: { healthy: opencodeHealthy },
+        instance: {
+          id: this.coordinator?.instanceId ?? "single",
+          leader: this.coordinator?.leader ?? true,
+          activeInstances: this.coordinator?.activeInstances() ?? [],
+        },
         system: {
           memoryMB: {
             rss: Math.round(mem.rss / 1024 / 1024),

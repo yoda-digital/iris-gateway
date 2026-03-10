@@ -5,6 +5,7 @@ import Database from "better-sqlite3";
  * Issue #107 — coverage fix for lines 90–387
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { PluginLoader } from "../../src/plugins/loader.js";
 
 // ─── Module mocks (hoisted by vitest) ─────────────────────────────────────────
 

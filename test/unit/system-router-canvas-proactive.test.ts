@@ -494,14 +494,17 @@ describe("Heartbeat endpoints", () => {
     expect(res.status).toBe(503);
   });
 
-  it("POST /heartbeat/trigger calls tick and returns ok", async () => {
-    const engine = { getStatus: vi.fn(), tick: vi.fn().mockResolvedValue(undefined) };
+  it("POST /heartbeat/trigger calls tick and returns ok with components", async () => {
+    const mockComponents = [{ agentId: "a1", component: "email", status: "ok" }];
+    const engine = { getStatus: vi.fn(() => mockComponents), tick: vi.fn().mockResolvedValue(undefined) };
     const app = buildApp({ heartbeatRef: { engine } });
     const res = await app.request("/heartbeat/trigger", { method: "POST" });
     expect(res.status).toBe(200);
     expect(engine.tick).toHaveBeenCalled();
+    expect(engine.getStatus).toHaveBeenCalled();
     const body = await res.json();
     expect(body.ok).toBe(true);
+    expect(body.components).toEqual(mockComponents);
   });
 
   it("POST /heartbeat/trigger returns 500 on tick failure", async () => {

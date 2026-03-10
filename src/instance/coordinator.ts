@@ -29,7 +29,6 @@ export class InstanceCoordinator {
   }
 
   private ensureSchema(): void {
-    if (!this.db) return;
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS instance_locks (
         lock_name   TEXT PRIMARY KEY,
@@ -79,7 +78,6 @@ export class InstanceCoordinator {
   }
 
   private tick(): void {
-    if (!this.db) return;
     const now = Date.now();
     // Update presence
     this.db
@@ -96,11 +94,10 @@ export class InstanceCoordinator {
   }
 
   private tryAcquire(now: number): boolean {
-    if (!this.db) return false;
     const expiresAt = now + LOCK_TTL_MS;
 
     // Try to insert (acquire) or update (renew) atomically
-    const inserted = this.db
+    this.db
       .prepare(
         `INSERT INTO instance_locks(lock_name, holder_id, acquired_at, expires_at)
          VALUES ('leader', ?, ?, ?)

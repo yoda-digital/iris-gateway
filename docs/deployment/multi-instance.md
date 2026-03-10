@@ -8,6 +8,8 @@ iris-gateway supports running multiple instances against the same SQLite databas
 
 Each instance gets a unique ID at startup:
 
+> ⚠️ **`IRIS_INSTANCE_ID` must be unique across all running instances.** Two instances sharing the same ID will both believe they are the leader, causing split-brain. When using auto-generated UUIDs (default), uniqueness is guaranteed. When setting explicit IDs, you are responsible for ensuring no two instances share the same value.
+
 ```bash
 # Auto-generated UUID (default)
 pnpm start
@@ -78,6 +80,7 @@ services:
 
 ## Limitations
 
-- Leader election requires both instances to share the **same SQLite file** (bind mount, NFS, etc.)
+- Leader election requires both instances to share the **same SQLite file** via a **local shared volume only**
+- ⚠️ **SQLite over NFS is NOT supported** — file locking over network filesystems (NFS, CIFS, SMB) is unreliable and will cause data corruption. Use only local bind mounts (e.g. Docker `--mount type=bind`) on the same host
 - Ephemeral containers that recreate the volume will not coordinate correctly — use persistent volumes
 - No cross-host network coordination (by design — SQLite only)

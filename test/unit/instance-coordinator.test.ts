@@ -42,26 +42,45 @@ describe("InstanceCoordinator", () => {
     expect(coordinator.leader).toBe(true);
   });
 
-  it("fires onLeaderChange when leader is acquired", () => {
+  it("fires onLeaderChange(true) when leader is acquired", () => {
     const handler = vi.fn();
     coordinator.onLeaderChange(handler);
     coordinator.start();
     expect(handler).toHaveBeenCalledWith(true);
   });
 
+  it("fires onLeaderChange(false) when leadership is lost on stop()", () => {
+    const handler = vi.fn();
+    coordinator.onLeaderChange(handler);
+    coordinator.start();
+    expect(handler).toHaveBeenCalledWith(true);
+    coordinator.stop();
+    expect(handler).toHaveBeenCalledWith(false);
+  });
+
   it("second instance does NOT become leader while first holds lock", () => {
     coordinator.start();
     expect(coordinator.leader).toBe(true);
 
-    const db2 = makeDb();
-    // Share the same lock table via a copy of the tables
-    // We simulate by using the same in-memory db reference
+    // c2 shares the same DB (same lock table)
     const c2 = new InstanceCoordinator(db);
     c2.start();
-    // First coordinator holds the lock; second should not be leader
     expect(c2.leader).toBe(false);
     c2.stop();
-    db2.close();
+  });
+
+  it("second instance becomes leader after TTL expiry of first", () => {
+    coordinator.start();
+    expect(coordinator.leader).toBe(true);
+
+    // Simulate TTL expiry by backdating the lock
+    db.prepare("UPDATE instance_locks SET expires_at = 1 WHERE lock_name = 'leader'").run();
+
+    // c2 shares the same DB — after TTL expired, it should acquire
+    const c2 = new InstanceCoordinator(db);
+    c2.start();
+    expect(c2.leader).toBe(true);
+    c2.stop();
   });
 
   it("stops cleanly and releases lock", () => {

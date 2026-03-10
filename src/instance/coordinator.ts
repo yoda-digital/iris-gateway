@@ -130,7 +130,6 @@ export class InstanceCoordinator {
 
   /** Returns IDs of instances seen within the last 30 s. */
   activeInstances(): string[] {
-    if (!this.db) return [this.instanceId];
     const rows = this.db
       .prepare(
         "SELECT instance_id FROM instance_registry WHERE last_seen > ? ORDER BY last_seen DESC"

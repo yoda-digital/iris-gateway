@@ -1,9 +1,3 @@
-## [1.9.1](https://github.com/yoda-digital/iris-gateway/compare/v1.9.0...v1.9.1) (2026-03-10)
-
-### Bug Fixes
-
-* **init:** remove paid model preset from init wizard ([#119](https://github.com/yoda-digital/iris-gateway/issues/119)) ([decd096](https://github.com/yoda-digital/iris-gateway/commit/decd096d3f493f5d55d717bb1b28db90d8a303f0)), closes [#106](https://github.com/yoda-digital/iris-gateway/issues/106)
-
 ## [1.9.2](https://github.com/yoda-digital/iris-gateway/compare/v1.9.1...v1.9.2) (2026-03-10)
 
 ### Bug Fixes
@@ -17,6 +11,12 @@
 * [#111](https://github.com/yoda-digital/iris-gateway/issues/111) — `governance/policy.ts` from 6.27% to ~88% coverage: 40 tests covering `PolicyEngine` enforcement, audit, and permission validation ([#117](https://github.com/yoda-digital/iris-gateway/issues/117))
 * [#112](https://github.com/yoda-digital/iris-gateway/issues/112) — intelligence domain stores from <5% to ≥60% coverage: 53 tests for `ArcsStore`, `GoalsStore`, `InferenceStore`, and `InferenceEngine` ([#118](https://github.com/yoda-digital/iris-gateway/issues/118))
 * [#116](https://github.com/yoda-digital/iris-gateway/issues/116) — add 5 tests for heartbeat endpoints in system router (`GET /heartbeat/status`, `POST /heartbeat/trigger`) — both happy paths and error branches ([#120](https://github.com/yoda-digital/iris-gateway/issues/120))
+
+## [1.9.1](https://github.com/yoda-digital/iris-gateway/compare/v1.9.0...v1.9.1) (2026-03-10)
+
+### Bug Fixes
+
+* **init:** remove paid model preset from init wizard ([#119](https://github.com/yoda-digital/iris-gateway/issues/119)) ([decd096](https://github.com/yoda-digital/iris-gateway/commit/decd096d3f493f5d55d717bb1b28db90d8a303f0)), closes [#106](https://github.com/yoda-digital/iris-gateway/issues/106)
 
 ## [1.9.0](https://github.com/yoda-digital/iris-gateway/compare/v1.8.11...v1.9.0) (2026-03-10)
 

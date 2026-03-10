@@ -67,11 +67,10 @@ The wizard prompts you for the essentials and writes a ready-to-run config. You 
 
 ### What the wizard configures
 
-1. **Config path** — where to write the output file (default: `iris.config.json` in current directory)
-2. **AI model** — choose from pre-vetted free OpenRouter models or enter a custom model string
-3. **OpenCode CLI** — detects existing installation or offers to install via npm
-4. **Channels** — pick which messaging platforms to enable (Telegram, WhatsApp, Discord, Slack, WebChat)
-5. **Per-channel tokens** — collect bot tokens or API keys for each enabled channel
+1. **Channels** — pick which messaging platforms to enable (Telegram, WhatsApp, Discord, Slack)
+2. **Per-channel tokens** — collect bot tokens or API keys for each enabled channel
+3. **AI model** — choose from pre-vetted free OpenRouter models or enter a custom model string
+4. **OpenCode CLI** — detects existing installation or offers to install via npm
 
 ### Free model presets
 

@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/yoda-digital/iris-gateway/compare/v1.9.0...v1.9.1) (2026-03-10)
+
+### Bug Fixes
+
+* **init:** remove paid model preset from init wizard ([#119](https://github.com/yoda-digital/iris-gateway/issues/119)) ([decd096](https://github.com/yoda-digital/iris-gateway/commit/decd096d3f493f5d55d717bb1b28db90d8a303f0)), closes [#106](https://github.com/yoda-digital/iris-gateway/issues/106)
+
 ## [1.9.0](https://github.com/yoda-digital/iris-gateway/compare/v1.8.11...v1.9.0) (2026-03-10)
 
 ### Features

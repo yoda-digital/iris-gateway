@@ -55,6 +55,47 @@ iris config show
 
 Config validation is powered by Zod schemas defined in `src/config/schema.ts`.
 
+## Init Wizard
+
+The fastest way to generate a valid `iris.config.json` is the interactive init wizard:
+
+```bash
+iris init
+```
+
+The wizard prompts you for the essentials and writes a ready-to-run config. You can re-run it at any time — it will overwrite the existing file after confirmation.
+
+### What the wizard configures
+
+1. **Channels** — pick which messaging platforms to enable (Telegram, WhatsApp, Discord, Slack)
+2. **Per-channel tokens** — collect bot tokens or API keys for each enabled channel
+3. **AI model** — choose from pre-vetted free OpenRouter models or enter a custom model string
+4. **OpenCode CLI** — detects existing installation or offers to install via npm
+
+### Free model presets
+
+The wizard offers four free OpenRouter models out of the box:
+
+| Preset | Model ID | Notes |
+|--------|----------|-------|
+| Arcee Spotlight | `openrouter/arcee-ai/arcee-spotlight:free` | Strong general-purpose, fast |
+| Arcee Trinity Large | `openrouter/arcee-ai/trinity-large-preview:free` | Best reasoning in the free tier |
+| Llama 3.3 70B | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | Meta's flagship open model |
+| Mistral 7B | `openrouter/mistralai/mistral-7b-instruct:free` | Ultra-fast, minimal latency |
+| Custom | _(manual entry)_ | Any OpenRouter model ID |
+
+> **Policy:** The init wizard only offers free OpenRouter models as presets. Paid models (OpenAI, Anthropic) can be entered via the "Custom" option — you will be prompted for the corresponding API key. This is by design: Iris is built around zero-cost model access.
+
+### Running headlessly
+
+For automated deploys (Docker, CI), skip the wizard entirely and provide a config file directly:
+
+```bash
+cp iris.config.example.json iris.config.json
+# Edit iris.config.json as needed
+iris gateway run --config iris.config.json
+```
+
 ## Environment Variable Substitution
 
 Config values can reference environment variables using the `${env:VAR_NAME}` syntax. This is the recommended way to handle secrets like bot tokens.

@@ -1,3 +1,17 @@
+## [1.9.2](https://github.com/yoda-digital/iris-gateway/compare/v1.9.1...v1.9.2) (2026-03-10)
+
+### Bug Fixes
+
+* [#106](https://github.com/yoda-digital/iris-gateway/issues/106) — remove `openai/gpt-4o` paid model preset from init wizard; replace with four free OpenRouter alternatives ([#119](https://github.com/yoda-digital/iris-gateway/issues/119)) — init wizard now exclusively presents free-tier models as presets, in line with zero-cost-model policy
+* [#115](https://github.com/yoda-digital/iris-gateway/issues/115) — mock `InstanceCoordinator` in gateway startup tests to prevent 13 leaked `setInterval` timers per test run ([#120](https://github.com/yoda-digital/iris-gateway/issues/120))
+
+### Tests
+
+* [#107](https://github.com/yoda-digital/iris-gateway/issues/107) — restore coverage above 75% threshold: add 1575 lines of unit tests across `lifecycle.ts`, `intelligence-wiring.ts`, `health/trend-detector.ts`, `health/gate.ts`, `bridge/routers/system.ts` ([#114](https://github.com/yoda-digital/iris-gateway/issues/114))
+* [#111](https://github.com/yoda-digital/iris-gateway/issues/111) — `governance/policy.ts` from 6.27% to ~88% coverage: 40 tests covering `PolicyEngine` enforcement, audit, and permission validation ([#117](https://github.com/yoda-digital/iris-gateway/issues/117))
+* [#112](https://github.com/yoda-digital/iris-gateway/issues/112) — intelligence domain stores from <5% to ≥60% coverage: 53 tests for `ArcsStore`, `GoalsStore`, `InferenceStore`, and `InferenceEngine` ([#118](https://github.com/yoda-digital/iris-gateway/issues/118))
+* [#116](https://github.com/yoda-digital/iris-gateway/issues/116) — add 5 tests for heartbeat endpoints in system router (`GET /heartbeat/status`, `POST /heartbeat/trigger`) — both happy paths and error branches ([#120](https://github.com/yoda-digital/iris-gateway/issues/120))
+
 ## [1.9.1](https://github.com/yoda-digital/iris-gateway/compare/v1.9.0...v1.9.1) (2026-03-10)
 
 ### Bug Fixes

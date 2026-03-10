@@ -198,5 +198,47 @@ describe("PolicyEngine", () => {
       const r = new PolicyEngine(makeConfig({ skills: { restricted: [], requireTriggers: true } })).auditAll().find(x => x.name === "no-triggers");
       expect(r?.violations.some(v => v.code === "SKILL_NO_TRIGGERS")).toBe(true);
     });
+
+  it("warns AGENT_NO_DESCRIPTION in auditAll when requireDescription=true", () => {
+    const d = join(tmpDir, ".opencode", "agents"); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "no-desc.md"), "mode: subagent\n");
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    const engine = new PolicyEngine(makeConfig({ agents: { allowedModes: ["subagent"], allowPrimaryCreation: false, requireDescription: true, maxSteps: 0 } }));
+    const r = engine.auditAll().find(x => x.name === "no-desc");
+    expect(r?.violations.some(v => v.code === "AGENT_NO_DESCRIPTION")).toBe(true);
+  });
+
+  it("warns AGENT_TOOL_NOT_ALLOWED in auditAll when tool not in non-empty allowlist", () => {
+    const d = join(tmpDir, ".opencode", "agents"); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "bad-tool.md"), "mode: subagent\n  bash: true\n");
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    const r = new PolicyEngine(makeConfig({ tools: { allowed: ["read"], denied: [] } })).auditAll().find(x => x.name === "bad-tool");
+    expect(r?.violations.some(v => v.code === "AGENT_TOOL_NOT_ALLOWED")).toBe(true);
+  });
+
+  it("detects restricted skill referenced in agent file", () => {
+    const d = join(tmpDir, ".opencode", "agents"); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "skill-agent.md"), "mode: subagent\nskills:\n  - hack-skill\n");
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    const r = new PolicyEngine(makeConfig({ skills: { restricted: ["hack-skill"], requireTriggers: false } })).auditAll().find(x => x.name === "skill-agent");
+    expect(r?.violations.some(v => v.code === "AGENT_SKILL_RESTRICTED")).toBe(true);
+  });
+
+  it("skips hidden dirs in skills folder", () => {
+    const d = join(tmpDir, ".opencode", "skills", ".hidden"); mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "SKILL.md"), "# Hidden\n");
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    expect(new PolicyEngine(makeConfig()).auditAll().find(x => x.name === ".hidden")).toBeUndefined();
+  });
+
+  it("auditAll with enabled=false returns empty violations", () => {
+    const d1 = join(tmpDir, ".opencode", "agents"); mkdirSync(d1, { recursive: true });
+    const d2 = join(tmpDir, ".opencode", "skills", "s"); mkdirSync(d2, { recursive: true });
+    writeFileSync(join(d1, "a.md"), "mode: unknown\n  bash: true\n");
+    writeFileSync(join(d2, "SKILL.md"), "# S\n");
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    const results = new PolicyEngine(makeConfig({ enabled: false })).auditAll();
+    results.forEach(r => expect(r.violations).toHaveLength(0));
+  });
   });
 });

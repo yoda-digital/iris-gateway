@@ -4,7 +4,7 @@
 
 Run a personal AI with memory, goals, and proactive nudges on your own server, at zero model cost, using [OpenRouter's free tier](https://openrouter.ai) (Arcee Trinity works great).
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/yoda-digital/iris-gateway/releases)
+[![Version](https://img.shields.io/badge/version-1.9.2-blue)](https://github.com/yoda-digital/iris-gateway/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 

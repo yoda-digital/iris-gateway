@@ -1,3 +1,9 @@
+## [1.8.11](https://github.com/yoda-digital/iris-gateway/compare/v1.8.10...v1.8.11) (2026-03-10)
+
+### Bug Fixes
+
+* [#105](https://github.com/yoda-digital/iris-gateway/issues/105) — mock heavy channel adapter deps to prevent test timeout ([8639b43](https://github.com/yoda-digital/iris-gateway/commit/8639b43d69ea0ce6c050cc85c7f03ed3b068a4bf))
+
 ## [1.8.10](https://github.com/yoda-digital/iris-gateway/compare/v1.8.9...v1.8.10) (2026-03-09)
 
 ### Bug Fixes

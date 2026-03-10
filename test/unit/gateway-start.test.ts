@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import Database from "better-sqlite3";
 
 // ─── Mock all heavy dependencies before any imports ───────────────────────────
 
@@ -296,7 +297,10 @@ beforeEach(() => {
   vi.mocked(ToolServer).mockImplementation(() => makeToolServer() as any);
   vi.mocked(ChannelRegistry).mockImplementation(() => ({ register: vi.fn(), get: vi.fn(), list: vi.fn().mockReturnValue([]) }) as any);
   vi.mocked(MessageCache).mockImplementation(() => ({ dispose: vi.fn() }) as any);
-  vi.mocked(VaultDB).mockImplementation(() => ({ close: vi.fn(), raw: vi.fn() }) as any);
+  vi.mocked(VaultDB).mockImplementation(() => ({
+    close: vi.fn(),
+    raw: vi.fn().mockReturnValue(new Database(':memory:'))
+  }) as any);
   vi.mocked(VaultStore).mockImplementation(() => ({}) as any);
   vi.mocked(VaultSearch).mockImplementation(() => ({}) as any);
   vi.mocked(GovernanceEngine).mockImplementation(() => makeGovernanceEngine() as any);

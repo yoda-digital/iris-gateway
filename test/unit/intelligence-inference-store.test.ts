@@ -1,210 +1,68 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { InferenceEngine } from "../../src/intelligence/inference/engine.js";
-import type { InferenceRule } from "../../src/intelligence/inference/engine.js";
-import type { IntelligenceStore } from "../../src/intelligence/store.js";
-import type { IntelligenceBus } from "../../src/intelligence/bus.js";
-import type { DerivedSignal } from "../../src/intelligence/types.js";
-import type { SignalStore } from "../../src/onboarding/signals.js";
-import type { Logger } from "../../src/logging/logger.js";
-import type { ProfileSignal } from "../../src/onboarding/types.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import Database from "better-sqlite3";
+import { InferenceStore } from "../../src/intelligence/inference/store.js";
+import type { VaultDB } from "../../src/vault/db.js";
 
-const FAKE_SIGNAL: DerivedSignal = {
-  id: "sig-1", senderId: "s1", channelId: "c1",
-  signalType: "rule-a", value: "high", confidence: 0.9,
-  evidence: "evidence", createdAt: 1000, updatedAt: 1000,
-};
-
-const RAW_SIGNAL: ProfileSignal = {
-  id: "r1", senderId: "s1", channelId: "c1",
-  signalType: "msg_freq", value: "10", confidence: 0.8,
-  source: "observation", createdAt: 1000, updatedAt: 1000,
-};
-
-function makeStore(overrides: Partial<IntelligenceStore> = {}): IntelligenceStore {
-  return {
-    getLastInferenceRun: vi.fn(() => null),
-    logInference: vi.fn(),
-    getDerivedSignals: vi.fn(() => []),
-    writeDerivedSignal: vi.fn(() => FAKE_SIGNAL),
-    ...overrides,
-  } as unknown as IntelligenceStore;
+function makeVaultDB(): VaultDB {
+  const db = new Database(":memory:");
+  return { raw: () => db } as unknown as VaultDB;
 }
 
-function makeSignalStore(signals: ProfileSignal[] = [RAW_SIGNAL]): SignalStore {
-  return { getSignals: vi.fn(() => signals) } as unknown as SignalStore;
-}
+describe("InferenceStore", () => {
+  let store: InferenceStore;
+  beforeEach(() => { store = new InferenceStore(makeVaultDB()); });
 
-function makeBus(): IntelligenceBus {
-  return { emit: vi.fn() } as unknown as IntelligenceBus;
-}
-
-function makeLogger(): Logger {
-  return { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: vi.fn() } as unknown as Logger;
-}
-
-function makeRule(overrides: Partial<InferenceRule> = {}): InferenceRule {
-  return {
-    id: "rule-a",
-    inputSignals: ["msg_freq"],
-    minSamples: 1,
-    cooldownMs: 0,
-    evaluate: vi.fn(() => ({ value: "high", confidence: 0.9, evidence: "e" })),
-    ...overrides,
-  };
-}
-
-describe("InferenceEngine", () => {
-  let store: IntelligenceStore;
-  let signalStore: SignalStore;
-  let bus: IntelligenceBus;
-  let logger: Logger;
-
-  beforeEach(() => {
-    store = makeStore();
-    signalStore = makeSignalStore();
-    bus = makeBus();
-    logger = makeLogger();
+  it("writeDerivedSignal creates new signal", () => {
+    const s = store.writeDerivedSignal({ senderId: "s1", signalType: "lang", value: "ro", confidence: 0.9 });
+    expect(s.id).toBeTruthy();
+    expect(s.senderId).toBe("s1");
+    expect(s.signalType).toBe("lang");
+    expect(s.value).toBe("ro");
+    expect(s.confidence).toBe(0.9);
   });
 
-  it("returns empty array when no rules", async () => {
-    const engine = new InferenceEngine(store, signalStore, bus, [], logger);
-    expect(await engine.evaluate("s1", "c1")).toEqual([]);
+  it("writeDerivedSignal updates existing signal same sender+type", () => {
+    store.writeDerivedSignal({ senderId: "s1", signalType: "lang", value: "ro" });
+    const updated = store.writeDerivedSignal({ senderId: "s1", signalType: "lang", value: "en", confidence: 0.8 });
+    expect(updated.value).toBe("en");
+    expect(store.getDerivedSignals("s1", "lang")).toHaveLength(1);
   });
 
-  it("produces signal when rule matches", async () => {
-    const rule = makeRule();
-    const engine = new InferenceEngine(store, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(1);
-    expect(results[0]).toBe(FAKE_SIGNAL);
-    expect(store.writeDerivedSignal).toHaveBeenCalled();
-    expect(bus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: "signal_derived" }));
-    expect(logger.info).toHaveBeenCalled();
+  it("writeDerivedSignal defaults confidence to 0.5", () => {
+    const s = store.writeDerivedSignal({ senderId: "s1", signalType: "x", value: "v" });
+    expect(s.confidence).toBe(0.5);
   });
 
-  it("skips rule in cooldown", async () => {
-    const store2 = makeStore({ getLastInferenceRun: vi.fn(() => Date.now() - 100) });
-    const rule = makeRule({ cooldownMs: 60_000 });
-    const engine = new InferenceEngine(store2, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(0);
-    expect(store2.writeDerivedSignal).not.toHaveBeenCalled();
+  it("getDerivedSignals returns empty for unknown sender", () => {
+    expect(store.getDerivedSignals("ghost")).toEqual([]);
   });
 
-  it("skips rule with insufficient samples", async () => {
-    const rule = makeRule({ minSamples: 5 });
-    const engine = new InferenceEngine(store, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(0);
-    expect(store.logInference).toHaveBeenCalledWith(expect.objectContaining({ result: "skipped" }));
+  it("getDerivedSignals filters by signalType", () => {
+    store.writeDerivedSignal({ senderId: "s1", signalType: "lang", value: "ro" });
+    store.writeDerivedSignal({ senderId: "s1", signalType: "tone", value: "formal" });
+    expect(store.getDerivedSignals("s1", "lang")).toHaveLength(1);
+    expect(store.getDerivedSignals("s1", "lang")[0].signalType).toBe("lang");
   });
 
-  it("logs skipped when rule.evaluate returns null", async () => {
-    const rule = makeRule({ evaluate: vi.fn(() => null) });
-    const engine = new InferenceEngine(store, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(0);
-    expect(store.logInference).toHaveBeenCalledWith(expect.objectContaining({ result: "skipped", details: null }));
+  it("getDerivedSignals without filter returns all", () => {
+    store.writeDerivedSignal({ senderId: "s1", signalType: "lang", value: "ro" });
+    store.writeDerivedSignal({ senderId: "s1", signalType: "tone", value: "formal" });
+    expect(store.getDerivedSignals("s1")).toHaveLength(2);
   });
 
-  it("logs unchanged when value and confidence unchanged (<0.05 delta)", async () => {
-    const existing = { ...FAKE_SIGNAL, value: "high", confidence: 0.9 };
-    const store2 = makeStore({ getDerivedSignals: vi.fn(() => [existing]) });
-    const rule = makeRule({ evaluate: vi.fn(() => ({ value: "high", confidence: 0.92, evidence: "e" })) });
-    const engine = new InferenceEngine(store2, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(0);
-    expect(store2.logInference).toHaveBeenCalledWith(expect.objectContaining({ result: "unchanged" }));
+  it("logInference stores entry", () => {
+    store.logInference({ ruleId: "r1", senderId: "s1", result: "produced", details: null, executedAt: 1000 });
+    const last = store.getLastInferenceRun("r1", "s1");
+    expect(last).toBe(1000);
   });
 
-  it("produces new signal when confidence changes significantly", async () => {
-    const existing = { ...FAKE_SIGNAL, value: "high", confidence: 0.5 };
-    const store2 = makeStore({ getDerivedSignals: vi.fn(() => [existing]), writeDerivedSignal: vi.fn(() => FAKE_SIGNAL) });
-    const rule = makeRule({ evaluate: vi.fn(() => ({ value: "high", confidence: 0.9, evidence: "e" })) });
-    const engine = new InferenceEngine(store2, signalStore, bus, [rule], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(1);
+  it("getLastInferenceRun returns null for unknown rule", () => {
+    expect(store.getLastInferenceRun("ghost", "s1")).toBeNull();
   });
 
-  it("produces signal when value changes even if confidence similar", async () => {
-    const existing = { ...FAKE_SIGNAL, value: "low", confidence: 0.9 };
-    const store2 = makeStore({ getDerivedSignals: vi.fn(() => [existing]), writeDerivedSignal: vi.fn(() => FAKE_SIGNAL) });
-    const rule = makeRule({ evaluate: vi.fn(() => ({ value: "high", confidence: 0.9, evidence: "e" })) });
-    const engine = new InferenceEngine(store2, signalStore, bus, [rule], logger);
-    expect(await engine.evaluate("s1", "c1")).toHaveLength(1);
+  it("getLastInferenceRun returns latest executedAt", () => {
+    store.logInference({ ruleId: "r1", senderId: "s1", result: "skipped", details: null, executedAt: 1000 });
+    store.logInference({ ruleId: "r1", senderId: "s1", result: "produced", details: null, executedAt: 5000 });
+    expect(store.getLastInferenceRun("r1", "s1")).toBe(5000);
   });
-
-  it("filters signals by inputSignals type", async () => {
-    const rawSignals: ProfileSignal[] = [
-      { ...RAW_SIGNAL, signalType: "msg_freq" },
-      { ...RAW_SIGNAL, id: "r2", signalType: "other_type" },
-    ];
-    const ss = makeSignalStore(rawSignals);
-    const rule = makeRule({ inputSignals: ["msg_freq"], minSamples: 1 });
-    const engine = new InferenceEngine(store, ss, bus, [rule], logger);
-    await engine.evaluate("s1", "c1");
-    expect(rule.evaluate).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ signalType: "msg_freq" })]),
-      null
-    );
-  });
-
-  it("catches and logs rule errors without throwing", async () => {
-    const rule = makeRule({ evaluate: vi.fn(() => { throw new Error("boom"); }) });
-    const engine = new InferenceEngine(store, signalStore, bus, [rule], logger);
-    await expect(engine.evaluate("s1", "c1")).resolves.toEqual([]);
-    expect(logger.error).toHaveBeenCalled();
-  });
-
-  it("logs produced inference result", async () => {
-    const rule = makeRule();
-    const engine = new InferenceEngine(store, signalStore, bus, [rule], logger);
-    await engine.evaluate("s1", "c1");
-    expect(store.logInference).toHaveBeenCalledWith(expect.objectContaining({ result: "produced" }));
-  });
-
-  it("processes multiple rules independently", async () => {
-    const ruleA = makeRule({ id: "rule-a", inputSignals: ["msg_freq"] });
-    const ruleB = makeRule({ id: "rule-b", inputSignals: ["msg_freq"] });
-    const store2 = makeStore({ writeDerivedSignal: vi.fn(() => FAKE_SIGNAL) });
-    const engine = new InferenceEngine(store2, signalStore, bus, [ruleA, ruleB], logger);
-    const results = await engine.evaluate("s1", "c1");
-    expect(results).toHaveLength(2);
-  });
-
-  // Additional coverage from @claude review on PR #118
-  it("filterSignals: only matching signals passed to evaluate (no extra signals leak)", async () => {
-    const rawSignals: ProfileSignal[] = [
-      { ...RAW_SIGNAL, signalType: "msg_freq" },
-      { ...RAW_SIGNAL, id: "r2", signalType: "other_type" },
-    ];
-    const ss = makeSignalStore(rawSignals);
-    const rule = makeRule({ inputSignals: ["msg_freq"], minSamples: 1 });
-    const engine = new InferenceEngine(store, ss, bus, [rule], logger);
-    await engine.evaluate("s1", "c1");
-    const callArg = (rule.evaluate as ReturnType<typeof vi.fn>).mock.calls[0][0] as ProfileSignal[];
-    expect(callArg).toHaveLength(1);
-    expect(callArg[0].signalType).toBe("msg_freq");
-  });
-
-  it("logInference details: insufficient_samples has non-null details, null-evaluate has null details", async () => {
-    // insufficient samples → details is JSON string
-    const rule1 = makeRule({ minSamples: 99 });
-    const engine1 = new InferenceEngine(store, signalStore, bus, [rule1], logger);
-    await engine1.evaluate("s1", "c1");
-    const call1 = (store.logInference as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call1.result).toBe("skipped");
-    expect(call1.details).not.toBeNull();
-
-    // null evaluate → details is null
-    const rule2 = makeRule({ evaluate: vi.fn(() => null) });
-    const freshStore = makeStore();
-    const engine3 = new InferenceEngine(freshStore, signalStore, bus, [rule2], logger);
-    await engine3.evaluate("s1", "c1");
-    const call3 = (freshStore.logInference as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(call3.result).toBe("skipped");
-    expect(call3.details).toBeNull();
-  });
-
-
 });

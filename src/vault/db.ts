@@ -151,11 +151,24 @@ export class VaultDB {
    * Each migration is idempotent (checks before altering).
    */
   private migrate(): void {
-    const columns = this.db
+    const piColumns = this.db
       .prepare("PRAGMA table_info(proactive_intents)")
       .all() as Array<{ name: string }>;
-    if (columns.length > 0 && !columns.some((c) => c.name === "category")) {
+    if (piColumns.length > 0 && !piColumns.some((c) => c.name === "category")) {
       this.db.exec("ALTER TABLE proactive_intents ADD COLUMN category TEXT");
+    }
+
+    // audit_log: add turn_id and step_index for trace grouping
+    const auditColumns = this.db
+      .prepare("PRAGMA table_info(audit_log)")
+      .all() as Array<{ name: string }>;
+    if (auditColumns.length > 0) {
+      if (!auditColumns.some((c) => c.name === "turn_id")) {
+        this.db.exec("ALTER TABLE audit_log ADD COLUMN turn_id TEXT");
+      }
+      if (!auditColumns.some((c) => c.name === "step_index")) {
+        this.db.exec("ALTER TABLE audit_log ADD COLUMN step_index INTEGER");
+      }
     }
   }
 

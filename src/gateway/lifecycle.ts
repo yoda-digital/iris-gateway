@@ -213,9 +213,26 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   if (config.cli?.enabled) {
     cliRegistry = new CliToolRegistry(config.cli.tools);
     cliExecutor = new CliExecutor({ allowedBinaries: config.cli.sandbox.allowedBinaries, timeout: config.cli.timeout, logger });
+
+    // Probe all tools in parallel (non-blocking, 2s timeout per check)
+    const probeResults = await Promise.all(
+      cliRegistry.listTools().map(async (toolName) => {
+        const def = cliRegistry!.getToolDef(toolName)!;
+        const result = await cliExecutor!.probe(def.binary, def.healthCheck);
+        return { toolName, binary: def.binary, ...result };
+      })
+    );
+    const unavailable = probeResults.filter((r) => !r.available);
+    if (unavailable.length > 0) {
+      for (const r of unavailable) {
+        logger.warn({ tool: r.toolName, binary: r.binary, reason: r.reason }, "CLI tool unavailable — removed from manifest");
+      }
+      cliRegistry.removeTools(unavailable.map((r) => r.toolName));
+    }
+
     const manifestPath = join(stateDir, "cli-tools.json");
     writeFileSync(manifestPath, JSON.stringify(cliRegistry.getManifest(), null, 2));
-    logger.info({ tools: cliRegistry.listTools() }, "CLI tool registry initialized");
+    logger.info({ tools: cliRegistry.listTools(), unavailable: unavailable.length }, "CLI tool registry initialized");
   }
 
   // 5.8 Load plugins

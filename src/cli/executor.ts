@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import type { CliExecResult } from "./types.js";
 import type { Logger } from "../logging/logger.js";
 
@@ -64,6 +64,32 @@ export class CliExecutor {
           resolve({ ok: true, data, exitCode: 0 });
         },
       );
+    });
+  }
+
+  async probe(binary: string, healthCheck?: { command: string[]; successExitCode: number }): Promise<{ available: boolean; reason?: string }> {
+    // Check binary exists via which
+    try {
+      execFileSync("which", [binary], { timeout: 2000, stdio: "pipe" });
+    } catch {
+      return { available: false, reason: `binary '${binary}' not found in PATH` };
+    }
+
+    if (!healthCheck) {
+      return { available: true };
+    }
+
+    // Run health check command
+    const [cmd, ...args] = healthCheck.command;
+    return new Promise((resolve) => {
+      execFile(cmd, args, { timeout: 2000 }, (error) => {
+        const exitCode = error?.code != null ? (typeof error.code === "number" ? error.code : 1) : 0;
+        if (exitCode === healthCheck.successExitCode) {
+          resolve({ available: true });
+        } else {
+          resolve({ available: false, reason: `health check '${healthCheck.command.join(" ")}' exited ${exitCode}` });
+        }
+      });
     });
   }
 }

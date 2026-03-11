@@ -4,10 +4,16 @@ export interface CliActionDef {
   readonly flags?: string[];
 }
 
+export interface CliHealthCheck {
+  readonly command: string[];
+  readonly successExitCode: number;
+}
+
 export interface CliToolDef {
   readonly binary: string;
   readonly description: string;
   readonly actions: Record<string, CliActionDef>;
+  readonly healthCheck?: CliHealthCheck;
 }
 
 export interface CliSandboxConfig {

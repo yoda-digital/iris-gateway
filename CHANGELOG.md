@@ -1,3 +1,9 @@
+## [1.9.2](https://github.com/yoda-digital/iris-gateway/compare/v1.9.1...v1.9.2) (2026-03-11)
+
+### Refactoring
+
+* **bridge:** commit untracked refactor files — supervisor.ts, skills-handlers.ts, skills-router.ts ([#124](https://github.com/yoda-digital/iris-gateway/issues/124)) ([2e9042f](https://github.com/yoda-digital/iris-gateway/commit/2e9042fe79e111c9bde8745617117dfb7a63e2a8)), closes [#123](https://github.com/yoda-digital/iris-gateway/issues/123)
+
 ## [1.9.2](https://github.com/yoda-digital/iris-gateway/compare/v1.9.1...v1.9.2) (2026-03-10)
 
 ### Bug Fixes

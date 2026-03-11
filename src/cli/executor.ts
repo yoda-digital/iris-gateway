@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from "node:child_process";
-import type { CliExecResult } from "./types.js";
+import type { CliExecResult, CliHealthCheck } from "./types.js";
 import type { Logger } from "../logging/logger.js";
 
 export interface CliExecutorOpts {
@@ -67,7 +67,7 @@ export class CliExecutor {
     });
   }
 
-  async probe(binary: string, healthCheck?: { command: string[]; successExitCode: number }): Promise<{ available: boolean; reason?: string }> {
+  async probe(binary: string, healthCheck?: CliHealthCheck): Promise<{ available: boolean; reason?: string }> {
     // Check binary exists via which
     try {
       execFileSync("which", [binary], { timeout: 2000, stdio: "pipe" });

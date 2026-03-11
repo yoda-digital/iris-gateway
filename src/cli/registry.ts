@@ -65,7 +65,7 @@ export class CliToolRegistry {
 
   removeTools(names: string[]): void {
     for (const name of names) {
-      delete (this.tools as Record<string, unknown>)[name];
+      delete this.tools[name];
     }
   }
 

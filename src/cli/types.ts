@@ -5,7 +5,7 @@ export interface CliActionDef {
 }
 
 export interface CliHealthCheck {
-  readonly command: string[];
+  readonly command: [string, ...string[]];
   readonly successExitCode: number;
 }
 

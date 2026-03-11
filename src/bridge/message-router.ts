@@ -1,3 +1,4 @@
+import { metrics } from "../gateway/metrics.js";
 import type { InboundMessage } from "../channels/adapter.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { SecurityGate, SecurityCheckResult } from "../security/dm-policy.js";
@@ -104,6 +105,7 @@ export class MessageRouter {
 
     const textPreview = msg.text ? `"${msg.text.substring(0, 60)}${msg.text.length > 60 ? "…" : ""}"` : "(no text)";
     log.info(`──── INBOUND ─── ${msg.channelId}/${msg.chatType} ─── ${textPreview}`);
+    metrics.messagesReceived.inc({ channel: msg.channelId });
 
     // ── Step 1: Adapter ──
     const adapter = this.registry.get(msg.channelId);
@@ -288,6 +290,7 @@ export class MessageRouter {
       );
     } catch (err) {
       cb.onFailure();
+      metrics.messagesErrors.inc({ channel: msg.channelId, error_type: 'bridge_error' });
       log.error({ err }, "  9 ▸ Bridge        ✗ sendAndWait threw");
       throw err;
     }
@@ -308,9 +311,12 @@ export class MessageRouter {
       log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);
       log.info(` 11 ▸ Deliver       → ${msg.channelId} ${responsePreview}`);
       await this.sendResponse(msg.channelId, msg.chatId, response, msg.id);
+      metrics.messageProcessingLatency.observe({ channel: msg.channelId, stage: 'full' }, elapsed / 1000);
+      metrics.messagesSent.inc({ channel: msg.channelId });
       log.info(`──── DONE ──── ${elapsed}ms total ────`);
     } else {
       cb.onFailure(); // Fix #2: null response = bridge failure
+      metrics.messagesErrors.inc({ channel: msg.channelId, error_type: 'empty_response' });
       log.warn(` 10 ▸ Response      ✗ empty (${elapsed}ms) — model may be unavailable`);
       log.info(`──── DONE ──── ${elapsed}ms total (no response) ────`);
     }

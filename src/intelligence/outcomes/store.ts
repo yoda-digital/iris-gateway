@@ -1,3 +1,4 @@
+import { metrics } from "../../gateway/metrics.js";
 import type Database from "better-sqlite3";
 import type { VaultDB } from "../../vault/db.js";
 import { randomUUID } from "node:crypto";
@@ -46,6 +47,7 @@ export class OutcomesStore {
       `INSERT INTO proactive_outcomes (id, intent_id, sender_id, channel_id, category, sent_at, day_of_week, hour_of_day, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(id, params.intentId, params.senderId, params.channelId, params.category, params.sentAt, params.dayOfWeek, params.hourOfDay, now);
+    metrics.outcomesLogged.inc({ type: params.category });
     return this.getOutcome(id)!;
   }
 

@@ -23,9 +23,11 @@ export interface SupervisorOptions {
 export class BridgeSupervisor {
   readonly circuitBreaker: CircuitBreaker;
   private healthTimer: ReturnType<typeof setInterval> | null = null;
-  restartAttempts = 0;
-  isRestarting = false;
+  private _restartAttempts = 0;
+  private _isRestarting = false;
   readonly pendingQueue: Array<() => void> = [];
+
+  get restartAttempts(): number { return this._restartAttempts; }
 
   private readonly maxRestarts: number;
   private readonly initialBackoffMs: number;
@@ -68,13 +70,13 @@ export class BridgeSupervisor {
   }
 
   private async _healthTick(): Promise<void> {
-    if (this.isRestarting) return;
+    if (this._isRestarting) return;
     const healthy = await this.checkHealthFn();
     if (healthy) {
       if (this.circuitBreaker.getState() !== "CLOSED") {
         this.logger.info("OpenCode health restored — closing circuit");
         this.circuitBreaker.onSuccess();
-        this.restartAttempts = 0;
+        this._restartAttempts = 0;
         this.drainQueue();
       }
     } else {
@@ -85,19 +87,19 @@ export class BridgeSupervisor {
   }
 
   scheduleRestart(attempt: number): void {
-    if (this.isRestarting) return;
+    if (this._isRestarting) return;
     if (attempt >= this.maxRestarts) {
       this.logger.error({ maxRestarts: this.maxRestarts }, "Max restarts exceeded — giving up");
       this.onMaxRestartsExceeded?.();
       return;
     }
 
-    this.isRestarting = true;
+    this._isRestarting = true;
     const backoff = Math.min(
       this.initialBackoffMs * Math.pow(2, attempt),
       this.maxBackoffMs,
     );
-    this.restartAttempts = attempt + 1;
+    this._restartAttempts = attempt + 1;
     this.logger.info({ attempt: attempt + 1, backoffMs: backoff }, "Scheduling OpenCode restart");
 
     setTimeout(async () => {
@@ -109,7 +111,7 @@ export class BridgeSupervisor {
         if (healthy) {
           this.logger.info("OpenCode restart succeeded");
           this.circuitBreaker.onSuccess();
-          this.restartAttempts = 0;
+          this._restartAttempts = 0;
           this.drainQueue();
         } else {
           this.logger.warn("OpenCode restart did not restore health");
@@ -119,7 +121,7 @@ export class BridgeSupervisor {
         this.logger.error({ err }, "OpenCode restart failed");
         this.scheduleRestart(attempt + 1);
       } finally {
-        this.isRestarting = false;
+        this._isRestarting = false;
       }
     }, backoff);
   }

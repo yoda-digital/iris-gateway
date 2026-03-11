@@ -166,7 +166,7 @@ describe("OpenCodeBridge", () => {
       cb.onFailure(); cb.onFailure(); cb.onFailure(); // OPEN
 
       // Fill queue to max
-      (bridge as any).pendingQueue.push(() => {}, () => {});
+      (bridge as any).supervisor.pendingQueue.push(() => {}, () => {});
 
       const result = await bridge.sendAndWait("s1", "hello");
       expect(result).toBe("");
@@ -190,16 +190,16 @@ describe("OpenCodeBridge", () => {
 
       // Simulate recovery: close circuit and drain
       cb.onSuccess();
-      (bridge as any)._drainQueue();
+      (bridge as any).supervisor.drainQueue();
 
       const result = await promise;
       expect(result).toBe("response text");
     });
   });
 
-  /* ── _scheduleRestart backoff ─────────────────────────────────── */
+  /* ── supervisor.scheduleRestart backoff ───────────────────────── */
 
-  describe("_scheduleRestart backoff", () => {
+  describe("supervisor.scheduleRestart backoff", () => {
     it("fires after initialBackoffMs at attempt 0", async () => {
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
         initialBackoffMs: 500,
@@ -210,7 +210,7 @@ describe("OpenCodeBridge", () => {
       (bridge as any)._doStart = doStart;
       (bridge as any).checkHealth = vi.fn().mockResolvedValue(true);
 
-      (bridge as any)._scheduleRestart(0);
+      (bridge as any).supervisor.scheduleRestart(0);
 
       // Not yet fired
       vi.advanceTimersByTime(499);
@@ -232,22 +232,30 @@ describe("OpenCodeBridge", () => {
       (bridge as any).checkHealth = vi.fn().mockResolvedValue(true);
 
       // attempt=3 → 1000*2^3 = 8000 → capped to 4000
-      (bridge as any)._scheduleRestart(3);
+      (bridge as any).supervisor.scheduleRestart(3);
       vi.advanceTimersByTime(3_999);
       expect(doStart).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
       expect(doStart).toHaveBeenCalledOnce();
     });
 
-    it("does NOT restart when isRestarting is true", () => {
-      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
-      (bridge as any).isRestarting = true;
-      const doStart = vi.fn();
+    it("does NOT restart when isRestarting is true", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger(), {
+        initialBackoffMs: 100,
+        maxRestarts: 5,
+      });
+      const doStart = vi.fn().mockResolvedValue(undefined);
       (bridge as any)._doStart = doStart;
+      (bridge as any).checkHealth = vi.fn().mockResolvedValue(true);
 
-      (bridge as any)._scheduleRestart(0);
-      vi.advanceTimersByTime(100_000);
-      expect(doStart).not.toHaveBeenCalled();
+      // First call sets _isRestarting=true synchronously
+      (bridge as any).supervisor.scheduleRestart(0);
+      // Second call is a no-op because _isRestarting is already true
+      (bridge as any).supervisor.scheduleRestart(0);
+
+      // Advance past both possible backoff windows — only one doStart should fire
+      await vi.advanceTimersByTimeAsync(200);
+      expect(doStart).toHaveBeenCalledOnce();
     });
 
     it("calls onMaxRestartsExceeded at maxRestarts", () => {
@@ -257,7 +265,7 @@ describe("OpenCodeBridge", () => {
         onMaxRestartsExceeded: exceeded,
       });
 
-      (bridge as any)._scheduleRestart(3);
+      (bridge as any).supervisor.scheduleRestart(3);
       expect(exceeded).toHaveBeenCalledOnce();
     });
 
@@ -271,7 +279,7 @@ describe("OpenCodeBridge", () => {
       (bridge as any)._doStart = vi.fn().mockResolvedValue(undefined);
       (bridge as any).checkHealth = vi.fn().mockResolvedValue(true);
 
-      (bridge as any)._scheduleRestart(0);
+      (bridge as any).supervisor.scheduleRestart(0);
       await vi.advanceTimersByTimeAsync(100);
 
       expect(closeFn).toHaveBeenCalledOnce();
@@ -431,10 +439,10 @@ describe("OpenCodeBridge", () => {
       // Mock _sendAndWaitInternal to throw
       (bridge as any)._sendAndWaitInternal = vi.fn().mockRejectedValue(new Error("network failure"));
 
-      // Spy on circuitBreaker and _scheduleRestart
+      // Spy on circuitBreaker and supervisor.scheduleRestart
       const cb = bridge.getCircuitBreaker();
       const onFailureSpy = vi.spyOn(cb, "onFailure");
-      const scheduleRestartSpy = vi.spyOn(bridge as any, "_scheduleRestart");
+      const scheduleRestartSpy = vi.spyOn((bridge as any).supervisor, "scheduleRestart");
       // sendAndWait re-throws after notifying circuit breaker
       await expect(bridge.sendAndWait("s1", "hello")).rejects.toThrow("network failure");
       expect(onFailureSpy).toHaveBeenCalledOnce();
@@ -457,7 +465,7 @@ describe("OpenCodeBridge", () => {
       const promise = bridge.sendAndWait("s1", "hi");
 
       // Drain queue WITHOUT closing circuit (recovery failed)
-      (bridge as any)._drainQueue();
+      (bridge as any).supervisor.drainQueue();
 
       const result = await promise;
       expect(result).toBe("");

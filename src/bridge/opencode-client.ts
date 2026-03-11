@@ -152,7 +152,7 @@ export class OpenCodeBridge {
     } catch (err) {
       this.logger.error({ err }, "sendAndWait failed — circuit breaker notified");
       this.supervisor.circuitBreaker.onFailure();
-      this._scheduleRestart(this.supervisor.restartAttempts);
+      this.supervisor.scheduleRestart(this.supervisor.restartAttempts);
       throw err;
     } finally {
       this.inFlightCount--;
@@ -321,13 +321,6 @@ export class OpenCodeBridge {
       return { role, text, hasParts: parts.length > 0 };
     });
   }
-
-  // Test-accessible supervisor delegations
-  _scheduleRestart(attempt: number): void { this.supervisor.scheduleRestart(attempt); }
-  get isRestarting(): boolean { return this.supervisor.isRestarting; }
-  set isRestarting(v: boolean) { this.supervisor.isRestarting = v; }
-  _drainQueue(): void { this.supervisor.drainQueue(); }
-  get pendingQueue(): Array<() => void> { return this.supervisor.pendingQueue; }
 
   async deleteSession(sessionId: string): Promise<void> {
     await this.getClient().session.delete({

@@ -1,3 +1,4 @@
+import { metrics } from "../../gateway/metrics.js";
 import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { DerivedSignal } from "../types.js";
@@ -31,6 +32,7 @@ export class InferenceEngine {
    * Returns newly produced/updated derived signals.
    */
   async evaluate(senderId: string, channelId: string): Promise<DerivedSignal[]> {
+    const _pipelineStart = Date.now();
     const produced: DerivedSignal[] = [];
     const now = Date.now();
 
@@ -118,6 +120,7 @@ export class InferenceEngine {
       }
     }
 
+    metrics.intelligencePipelineLatency.observe({ stage: 'inference' }, (Date.now() - _pipelineStart) / 1000);
     return produced;
   }
 }

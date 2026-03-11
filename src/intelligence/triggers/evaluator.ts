@@ -1,3 +1,4 @@
+import { metrics } from "../../gateway/metrics.js";
 import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { DerivedSignal, TriggerResult } from "../types.js";
@@ -89,6 +90,7 @@ export class TriggerEvaluator {
 
         // Emit to bus
         this.bus.emit({ type: "trigger_fired", senderId: msg.senderId, result });
+        metrics.intentsTriggered.inc({ intent_id: rule.id });
       } catch (err) {
         this.logger.error({ err, ruleId: rule.id }, "Trigger rule evaluation failed");
       }

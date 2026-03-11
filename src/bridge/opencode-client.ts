@@ -1,3 +1,4 @@
+import { metrics } from "../gateway/metrics.js";
 import {
   createOpencode,
   createOpencodeClient,
@@ -145,6 +146,7 @@ export class OpenCodeBridge {
     if (!allowed) return "";
 
     this.inFlightCount++;
+    metrics.queueDepth.set(this.inFlightCount);
     try {
       const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs);
       this.supervisor.circuitBreaker.onSuccess();
@@ -156,6 +158,7 @@ export class OpenCodeBridge {
       throw err;
     } finally {
       this.inFlightCount--;
+      metrics.queueDepth.set(this.inFlightCount);
     }
   }
 

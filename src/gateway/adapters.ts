@@ -1,3 +1,4 @@
+import { metrics } from "../gateway/metrics.js";
 import type { IrisConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
 import type { ChannelAdapter } from "../channels/adapter.js";
@@ -116,8 +117,8 @@ export async function startChannelAdapters(deps: AdapterWiringDeps): Promise<voi
       });
     });
 
-    adapter.events.on("connected", () => { logger.info({ channel: id }, "Channel connected"); });
-    adapter.events.on("disconnected", (reason) => { logger.warn({ channel: id, reason }, "Channel disconnected"); });
+    adapter.events.on("connected", () => { metrics.activeConnections.inc({ channel: id }); logger.info({ channel: id }, "Channel connected"); });
+    adapter.events.on("disconnected", (reason) => { metrics.activeConnections.dec({ channel: id }); logger.warn({ channel: id, reason }, "Channel disconnected"); });
     adapter.events.on("error", (err) => { logger.error({ err, channel: id }, "Channel error"); });
 
     try {

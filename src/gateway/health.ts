@@ -86,6 +86,9 @@ export class HealthServer {
 
     this.app.get("/metrics", async (c) => {
       metrics.uptime.set(Math.round((Date.now() - this.startedAt) / 1000));
+      const opencodeOk = await this.bridge.checkHealth();
+      metrics.systemHealth.set({ component: 'opencode' }, opencodeOk ? 1 : 0);
+      metrics.systemHealth.set({ component: 'gateway' }, 1);
       const metricsText = await metrics.metrics();
       c.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
       return c.body(metricsText);

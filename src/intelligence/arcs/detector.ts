@@ -1,3 +1,4 @@
+import { metrics } from "../../gateway/metrics.js";
 import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { Logger } from "../../logging/logger.js";
@@ -96,6 +97,7 @@ export class ArcDetector {
 
       this.bus.emit({ type: "arc_created", senderId, arc });
       this.logger.info({ arcId: arc.id, title: fallbackTitle }, "New memory arc created");
+      metrics.arcsDetected.inc();
 
       // Async AI title upgrade (fire-and-forget)
       if (this.titleGenerator) {

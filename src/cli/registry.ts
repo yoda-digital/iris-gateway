@@ -6,10 +6,10 @@ export interface BuiltCommand {
 }
 
 export class CliToolRegistry {
-  private readonly tools: Record<string, CliToolDef>;
+  private tools: Record<string, CliToolDef>;
 
   constructor(tools: Record<string, CliToolDef>) {
-    this.tools = tools;
+    this.tools = { ...tools };
   }
 
   buildCommand(
@@ -61,6 +61,12 @@ export class CliToolRegistry {
 
   getToolDef(toolName: string): CliToolDef | undefined {
     return this.tools[toolName];
+  }
+
+  removeTools(names: string[]): void {
+    for (const name of names) {
+      delete this.tools[name];
+    }
   }
 
   getManifest(): CliToolManifest {

@@ -103,6 +103,7 @@ export class BridgeSupervisor {
     this.logger.info({ attempt: attempt + 1, backoffMs: backoff }, "Scheduling OpenCode restart");
 
     setTimeout(async () => {
+      let nextAttempt: number | null = null;
       try {
         this.logger.info("Restarting OpenCode...");
         this.teardownFn();
@@ -115,14 +116,15 @@ export class BridgeSupervisor {
           this.drainQueue();
         } else {
           this.logger.warn("OpenCode restart did not restore health");
-          this.scheduleRestart(attempt + 1);
+          nextAttempt = attempt + 1;
         }
       } catch (err) {
         this.logger.error({ err }, "OpenCode restart failed");
-        this.scheduleRestart(attempt + 1);
+        nextAttempt = attempt + 1;
       } finally {
         this._isRestarting = false;
       }
+      if (nextAttempt !== null) this.scheduleRestart(nextAttempt);
     }, backoff);
   }
 

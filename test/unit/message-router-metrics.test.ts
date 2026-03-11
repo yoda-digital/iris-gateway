@@ -1,19 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { metrics } from "../../src/gateway/metrics.js";
-import { MessageRouter } from "../../src/bridge/message-router.js";
-import { SessionMap } from "../../src/bridge/session-map.js";
-import { SecurityGate } from "../../src/security/dm-policy.js";
-import { PairingStore } from "../../src/security/pairing-store.js";
-import { AllowlistStore } from "../../src/security/allowlist-store.js";
-import { RateLimiter } from "../../src/security/rate-limiter.js";
-import { ChannelRegistry } from "../../src/channels/registry.js";
-import { MockAdapter } from "../helpers/mock-adapter.js";
-import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
-import { makeInboundMessage } from "../helpers/fixtures.js";
-import pino from "pino";
 
 vi.mock("../../src/gateway/metrics.js", () => ({
   metrics: {
@@ -31,6 +17,21 @@ vi.mock("../../src/gateway/metrics.js", () => ({
     intelligencePipelineLatency: { observe: vi.fn() },
   },
 }));
+
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { MessageRouter } from "../../src/bridge/message-router.js";
+import { SessionMap } from "../../src/bridge/session-map.js";
+import { SecurityGate } from "../../src/security/dm-policy.js";
+import { PairingStore } from "../../src/security/pairing-store.js";
+import { AllowlistStore } from "../../src/security/allowlist-store.js";
+import { RateLimiter } from "../../src/security/rate-limiter.js";
+import { ChannelRegistry } from "../../src/channels/registry.js";
+import { MockAdapter } from "../helpers/mock-adapter.js";
+import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
+import { makeInboundMessage } from "../helpers/fixtures.js";
+import pino from "pino";
 
 function setup() {
   const tempDir = mkdtempSync(join(tmpdir(), "iris-metrics-test-"));
@@ -51,7 +52,6 @@ function setup() {
 
 describe("MessageRouter metric instrumentation", () => {
   let ctx: ReturnType<typeof setup>;
-
   beforeEach(() => { vi.clearAllMocks(); ctx = setup(); });
   afterEach(() => { rmSync(ctx.tempDir, { recursive: true, force: true }); });
 
@@ -63,15 +63,14 @@ describe("MessageRouter metric instrumentation", () => {
   it("records messageProcessingLatency after processing", async () => {
     await ctx.router.handleInbound(makeInboundMessage({ channelId: "mock" }));
     expect(metrics.messageProcessingLatency.observe).toHaveBeenCalledWith(
-      { channel: "mock", stage: "full" },
-      expect.any(Number)
+      { channel: "mock", stage: "full" }, expect.any(Number)
     );
   });
 
   it("increments messagesSent when bridge returns text", async () => {
     ctx.bridge.responseText = "reply from bridge";
     await ctx.router.handleInbound(makeInboundMessage({ channelId: "mock" }));
-    await new Promise(r => setTimeout(r, 30)); // flush outbound queue
+    await new Promise(r => setTimeout(r, 30));
     expect(metrics.messagesSent.inc).toHaveBeenCalledWith({ channel: "mock" });
   });
 
@@ -81,7 +80,15 @@ describe("MessageRouter metric instrumentation", () => {
     expect(metrics.messagesErrors.inc).toHaveBeenCalledWith({ channel: "mock", error_type: "empty_response" });
   });
 
+  it("increments messagesErrors with bridge_error when bridge throws", async () => {
+    vi.spyOn(ctx.bridge, "sendAndWait").mockRejectedValue(new Error("bridge down"));
+    await ctx.router.handleInbound(makeInboundMessage({ channelId: "mock" })).catch(() => {});
+    expect(metrics.messagesErrors.inc).toHaveBeenCalledWith({ channel: "mock", error_type: "bridge_error" });
+  });
 
-
-
+  it("does not increment messagesSent on bridge error", async () => {
+    vi.spyOn(ctx.bridge, "sendAndWait").mockRejectedValue(new Error("fail"));
+    await ctx.router.handleInbound(makeInboundMessage({ channelId: "mock" })).catch(() => {});
+    expect(metrics.messagesSent.inc).not.toHaveBeenCalled();
+  });
 });

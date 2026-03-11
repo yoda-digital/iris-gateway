@@ -481,3 +481,94 @@ describe("ToolServer vault/governance endpoints", () => {
     });
   });
 });
+
+// ──────────────── Auto-instrumentation middleware ────────────────
+
+describe("ToolServer auto-instrumentation middleware", () => {
+  let server: ToolServer;
+  let logger: ReturnType<typeof mockLogger>;
+  let port: number;
+  let base: string;
+  let dir: string;
+  let vaultDb: VaultDB;
+  let vaultStore: VaultStore;
+
+  beforeEach(async () => {
+    const adapter = mockAdapter();
+    const registry = mockRegistry(adapter);
+    logger = mockLogger();
+    port = 21950 + Math.floor(Math.random() * 1000);
+    base = `http://127.0.0.1:${port}`;
+    dir = mkdtempSync(join(tmpdir(), "iris-auto-"));
+    vaultDb = new VaultDB(dir);
+    vaultStore = new VaultStore(vaultDb);
+    server = new ToolServer({ registry, logger, port, vaultStore });
+    await server.start();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await server.stop();
+    vaultDb.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("increments stepIndex for sequential same-session POSTs within 2s", async () => {
+    const body = JSON.stringify({ content: "test", type: "fact", senderId: "u1", sessionId: "sess-A" });
+    const headers = { "Content-Type": "application/json" };
+    await fetch(`${base}/vault/store`, { method: "POST", headers, body });
+    await fetch(`${base}/vault/store`, { method: "POST", headers, body });
+
+    const entries = vaultStore.listAuditLog({ sessionId: "sess-A", limit: 10 });
+    expect(entries).toHaveLength(2);
+    const sorted = [...entries].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
+    expect(sorted[0].stepIndex).toBe(0);
+    expect(sorted[1].stepIndex).toBe(1);
+    expect(sorted[0].turnId).toBe(sorted[1].turnId);
+  });
+
+  it("creates a new turn after a >2s gap", async () => {
+    let mockedNow = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => mockedNow);
+
+    const body = JSON.stringify({ content: "test", type: "fact", senderId: "u1", sessionId: "sess-B" });
+    const headers = { "Content-Type": "application/json" };
+    await fetch(`${base}/vault/store`, { method: "POST", headers, body });
+
+    mockedNow += 3000; // simulate 3s elapsed
+    await fetch(`${base}/vault/store`, { method: "POST", headers, body });
+
+    const entries = vaultStore.listAuditLog({ sessionId: "sess-B", limit: 10 });
+    expect(entries).toHaveLength(2);
+    expect(entries[0].turnId).not.toBe(entries[1].turnId);
+    expect(entries[0].stepIndex).toBe(0);
+    expect(entries[1].stepIndex).toBe(0);
+  });
+
+  it("does not write an audit entry when sessionId is absent", async () => {
+    const body = JSON.stringify({ content: "test", type: "fact", senderId: "u1" }); // no sessionId
+    await fetch(`${base}/vault/store`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    const entries = vaultStore.listAuditLog({ limit: 10 });
+    expect(entries).toHaveLength(0);
+  });
+
+  it("concurrent same-session requests both produce audit entries", async () => {
+    const body = JSON.stringify({ content: "concurrent", type: "fact", senderId: "u1", sessionId: "sess-C" });
+    const headers = { "Content-Type": "application/json" };
+
+    await Promise.all([
+      fetch(`${base}/vault/store`, { method: "POST", headers, body }),
+      fetch(`${base}/vault/store`, { method: "POST", headers, body }),
+    ]);
+
+    const entries = vaultStore.listAuditLog({ sessionId: "sess-C", limit: 10 });
+    expect(entries).toHaveLength(2);
+    const indices = entries.map(e => e.stepIndex ?? -1).sort((a, b) => a - b);
+    expect(indices).toEqual([0, 1]);
+  });
+});

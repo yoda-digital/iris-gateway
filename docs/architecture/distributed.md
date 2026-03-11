@@ -24,8 +24,8 @@ The question: can iris-gateway scale horizontally, and if so — how?
 
 **Benchmark (2026-03-11, WSL2/Linux 6.6.87, ext4):**
 
-| Scenario | Writers | Inserts | Conflicts | Throughput | Avg Latency | P95 | Max |
-|----------|---------|---------|-----------|------------|-------------|-----|-----|
+| Scenario | Writers | Inserts | Conflicts | Throughput | Avg Latency | P50 (Median) | Max |
+|----------|---------|---------|-----------|------------|-------------|--------------|-----|
 | Low load | 4 | 400 | 0 (0%) | ~248/s | 9.74ms | 4.95ms | 1237ms |
 | High load | 8 | 1600 | 8 (0.5%) | 303/s | 8.92ms | 5.71ms | 1937ms |
 
@@ -63,7 +63,7 @@ Each instance handles a subset of sessions. A message arriving at instance A for
 
 ### 3. Cron/Intelligence Deduplication
 
-iris-gateway runs periodic jobs: heartbeats, PI ticks, cleanup crons. In multi-instance, these would fire N times unless deduplicated.
+iris-gateway runs periodic jobs: heartbeats, proactive intelligence (PI) ticks, cleanup crons. In multi-instance, these would fire N times unless deduplicated.
 
 **Options:**
 
@@ -86,7 +86,7 @@ iris-gateway runs periodic jobs: heartbeats, PI ticks, cleanup crons. In multi-i
 
 ### 4. Vault (SQLite) Write Contention Analysis
 
-Vault operations (vault_search, vault_write, vault_read) hit `~/vault/anastasia/` via obsidian vault-brain plugin, not `vault.db`. These are **read-heavy** and low-frequency. Write contention here is negligible.
+Vault operations (`vault_search`, `vault_write`, `vault_read`) interact with the configured vault backend (e.g., a local notes directory via a vault plugin), not `vault.db` directly. These are **read-heavy** and low-frequency. Write contention here is negligible.
 
 For `vault.db` (pipeline state, intelligence store):
 - Current write pattern: ~5-20 writes/minute under normal load

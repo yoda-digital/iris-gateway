@@ -1,3 +1,9 @@
+## [1.10.3](https://github.com/yoda-digital/iris-gateway/compare/v1.10.2...v1.10.3) (2026-03-11)
+
+### Bug Fixes
+
+* [#102](https://github.com/yoda-digital/iris-gateway/issues/102) — extend audit_log with turn_id/step_index, add GET /traces endpoints, auto-instrument tool-server ([#129](https://github.com/yoda-digital/iris-gateway/issues/129)) ([b3a38bd](https://github.com/yoda-digital/iris-gateway/commit/b3a38bd925c0c7cc19dd6e5b82d31fefe3f5d3ce))
+
 ## [1.10.2](https://github.com/yoda-digital/iris-gateway/compare/v1.10.1...v1.10.2) (2026-03-11)
 
 ### Bug Fixes

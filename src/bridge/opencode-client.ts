@@ -9,10 +9,11 @@ import {
 import type { OpenCodeConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
 import { CircuitBreaker } from "./circuit-breaker.js";
+import { BridgeSupervisor, type SupervisorOptions } from "./supervisor.js";
 export { CircuitBreaker };
 export type { CircuitState } from "./circuit-breaker.js";
 
-export type { OpenCodeEvent, Part, TextPart };
+export type { OpenCodeEvent, Part, TextPart, SupervisorOptions };
 
 export interface SessionInfo {
   readonly id: string;
@@ -20,40 +21,12 @@ export interface SessionInfo {
   readonly createdAt: number;
 }
 
-export interface SupervisorOptions {
-  /** Max restart attempts before giving up. Default: 5 */
-  maxRestarts?: number;
-  /** Initial backoff ms. Doubles each retry up to maxBackoffMs. Default: 1000 */
-  initialBackoffMs?: number;
-  /** Maximum backoff ms. Default: 30_000 */
-  maxBackoffMs?: number;
-  /** Health check interval ms. Default: 5000 */
-  healthIntervalMs?: number;
-  /** Max queued messages during restart window. Default: 50 */
-  maxQueueSize?: number;
-  /** Called when max restarts are exceeded (use for owner alerting). */
-  onMaxRestartsExceeded?: () => void;
-}
-
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
   private readonly projectDir: string;
   private inFlightCount = 0;
-
-  // Supervisor state
-  private readonly circuitBreaker: CircuitBreaker;
-  private healthTimer: ReturnType<typeof setInterval> | null = null;
-  private restartAttempts = 0;
-  private isRestarting = false;
-  private readonly pendingQueue: Array<() => void> = [];
-
-  private readonly maxRestarts: number;
-  private readonly initialBackoffMs: number;
-  private readonly maxBackoffMs: number;
-  private readonly healthIntervalMs: number;
-  private readonly maxQueueSize: number;
-  private readonly onMaxRestartsExceeded?: () => void;
+  private readonly supervisor: BridgeSupervisor;
 
   constructor(
     private readonly config: OpenCodeConfig,
@@ -61,18 +34,24 @@ export class OpenCodeBridge {
     supervisorOpts: SupervisorOptions = {},
   ) {
     this.projectDir = config.projectDir ?? process.cwd();
-    this.maxRestarts = supervisorOpts.maxRestarts ?? 5;
-    this.initialBackoffMs = supervisorOpts.initialBackoffMs ?? 1_000;
-    this.maxBackoffMs = supervisorOpts.maxBackoffMs ?? 30_000;
-    this.healthIntervalMs = supervisorOpts.healthIntervalMs ?? 5_000;
-    this.maxQueueSize = supervisorOpts.maxQueueSize ?? 50;
-    this.onMaxRestartsExceeded = supervisorOpts.onMaxRestartsExceeded;
-    this.circuitBreaker = new CircuitBreaker({ recoveryTimeoutMs: 15_000 });
+    this.supervisor = new BridgeSupervisor(
+      logger,
+      () => this.checkHealth(),
+      () => this._doStart(),
+      () => {
+        if (this.serverHandle) {
+          try { this.serverHandle.close(); } catch { /* ignore */ }
+          this.serverHandle = null;
+        }
+        this.client = null;
+      },
+      supervisorOpts,
+    );
   }
 
   async start(): Promise<void> {
     await this._doStart();
-    this._startHealthMonitor();
+    this.supervisor.startHealthMonitor();
   }
 
   private async _doStart(): Promise<void> {
@@ -95,7 +74,7 @@ export class OpenCodeBridge {
   }
 
   async stop(): Promise<void> {
-    this._stopHealthMonitor();
+    this.supervisor.stopHealthMonitor();
     if (this.serverHandle) {
       this.serverHandle.close();
       this.serverHandle = null;
@@ -104,109 +83,22 @@ export class OpenCodeBridge {
     this.client = null;
   }
 
-  private _startHealthMonitor(): void {
-    if (this.healthTimer) return;
-    this.healthTimer = setInterval(() => {
-      this._healthTick().catch((err) => {
-        this.logger.warn({ err }, "Health tick error");
-      });
-    }, this.healthIntervalMs);
-    this.healthTimer.unref?.();
-  }
-
-  private _stopHealthMonitor(): void {
-    if (this.healthTimer) {
-      clearInterval(this.healthTimer);
-      this.healthTimer = null;
-    }
-  }
-
-  private async _healthTick(): Promise<void> {
-    if (this.isRestarting) return;
-    const healthy = await this.checkHealth();
-    if (healthy) {
-      if (this.circuitBreaker.getState() !== "CLOSED") {
-        this.logger.info("OpenCode health restored — closing circuit");
-        this.circuitBreaker.onSuccess();
-        this.restartAttempts = 0;
-        this._drainQueue();
-      }
-    } else {
-      this.logger.warn("OpenCode health check failed — triggering supervisor restart");
-      this.circuitBreaker.onFailure();
-      this._scheduleRestart(0);
-    }
-  }
-
-  private _scheduleRestart(attempt: number): void {
-    if (this.isRestarting) return;
-    if (attempt >= this.maxRestarts) {
-      this.logger.error({ maxRestarts: this.maxRestarts }, "Max restarts exceeded — giving up");
-      this.onMaxRestartsExceeded?.();
-      return;
-    }
-
-    this.isRestarting = true;
-    const backoff = Math.min(
-      this.initialBackoffMs * Math.pow(2, attempt),
-      this.maxBackoffMs,
-    );
-    this.restartAttempts = attempt + 1;
-    this.logger.info({ attempt: attempt + 1, backoffMs: backoff }, "Scheduling OpenCode restart");
-
-    setTimeout(async () => {
-      try {
-        this.logger.info("Restarting OpenCode...");
-        if (this.serverHandle) {
-          try { this.serverHandle.close(); } catch { /* ignore */ }
-          this.serverHandle = null;
-        }
-        this.client = null;
-        await this._doStart();
-        const healthy = await this.checkHealth();
-        if (healthy) {
-          this.logger.info("OpenCode restart succeeded");
-          this.circuitBreaker.onSuccess();
-          this.restartAttempts = 0;
-          this._drainQueue();
-        } else {
-          this.logger.warn("OpenCode restart did not restore health");
-          this._scheduleRestart(attempt + 1);
-        }
-      } catch (err) {
-        this.logger.error({ err }, "OpenCode restart failed");
-        this._scheduleRestart(attempt + 1);
-      } finally {
-        this.isRestarting = false;
-      }
-    }, backoff);
-  }
-
-  private _drainQueue(): void {
-    const pending = this.pendingQueue.splice(0);
-    this.logger.info({ count: pending.length }, "Draining pending message queue");
-    for (const resume of pending) {
-      try { resume(); } catch { /* ignore */ }
-    }
-  }
-
-  /**
-   * Returns the circuit breaker for external inspection (e.g., heartbeat checkers).
-   */
   getCircuitBreaker(): CircuitBreaker {
-    return this.circuitBreaker;
+    return this.supervisor.circuitBreaker;
   }
 
-  /**
-   * Returns true if the bridge is currently accepting requests.
-   */
   isAvailable(): boolean {
-    return this.circuitBreaker.allowRequest();
+    return this.supervisor.circuitBreaker.allowRequest();
   }
 
   private getClient(): OpencodeClient {
     if (!this.client) throw new Error("OpenCode bridge not started");
     return this.client;
+  }
+
+  private getBaseUrl(): string {
+    if (this.serverHandle) return this.serverHandle.url;
+    return `http://${this.config.hostname}:${this.config.port}`;
   }
 
   async createSession(title?: string): Promise<SessionInfo> {
@@ -238,17 +130,10 @@ export class OpenCodeBridge {
     return reasoningParts.map((p) => p.text).join("");
   }
 
-  private getBaseUrl(): string {
-    if (this.serverHandle) return this.serverHandle.url;
-    return `http://${this.config.hostname}:${this.config.port}`;
-  }
-
   /**
    * Send a message and poll for the assistant response.
-   *
    * If the circuit breaker is OPEN, the message is queued (up to maxQueueSize)
-   * and this method awaits recovery before proceeding. Callers should independently
-   * handle the OPEN state for user-visible feedback before calling this.
+   * and this method awaits recovery before proceeding.
    */
   async sendAndWait(
     sessionId: string,
@@ -256,29 +141,18 @@ export class OpenCodeBridge {
     timeoutMs = 120_000,
     pollMs = 2_000,
   ): Promise<string> {
-    // If circuit is OPEN, queue this request and wait for recovery
-    if (!this.circuitBreaker.allowRequest()) {
-      if (this.pendingQueue.length >= this.maxQueueSize) {
-        this.logger.warn("Pending queue full — dropping message");
-        return "";
-      }
-      this.logger.info("Circuit OPEN — queuing message for later delivery");
-      await new Promise<void>((resolve) => {
-        this.pendingQueue.push(resolve);
-      });
-      // Re-check after queue drain; if still not healthy, bail
-      if (!this.circuitBreaker.allowRequest()) return "";
-    }
+    const allowed = await this.supervisor.waitForCircuit();
+    if (!allowed) return "";
 
     this.inFlightCount++;
     try {
       const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs);
-      this.circuitBreaker.onSuccess();
+      this.supervisor.circuitBreaker.onSuccess();
       return result;
     } catch (err) {
       this.logger.error({ err }, "sendAndWait failed — circuit breaker notified");
-      this.circuitBreaker.onFailure();
-      this._scheduleRestart(this.restartAttempts);
+      this.supervisor.circuitBreaker.onFailure();
+      this._scheduleRestart(this.supervisor.restartAttempts);
       throw err;
     } finally {
       this.inFlightCount--;
@@ -322,10 +196,7 @@ export class OpenCodeBridge {
             const txt = m.text ? ` "${m.text.substring(0, 80)}${m.text.length > 80 ? "\u2026" : ""}"` : "";
             return `  ${m.role}${parts}${txt}`;
           });
-          this.logger.info(
-            { newMsgs: newMsgs.length },
-            `\ud83d\udd04 Poll\n${details.join("\n")}`,
-          );
+          this.logger.info({ newMsgs: newMsgs.length }, `\ud83d\udd04 Poll\n${details.join("\n")}`);
         }
 
         const lastMsg = newMsgs[newMsgs.length - 1];
@@ -370,9 +241,7 @@ export class OpenCodeBridge {
     return "";
   }
 
-  async subscribeEvents(
-    onEvent: (event: OpenCodeEvent) => void,
-  ): Promise<void> {
+  async subscribeEvents(onEvent: (event: OpenCodeEvent) => void): Promise<void> {
     const result = await this.getClient().event.subscribe({
       onSseEvent: (streamEvent) => {
         if (streamEvent.data && typeof streamEvent.data === "object") {
@@ -410,7 +279,7 @@ export class OpenCodeBridge {
   }
 
   getPendingQueueSize(): number {
-    return this.pendingQueue.length;
+    return this.supervisor.pendingQueue.length;
   }
 
   /** @deprecated Use getInFlightCount() for heartbeat suppression or getPendingQueueSize() for circuit-breaker queue depth */
@@ -449,13 +318,16 @@ export class OpenCodeBridge {
         text = reasoningParts.map((p) => p.text).join("");
       }
       text = this.stripThinking(text);
-      return {
-        role,
-        text,
-        hasParts: parts.length > 0,
-      };
+      return { role, text, hasParts: parts.length > 0 };
     });
   }
+
+  // Test-accessible supervisor delegations
+  _scheduleRestart(attempt: number): void { this.supervisor.scheduleRestart(attempt); }
+  get isRestarting(): boolean { return this.supervisor.isRestarting; }
+  set isRestarting(v: boolean) { this.supervisor.isRestarting = v; }
+  _drainQueue(): void { this.supervisor.drainQueue(); }
+  get pendingQueue(): Array<() => void> { return this.supervisor.pendingQueue; }
 
   async deleteSession(sessionId: string): Promise<void> {
     await this.getClient().session.delete({

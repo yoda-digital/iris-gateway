@@ -216,7 +216,7 @@ describe("BridgeSupervisor", () => {
     expect(resume).toHaveBeenCalled();
   });
 
-  it("scheduleRestart: restart succeeds but health still failing → logs warning", async () => {
+  it("scheduleRestart: restart succeeds but health still failing → reschedules retry", async () => {
     const checkHealth = vi.fn().mockResolvedValue(false);
     const doStart = vi.fn().mockResolvedValue(undefined);
     const { sup, logger } = makeSupervisor({ checkHealth, doStart, maxRestarts: 3, initialBackoffMs: 50 });
@@ -225,9 +225,13 @@ describe("BridgeSupervisor", () => {
     await Promise.resolve();
     expect(doStart).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/did not restore health/));
+    // source bug fixed: nextAttempt set after finally resets _isRestarting
+    await vi.advanceTimersByTimeAsync(100);
+    await Promise.resolve();
+    expect(doStart).toHaveBeenCalledTimes(2);
   });
 
-  it("scheduleRestart: doStartFn throws → logs error", async () => {
+  it("scheduleRestart: doStartFn throws → logs error and is restartable again", async () => {
     const doStart = vi.fn().mockRejectedValue(new Error("start failed"));
     const checkHealth = vi.fn().mockResolvedValue(true);
     const { sup, logger } = makeSupervisor({ doStart, checkHealth, maxRestarts: 3, initialBackoffMs: 50 });
@@ -238,6 +242,10 @@ describe("BridgeSupervisor", () => {
       expect.objectContaining({ err: expect.any(Error) }),
       expect.stringMatching(/restart failed/)
     );
+    // _isRestarting reset via finally — attempt 1 auto-rescheduled
+    await vi.advanceTimersByTimeAsync(100);
+    await Promise.resolve();
+    expect(doStart).toHaveBeenCalledTimes(2);
   });
 
   // ── drainQueue ──
@@ -257,6 +265,16 @@ describe("BridgeSupervisor", () => {
     const { sup } = makeSupervisor();
     sup.pendingQueue.push(() => { throw new Error("oops"); });
     expect(() => sup.drainQueue()).not.toThrow();
+  });
+
+  it("drainQueue: subsequent callbacks still fire when first throws", () => {
+    const { sup } = makeSupervisor();
+    const cb2 = vi.fn();
+    const cb3 = vi.fn();
+    sup.pendingQueue.push(() => { throw new Error("first fails"); }, cb2, cb3);
+    sup.drainQueue();
+    expect(cb2).toHaveBeenCalled();
+    expect(cb3).toHaveBeenCalled();
   });
 
   it("drainQueue: no-op on empty queue", () => {
@@ -289,6 +307,6 @@ describe("BridgeSupervisor", () => {
     expect(sup.pendingQueue).toHaveLength(1);
     sup.drainQueue();
     // After drain, circuit still open so allowRequest may be false
-    await expect(promise).resolves.toBeDefined();
+    await expect(promise).resolves.toBe(false); // circuit still OPEN after drain
   });
 });

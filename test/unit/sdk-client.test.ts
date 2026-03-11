@@ -44,7 +44,7 @@ describe("IrisClient SDK", () => {
 
   it("vault.extract posts to /vault/extract", async () => {
     mockFetch.mockReturnValue(mockOk({ facts: [{ content: "fact1", type: "insight" }] }));
-    const r = await client.vault.extract({ sessionID: "s1", context: ["ctx1"] });
+    const r = await client.vault.extract({ sessionId: "s1", context: ["ctx1"] });
     expect(r.facts).toHaveLength(1);
   });
 
@@ -73,21 +73,6 @@ describe("IrisClient SDK", () => {
     expect(r.allowed).toBe(true);
   });
 
-  it("governance.getTraces calls GET /traces/:turn_id", async () => {
-    mockFetch.mockReturnValue(mockOk({ turn_id: "t1", steps: [] }));
-    await client.governance.getTraces("t1");
-    expect(mockFetch.mock.calls[0][0]).toContain("/traces/t1");
-    expect(mockFetch.mock.calls[0][1].method).toBe("GET");
-  });
-
-  it("governance.listTraces passes query params", async () => {
-    mockFetch.mockReturnValue(mockOk({ turns: [] }));
-    await client.governance.listTraces({ session: "s1", limit: 10 });
-    const url: string = mockFetch.mock.calls[0][0];
-    expect(url).toContain("session=s1");
-    expect(url).toContain("limit=10");
-  });
-
   it("throws on non-2xx response", async () => {
     mockFetch.mockReturnValue(mockFail(500, "internal error"));
     await expect(client.vault.search({ query: "x" })).rejects.toThrow("500");
@@ -98,5 +83,54 @@ describe("IrisClient SDK", () => {
     mockFetch.mockReturnValue(mockOk({ results: [] }));
     await c.vault.search({ query: "x" });
     expect(mockFetch.mock.calls[0][0]).toBe("http://localhost:19877/vault/search");
+  });
+
+  it("vault.context posts to /vault/context", async () => {
+    mockFetch.mockReturnValue(mockOk({ context: "test context" }));
+    await client.vault.context({ sessionId: "s1", query: "q" });
+    expect(mockFetch.mock.calls[0][0]).toContain("/vault/context");
+  });
+
+  it("vault.storeBatch posts to /vault/store-batch", async () => {
+    mockFetch.mockReturnValue(mockOk({ ok: true, count: 2 }));
+    const r = await client.vault.storeBatch({ entries: [{ sessionId: "s1", content: "fact1" }] });
+    expect(r.count).toBe(2);
+    expect(mockFetch.mock.calls[0][0]).toContain("/vault/store-batch");
+  });
+
+  it("intelligence.systemContext posts to /session/system-context", async () => {
+    mockFetch.mockReturnValue(mockOk({ context: "sys ctx" }));
+    await client.intelligence.systemContext({ sessionId: "s1", senderId: "u1", channelId: "c1" });
+    expect(mockFetch.mock.calls[0][0]).toContain("/session/system-context");
+  });
+
+  it("intelligence.createGoal posts to /goals/create", async () => {
+    mockFetch.mockReturnValue(mockOk({ id: "goal-1", ok: true }));
+    const r = await client.intelligence.createGoal({ sessionId: "s1", channelId: "c1", senderId: "u1", content: "goal" });
+    expect(r.id).toBe("goal-1");
+  });
+
+  it("intelligence.listGoals posts to /goals/list", async () => {
+    mockFetch.mockReturnValue(mockOk({ goals: [] }));
+    await client.intelligence.listGoals({ sessionId: "s1" });
+    expect(mockFetch.mock.calls[0][0]).toContain("/goals/list");
+  });
+
+  it("system.proactiveIntent posts to /proactive/intent", async () => {
+    mockFetch.mockReturnValue(mockOk({ id: "intent-1", ok: true }));
+    const r = await client.system.proactiveIntent({ sessionId: "s1", senderId: "u1", channelId: "c1", chatId: "chat1", what: "remind" });
+    expect(r.id).toBe("intent-1");
+  });
+
+  it("system.heartbeatStatus calls GET /heartbeat/status", async () => {
+    mockFetch.mockReturnValue(mockOk({ status: "ok" }));
+    await client.system.heartbeatStatus();
+    expect(mockFetch.mock.calls[0][0]).toContain("/heartbeat/status");
+  });
+
+  it("governance.getPolicyStatus calls GET /policy/status", async () => {
+    mockFetch.mockReturnValue(mockOk({ rules: [] }));
+    await client.governance.getPolicyStatus();
+    expect(mockFetch.mock.calls[0][0]).toContain("/policy/status");
   });
 });

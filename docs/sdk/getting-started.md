@@ -80,8 +80,6 @@ if (!allowed) throw new Error(`Blocked: ${reason}`);
 |--------|-------------|
 | `checkPolicy({ tool, sessionId?, args? })` | Check if a tool call is allowed |
 | `logAudit({ tool, sessionId?, args?, result?, durationMs? })` | Manual audit log entry |
-| `getTraces(turnId)` | Get all steps for a turn |
-| `listTraces({ session?, limit? })` | List recent turns |
 | `getPolicyStatus()` | Current policy engine state |
 
 ### `iris.intelligence`
@@ -111,7 +109,6 @@ await iris.governance.checkPolicy(..); // step 1
 await iris.channels.sendMessage(...);  // step 2
 
 // Later: retrieve the trace
-const trace = await iris.governance.getTraces("order-processing-job-42");
 // { turn_id, steps: [{ tool, args, result, duration_ms, step_index }] }
 ```
 

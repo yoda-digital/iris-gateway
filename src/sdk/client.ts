@@ -23,7 +23,7 @@ export interface VaultSearchResult { results: Array<{ id: string; content: strin
 export interface VaultStoreParams { sessionId: string; content: string; type?: string; source?: string; }
 export interface VaultStoreResult { id: string; ok: boolean }
 
-export interface VaultExtractParams { sessionID: string; context: string[] }
+export interface VaultExtractParams { sessionId: string; context: string[] }
 export interface VaultExtractResult { facts: Array<{ content: string; type: string }> }
 
 export interface VaultContextParams { sessionId: string; query?: string }
@@ -109,14 +109,6 @@ class GovernanceApi {
   constructor(private c: IrisClient) {}
   checkPolicy(p: PolicyCheckParams): Promise<PolicyCheckResult> { return this.c.post("/policy/check-tool", p); }
   logAudit(p: AuditLogParams): Promise<AuditLogResult> { return this.c.post("/audit/log", p); }
-  getTraces(turnId: string): Promise<{ turn_id: string; steps: unknown[] }> { return this.c.get(`/traces/${turnId}`); }
-  listTraces(params?: { session?: string; limit?: number }): Promise<{ turns: unknown[] }> {
-    const qs = new URLSearchParams();
-    if (params?.session) qs.set("session", params.session);
-    if (params?.limit) qs.set("limit", String(params.limit));
-    const q = qs.toString();
-    return this.c.get(`/traces${q ? "?" + q : ""}`);
-  }
   getPolicyStatus(): Promise<unknown> { return this.c.get("/policy/status"); }
 }
 

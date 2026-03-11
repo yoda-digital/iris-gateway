@@ -186,3 +186,14 @@ export class VaultDB {
     }
   }
 }
+
+/**
+ * Standalone migration helper for unit tests and external tooling.
+ * Also called automatically by VaultDB constructor.
+ */
+export function runAuditLogMigration(db: Database.Database): void {
+  const cols = (db.prepare("PRAGMA table_info(audit_log)").all() as Array<{name:string}>).map(c => c.name);
+  if (cols.length === 0) return; // table doesn't exist yet
+  if (!cols.includes("turn_id")) db.exec("ALTER TABLE audit_log ADD COLUMN turn_id TEXT");
+  if (!cols.includes("step_index")) db.exec("ALTER TABLE audit_log ADD COLUMN step_index INTEGER");
+}

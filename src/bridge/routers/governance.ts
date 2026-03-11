@@ -61,7 +61,7 @@ export function governanceRouter(deps: GovernanceDeps): Hono {
   app.get("/traces", (c) => {
     if (!vaultStore) return c.json({ entries: [] });
     const session = c.req.query("session");
-    const limit = Number(c.req.query("limit") ?? "50");
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "50", 10) || 50, 1), 1000);
     const entries = vaultStore.listAuditLog({ sessionId: session ?? null, limit });
     return c.json({ entries });
   });

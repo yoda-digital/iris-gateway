@@ -90,8 +90,23 @@ export class ToolServer {
 
   // Per-session turn state for auto-instrumentation
   private readonly turnState = new Map<string, { turnId: string; stepIndex: number; lastMs: number }>();
+  private turnStateTimer: ReturnType<typeof setInterval> | null = null;
 
-  private setupMiddleware(logger: Logger, vaultStore?: import("../vault/store.js").VaultStore | null): void {
+  private startTurnStateEviction(): void {
+    if (this.turnStateTimer) return;
+    const TTL_MS = 30_000; // evict entries idle for >30s
+    this.turnStateTimer = setInterval(() => {
+      const cutoff = Date.now() - TTL_MS;
+      for (const [key, val] of this.turnState) {
+        if (val.lastMs < cutoff) this.turnState.delete(key);
+      }
+    }, TTL_MS);
+    this.turnStateTimer.unref?.();
+  }
+
+  private setupMiddleware(logger: Logger, vaultStore?: import("../vault/store.js").VaultStore | null | undefined): void {
+    if (vaultStore) this.startTurnStateEviction();
+
     this.app.use("*", async (c, next) => {
       const start = Date.now();
       const method = c.req.method;
@@ -102,9 +117,11 @@ export class ToolServer {
         return;
       }
 
-      // Skip instrumentation paths (audit/log itself, governance, system)
-      const skipInstrumentation = path.startsWith("/audit/") || path.startsWith("/traces") ||
-        path.startsWith("/governance/") || path.startsWith("/usage/") || path.startsWith("/health");
+      // Skip self-referential and read-only paths
+      const skipInstrumentation = !vaultStore ||
+        path.startsWith("/audit/") || path.startsWith("/traces") ||
+        path.startsWith("/governance/") || path.startsWith("/usage/") ||
+        path.startsWith("/health") || method === "GET";
 
       let parsedBody: Record<string, unknown> | null = null;
       let args: unknown = undefined;
@@ -122,63 +139,61 @@ export class ToolServer {
         } catch { /* GET or unparseable body */ }
       }
 
-      logger.info({ method, path, args }, "⚡ Tool call");
-      await next();
-      const ms = Date.now() - start;
-      const status = c.res.status;
-
-      // Auto-instrumentation: log every tool-server request to audit_log
-      if (vaultStore && !skipInstrumentation) {
-        try {
-          const sessionId = (parsedBody?.["sessionId"] as string | undefined) ??
-            (parsedBody?.["sessionID"] as string | undefined) ?? null;
-          const sid = sessionId ?? "__global__";
-          const now = Date.now();
-          let state = this.turnState.get(sid);
-          // New turn if: no state, or last activity >2s ago
+      // Compute turn state BEFORE await (no race condition)
+      let auditPayload: null | import("../vault/store.js").LogAuditParams = null;
+      if (!skipInstrumentation) {
+        const sessionId = (parsedBody?.["sessionId"] as string | undefined) ??
+          (parsedBody?.["sessionID"] as string | undefined) ?? null;
+        // Skip if no sessionId — avoids "__global__" memory leak
+        if (sessionId) {
+          const now = start;
+          let state = this.turnState.get(sessionId);
           if (!state || (now - state.lastMs) > 2000) {
             state = { turnId: randomUUID(), stepIndex: 0, lastMs: now };
-            this.turnState.set(sid, state);
+            this.turnState.set(sessionId, state);
           } else {
             state.stepIndex += 1;
             state.lastMs = now;
           }
           const { turnId, stepIndex } = state;
-
-          let resultStr: string | null = null;
-          try {
-            const resClone = c.res.clone();
-            const resBody = await resClone.json();
-            const preview = JSON.stringify(resBody);
-            resultStr = preview.length > 1000 ? preview.substring(0, 1000) + "…" : preview;
-          } catch { /* non-JSON response */ }
-
           const toolName = path.replace(/^\//, "").replace(/\//g, ".");
           const argsStr = parsedBody ? JSON.stringify(parsedBody) : null;
-          vaultStore.logAudit({
+          auditPayload = {
             sessionId,
             tool: toolName,
             args: argsStr && argsStr.length > 500 ? argsStr.substring(0, 500) + "…" : argsStr,
-            result: resultStr,
-            durationMs: ms,
+            result: null,
+            durationMs: 0,
             turnId,
             stepIndex,
-          });
-        } catch { /* never block the request */ }
+          };
+        }
       }
 
-      if (!vaultStore || !path.startsWith("/traces")) {
-        try {
-          const resClone = c.res.clone();
-          const resBody = await resClone.json();
-          const preview = JSON.stringify(resBody);
-          const truncated = preview.length > 500 ? preview.substring(0, 500) + "…" : preview;
-          logger.info({ path, status, ms, result: truncated }, "⚡ Tool done");
-        } catch {
-          logger.info({ path, status, ms }, "⚡ Tool done");
-        }
-      } else {
+      logger.info({ method, path, args }, "⚡ Tool call");
+      await next();
+      const ms = Date.now() - start;
+      const status = c.res.status;
+
+      // Capture response once; reuse for both audit and logger
+      let resultStr: string | null = null;
+      try {
+        const resClone = c.res.clone();
+        const resBody = await resClone.json();
+        const preview = JSON.stringify(resBody);
+        resultStr = preview.length > 1000 ? preview.substring(0, 1000) + "…" : preview;
+        logger.info({ path, status, ms, result: resultStr.substring(0, 500) }, "⚡ Tool done");
+      } catch {
         logger.info({ path, status, ms }, "⚡ Tool done");
+      }
+
+      // Auto-instrumentation
+      if (auditPayload) {
+        try {
+          auditPayload.result = resultStr;
+          auditPayload.durationMs = ms;
+          vaultStore!.logAudit(auditPayload);
+        } catch { /* never block */ }
       }
     });
   }

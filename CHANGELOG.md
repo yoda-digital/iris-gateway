@@ -1,3 +1,10 @@
+## [1.10.2](https://github.com/yoda-digital/iris-gateway/compare/v1.10.1...v1.10.2) (2026-03-11)
+
+### Bug Fixes
+
+* **ci:** grant contents:write so Claude Code can push fixes ([e7f7e7f](https://github.com/yoda-digital/iris-gateway/commit/e7f7e7fefbdb76939948d20f1f83a56c7f34ab10))
+* **ci:** grant contents:write so Claude Code can push review fixes ([ee2392b](https://github.com/yoda-digital/iris-gateway/commit/ee2392bab465cc0e2e88b7222b8a21ba43accfde))
+
 ## [1.10.1](https://github.com/yoda-digital/iris-gateway/compare/v1.10.0...v1.10.1) (2026-03-11)
 
 ### Bug Fixes

@@ -1,3 +1,9 @@
+## [1.10.1](https://github.com/yoda-digital/iris-gateway/compare/v1.10.0...v1.10.1) (2026-03-11)
+
+### Bug Fixes
+
+* [#99](https://github.com/yoda-digital/iris-gateway/issues/99) — wire dead metric definitions to hot paths ([#127](https://github.com/yoda-digital/iris-gateway/issues/127)) ([46ab5bc](https://github.com/yoda-digital/iris-gateway/commit/46ab5bc636e0e815fb632090de187f8e0834059d))
+
 ## [1.10.0](https://github.com/yoda-digital/iris-gateway/compare/v1.9.2...v1.10.0) (2026-03-11)
 
 ### Features

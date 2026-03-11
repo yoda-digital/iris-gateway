@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/yoda-digital/iris-gateway/compare/v1.9.2...v1.10.0) (2026-03-11)
+
+### Features
+
+* [#103](https://github.com/yoda-digital/iris-gateway/issues/103) — capability detection at boot, probe binaries and filter manifest ([#125](https://github.com/yoda-digital/iris-gateway/issues/125)) ([4b79312](https://github.com/yoda-digital/iris-gateway/commit/4b79312f4a5afd66633c58078a342ef5fc8fdf6b))
+
 ## [1.9.2](https://github.com/yoda-digital/iris-gateway/compare/v1.9.1...v1.9.2) (2026-03-11)
 
 ### Refactoring

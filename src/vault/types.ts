@@ -34,6 +34,8 @@ export interface AuditEntry {
   readonly args: string | null;
   readonly result: string | null;
   readonly durationMs: number | null;
+  readonly turnId: string | null;
+  readonly stepIndex: number | null;
 }
 
 export interface GovernanceLogEntry {

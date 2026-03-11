@@ -45,8 +45,25 @@ export function governanceRouter(deps: GovernanceDeps): Hono {
       args: typeof body.args === "string" ? body.args : JSON.stringify(body.args ?? null),
       result: typeof body.result === "string" ? body.result : JSON.stringify(body.result ?? null),
       durationMs: body.durationMs ?? null,
+      turnId: body.turnId ?? body.turn_id ?? null,
+      stepIndex: body.stepIndex ?? body.step_index ?? null,
     });
     return c.json({ ok: true });
+  });
+
+  app.get("/traces/:turn_id", (c) => {
+    if (!vaultStore) return c.json({ steps: [] });
+    const turnId = c.req.param("turn_id");
+    const steps = vaultStore.listAuditLog({ turnId });
+    return c.json({ turnId, steps });
+  });
+
+  app.get("/traces", (c) => {
+    if (!vaultStore) return c.json({ entries: [] });
+    const session = c.req.query("session");
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "50", 10) || 50, 1), 1000);
+    const entries = vaultStore.listAuditLog({ sessionId: session ?? null, limit });
+    return c.json({ entries });
   });
 
   app.post("/usage/record", async (c) => {

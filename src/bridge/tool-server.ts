@@ -27,6 +27,7 @@ import { intelligenceRouter } from "./routers/intelligence.js";
 import { systemRouter } from "./routers/system.js";
 import { skillsRouter } from "./routers/skills.js";
 import { cliRouter } from "./routers/cli.js";
+import { randomUUID } from "node:crypto";
 
 export type HeartbeatEngine = { getStatus(): Array<{ agentId: string; component: string; status: string }>; tick(): Promise<void> };
 
@@ -83,11 +84,29 @@ export class ToolServer {
     this.heartbeatRef = { engine: deps.heartbeatEngine ?? null };
 
     this.app = new Hono();
-    this.setupMiddleware(deps.logger);
+    this.setupMiddleware(deps.logger, deps.vaultStore);
     this.mountRouters(deps);
   }
 
-  private setupMiddleware(logger: Logger): void {
+  // Per-session turn state for auto-instrumentation
+  private readonly turnState = new Map<string, { turnId: string; stepIndex: number; lastMs: number }>();
+  private turnStateTimer: ReturnType<typeof setInterval> | null = null;
+
+  private startTurnStateEviction(): void {
+    if (this.turnStateTimer) return;
+    const TTL_MS = 30_000; // evict entries idle for >30s
+    this.turnStateTimer = setInterval(() => {
+      const cutoff = Date.now() - TTL_MS;
+      for (const [key, val] of this.turnState) {
+        if (val.lastMs < cutoff) this.turnState.delete(key);
+      }
+    }, TTL_MS);
+    this.turnStateTimer.unref?.();
+  }
+
+  private setupMiddleware(logger: Logger, vaultStore?: import("../vault/store.js").VaultStore | null | undefined): void {
+    if (vaultStore) this.startTurnStateEviction();
+
     this.app.use("*", async (c, next) => {
       const start = Date.now();
       const method = c.req.method;
@@ -98,11 +117,19 @@ export class ToolServer {
         return;
       }
 
+      // Skip self-referential and read-only paths
+      const skipInstrumentation = !vaultStore ||
+        path.startsWith("/audit/") || path.startsWith("/traces") ||
+        path.startsWith("/governance/") || path.startsWith("/usage/") ||
+        path.startsWith("/health") || method === "GET";
+
+      let parsedBody: Record<string, unknown> | null = null;
       let args: unknown = undefined;
       if (method === "POST") {
         try {
           const cloned = c.req.raw.clone();
           const body = await cloned.json();
+          parsedBody = body as Record<string, unknown>;
           args = Object.fromEntries(
             Object.entries(body as Record<string, unknown>).map(([k, v]) => {
               if (typeof v === "string" && v.length > 200) return [k, v.substring(0, 200) + "…"];
@@ -112,19 +139,61 @@ export class ToolServer {
         } catch { /* GET or unparseable body */ }
       }
 
+      // Compute turn state BEFORE await (no race condition)
+      let auditPayload: null | import("../vault/store.js").LogAuditParams = null;
+      if (!skipInstrumentation) {
+        const sessionId = (parsedBody?.["sessionId"] as string | undefined) ??
+          (parsedBody?.["sessionID"] as string | undefined) ?? null;
+        // Skip if no sessionId — avoids "__global__" memory leak
+        if (sessionId) {
+          const now = start;
+          let state = this.turnState.get(sessionId);
+          if (!state || (now - state.lastMs) > 2000) {
+            state = { turnId: randomUUID(), stepIndex: 0, lastMs: now };
+            this.turnState.set(sessionId, state);
+          } else {
+            state.stepIndex += 1;
+            state.lastMs = now;
+          }
+          const { turnId, stepIndex } = state;
+          const toolName = path.replace(/^\//, "").replace(/\//g, ".");
+          const argsStr = parsedBody ? JSON.stringify(parsedBody) : null;
+          auditPayload = {
+            sessionId,
+            tool: toolName,
+            args: argsStr && argsStr.length > 500 ? argsStr.substring(0, 500) + "…" : argsStr,
+            result: null,
+            durationMs: 0,
+            turnId,
+            stepIndex,
+          };
+        }
+      }
+
       logger.info({ method, path, args }, "⚡ Tool call");
       await next();
       const ms = Date.now() - start;
       const status = c.res.status;
 
+      // Capture response once; reuse for both audit and logger
+      let resultStr: string | null = null;
       try {
         const resClone = c.res.clone();
         const resBody = await resClone.json();
         const preview = JSON.stringify(resBody);
-        const truncated = preview.length > 500 ? preview.substring(0, 500) + "…" : preview;
-        logger.info({ path, status, ms, result: truncated }, "⚡ Tool done");
+        resultStr = preview.length > 1000 ? preview.substring(0, 1000) + "…" : preview;
+        logger.info({ path, status, ms, result: resultStr.substring(0, 500) }, "⚡ Tool done");
       } catch {
         logger.info({ path, status, ms }, "⚡ Tool done");
+      }
+
+      // Auto-instrumentation
+      if (auditPayload) {
+        try {
+          auditPayload.result = resultStr;
+          auditPayload.durationMs = ms;
+          vaultStore!.logAudit(auditPayload);
+        } catch { /* never block */ }
       }
     });
   }

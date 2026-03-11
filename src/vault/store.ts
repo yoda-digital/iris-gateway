@@ -40,6 +40,8 @@ export interface LogAuditParams {
   args?: string | null;
   result?: string | null;
   durationMs?: number | null;
+  turnId?: string | null;
+  stepIndex?: number | null;
 }
 
 export interface LogGovernanceParams {
@@ -176,8 +178,8 @@ export class VaultStore {
   logAudit(params: LogAuditParams): void {
     this.db
       .prepare(
-        `INSERT INTO audit_log (timestamp, session_id, tool, args, result, duration_ms)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO audit_log (timestamp, session_id, tool, args, result, duration_ms, turn_id, step_index)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         Date.now(),
@@ -186,10 +188,24 @@ export class VaultStore {
         params.args ?? null,
         params.result ?? null,
         params.durationMs ?? null,
+        params.turnId ?? null,
+        params.stepIndex ?? null,
       );
   }
 
-  listAuditLog(params: { limit?: number }): AuditEntry[] {
+  listAuditLog(params: { limit?: number; sessionId?: string | null; turnId?: string | null }): AuditEntry[] {
+    if (params.turnId) {
+      const rows = this.db
+        .prepare("SELECT * FROM audit_log WHERE turn_id = ? ORDER BY step_index ASC, timestamp ASC")
+        .all(params.turnId) as Record<string, unknown>[];
+      return rows.map((r) => this.toAudit(r));
+    }
+    if (params.sessionId) {
+      const rows = this.db
+        .prepare("SELECT * FROM audit_log WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?")
+        .all(params.sessionId, params.limit ?? 50) as Record<string, unknown>[];
+      return rows.map((r) => this.toAudit(r));
+    }
     const rows = this.db
       .prepare("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?")
       .all(params.limit ?? 50) as Record<string, unknown>[];
@@ -261,6 +277,8 @@ export class VaultStore {
       args: (row["args"] as string) ?? null,
       result: (row["result"] as string) ?? null,
       durationMs: (row["duration_ms"] as number) ?? null,
+      turnId: (row["turn_id"] as string) ?? null,
+      stepIndex: (row["step_index"] as number) ?? null,
     };
   }
 

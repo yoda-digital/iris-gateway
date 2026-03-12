@@ -32,7 +32,7 @@
     }],
     "@semantic-release/changelog",
     ["@semantic-release/npm", {
-      "npmPublish": false
+      "npmPublish": true
     }],
     ["@semantic-release/git", {
       "assets": ["package.json", "pnpm-lock.yaml", "CHANGELOG.md"],

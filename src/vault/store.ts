@@ -201,15 +201,16 @@ export class VaultStore {
         .all(params.turnId, limit) as Record<string, unknown>[];
       return rows.map((r) => this.toAudit(r));
     }
+    const limit = Math.max(1, Math.min(params.limit ?? 50, 1000));
     if (params.sessionId) {
       const rows = this.db
         .prepare("SELECT * FROM audit_log WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?")
-        .all(params.sessionId, params.limit ?? 50) as Record<string, unknown>[];
+        .all(params.sessionId, limit) as Record<string, unknown>[];
       return rows.map((r) => this.toAudit(r));
     }
     const rows = this.db
       .prepare("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?")
-      .all(params.limit ?? 50) as Record<string, unknown>[];
+      .all(limit) as Record<string, unknown>[];
     return rows.map((r) => this.toAudit(r));
   }
 

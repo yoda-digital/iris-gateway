@@ -56,8 +56,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   tool        TEXT NOT NULL,
   args        TEXT,
   result      TEXT,
-  duration_ms INTEGER
+  duration_ms INTEGER,
+  turn_id     TEXT,
+  step_index  INTEGER
 );
+CREATE INDEX IF NOT EXISTS idx_audit_log_session_id  ON audit_log (session_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_turn_id     ON audit_log (turn_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp   ON audit_log (timestamp DESC);
 
 CREATE TABLE IF NOT EXISTS governance_log (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,

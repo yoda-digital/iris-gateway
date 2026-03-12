@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/yoda-digital/iris-gateway/compare/v1.12.0...v1.12.1) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** pass github_token to Claude Code Review so git push works ([d409312](https://github.com/yoda-digital/iris-gateway/commit/d409312ce82844deda25dc216f718c622445a828))
+* **ci:** pass github_token to Claude Code so git push works from tools ([f150c73](https://github.com/yoda-digital/iris-gateway/commit/f150c7319d4389ad14ff9355aa3d5986066b1a0c))
+
 ## [1.12.0](https://github.com/yoda-digital/iris-gateway/compare/v1.11.4...v1.12.0) (2026-03-12)
 
 ### Features

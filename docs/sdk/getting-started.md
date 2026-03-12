@@ -8,18 +8,24 @@ Iris runs a tool-server on port 19877. The SDK is a typed HTTP client for that A
 
 ## Install
 
-No package yet — copy `src/sdk/client.ts` into your project or import directly if you have access to the gateway repo:
-
-```ts
-import IrisClient from "@iris-gateway/src/sdk/client.js";
+```bash
+npm install @yoda-digital/iris-gateway
+# or
+pnpm add @yoda-digital/iris-gateway
 ```
 
-Or use fetch directly — the SDK is just a thin wrapper.
+Then import the SDK client via the `./sdk` export path:
+
+```ts
+import IrisClient from "@yoda-digital/iris-gateway/sdk";
+```
+
+> **Note:** The SDK export (`/sdk`) is a zero-dependency typed HTTP client. You don't need to pull in the full gateway runtime to use it.
 
 ## Quick Start
 
 ```ts
-import IrisClient from "./sdk/client.js";
+import IrisClient from "@yoda-digital/iris-gateway/sdk";
 
 const iris = new IrisClient({
   baseUrl: "http://localhost:19877",

@@ -207,4 +207,14 @@ describe("Execution Traces — GET /traces/:turn_id limit", () => {
     const limited = store.listAuditLog({ turnId: "turn-max", limit: 2 });
     expect(limited).toHaveLength(2);
   });
+
+  it("listAuditLog turnId branch clamps negative limit — LIMIT -1 must not return all rows", () => {
+    for (let i = 0; i < 5; i++) {
+      store.logAudit({ sessionId: "s1", tool: `t${i}`, turnId: "turn-neg", stepIndex: i });
+    }
+    // limit: -1 would be LIMIT -1 (no limit) in SQLite without the lower bound guard
+    const rows = store.listAuditLog({ turnId: "turn-neg", limit: -1 });
+    // Must be clamped to at least 1, never returning more than 1 row
+    expect(rows.length).toBeLessThanOrEqual(1);
+  });
 });

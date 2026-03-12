@@ -67,5 +67,17 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
-  }
+  },
+  "exports": {
+    "./sdk": {
+      "import": "./dist/sdk/client.js",
+      "types": "./dist/sdk/client.d.ts"
+    }
+  },
+  "files": [
+    "dist/**",
+    "docs/sdk/**",
+    "README.md",
+    "CHANGELOG.md"
+  ]
 }

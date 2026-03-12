@@ -4,7 +4,7 @@
 
 Run a personal AI with memory, goals, and proactive nudges on your own server, at zero model cost, using [OpenRouter's free tier](https://openrouter.ai).
 
-[![Version](https://img.shields.io/badge/version-1.9.2-blue)](https://github.com/yoda-digital/iris-gateway/releases)
+[![Version](https://img.shields.io/badge/version-1.11.0-blue)](https://github.com/yoda-digital/iris-gateway/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Coverage](https://img.shields.io/badge/coverage-%3E75%25-brightgreen)](docs/configuration.md)
@@ -14,9 +14,11 @@ Run a personal AI with memory, goals, and proactive nudges on your own server, a
 - 📱 **All your channels, one brain** — Telegram, WhatsApp, Discord, Slack, WebChat share a single SQLite vault
 - 🎯 **Goal and arc tracking** — remembers what you're working on, sets next-action deadlines, follows up when relevant
 - 🔧 **40+ built-in tools** — calendar, email, contacts, tasks, web search, vault search out of the box
+- 📊 **Execution traces** — turn-grouped audit logs with step indexing for debugging multi-tool workflows
 - 🛡️ **Self-healing health monitor** — linear regression trend detection, predictive threshold breach, health-aware throttling
 - 🔒 **Master policy enforcement** — structural ceiling for tool access, agent modes, and permission grants — config-driven, immutable at runtime
 - 🔌 **Extensible** — write plugins, add CLI tools, create custom skills with trigger-based activation
+- 📦 **SDK client** — typed HTTP client for building external integrations against tool-server API
 
 ---
 
@@ -228,6 +230,31 @@ iris send <ch> <to> <msg> # One-shot message without starting the gateway
 | [CHANGELOG.md](CHANGELOG.md) | Full version history |
 
 ---
+
+---
+
+## SDK
+
+Build external plugins and integrations using the typed HTTP client:
+
+```typescript
+import IrisClient from "@iris-gateway/src/sdk/client.js";
+
+const iris = new IrisClient({ baseUrl: "http://localhost:19877" });
+
+// Search vault
+const { results } = await iris.vault.search({ query: "project goals", limit: 5 });
+
+// Send a message
+await iris.channels.sendMessage({ channel: "telegram", to: "123456", text: "Hello!" });
+
+// Check execution traces
+const trace = await iris.governance.getTraces("turn-abc-123");
+```
+
+Full SDK documentation: [docs/sdk/getting-started.md](docs/sdk/getting-started.md)
+
+Tool-server API reference: [docs/tool-api.md](docs/tool-api.md)
 
 ## License
 

@@ -138,6 +138,51 @@ Store a memory entry.
 
 ---
 
+
+### `POST /vault/extract`
+
+Extract facts from context strings (pure extraction, no storage).
+
+**Request:**
+```json
+{
+  "sessionId": "session-1",
+  "context": ["User prefers dark mode", "Lives in Berlin"]
+}
+```
+
+**Response:**
+```json
+{
+  "facts": [
+    { "content": "User prefers dark mode", "type": "insight" },
+    { "content": "Lives in Berlin", "type": "insight" }
+  ]
+}
+```
+
+### `POST /vault/store-batch`
+
+Store multiple memory entries in a single call.
+
+**Request:**
+```json
+{
+  "entries": [
+    { "sessionId": "session-1", "content": "fact 1", "type": "insight" },
+    { "sessionId": "session-1", "content": "fact 2", "type": "preference" }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "count": 2
+}
+```
+
 ### `DELETE /vault/memory/:id`
 Delete a memory by ID.
 
@@ -194,6 +239,57 @@ Log a tool execution to the audit trail.
 **Request:** `{ "sessionID", "tool", "args", "result", "durationMs" }`
 
 ---
+
+
+### `GET /traces/:turn_id`
+
+Retrieve all audit log entries for a specific turn (grouped multi-step execution).
+
+**Query params:** none
+
+**Response:**
+```json
+{
+  "turnId": "abc-123",
+  "steps": [
+    {
+      "id": 1,
+      "timestamp": 1773257583815,
+      "sessionId": "session-1",
+      "tool": "vault.search",
+      "args": "{"query":"test"}",
+      "result": "{"results":[]}",
+      "durationMs": 45,
+      "turnId": "abc-123",
+      "stepIndex": 0
+    }
+  ]
+}
+```
+
+### `GET /traces`
+
+List recent audit log entries, optionally filtered by session.
+
+**Query params:**
+- `session` (optional): session ID filter
+- `limit` (optional, default 50, max 1000): number of entries to return
+
+**Response:**
+```json
+{
+  "entries": [
+    {
+      "id": 1,
+      "timestamp": 1773257583815,
+      "sessionId": "session-1",
+      "tool": "vault.search",
+      "turnId": "abc-123",
+      "stepIndex": 0
+    }
+  ]
+}
+```
 
 ### `POST /usage/record`
 Record token/cost usage.

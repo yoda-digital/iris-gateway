@@ -1,3 +1,9 @@
+## [1.11.2](https://github.com/yoda-digital/iris-gateway/compare/v1.11.1...v1.11.2) (2026-03-12)
+
+### Refactoring
+
+* **sdk:** simplify IrisClient — Transport interface + concrete return types ([4f2561a](https://github.com/yoda-digital/iris-gateway/commit/4f2561a4f535de8a06d7cb1bba6b33e080dfd99b))
+
 ## [1.11.1](https://github.com/yoda-digital/iris-gateway/compare/v1.11.0...v1.11.1) (2026-03-12)
 
 ### Bug Fixes

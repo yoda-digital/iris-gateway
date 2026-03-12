@@ -1,3 +1,9 @@
+## [1.11.0](https://github.com/yoda-digital/iris-gateway/compare/v1.10.5...v1.11.0) (2026-03-12)
+
+### Features
+
+* **sdk:** external HTTP client for tool-server API — closes [#100](https://github.com/yoda-digital/iris-gateway/issues/100) ([#130](https://github.com/yoda-digital/iris-gateway/issues/130)) ([c38913f](https://github.com/yoda-digital/iris-gateway/commit/c38913f23522a8b9fb3a8a6d916cd1405d5a1955)), closes [#129](https://github.com/yoda-digital/iris-gateway/issues/129) [#129](https://github.com/yoda-digital/iris-gateway/issues/129)
+
 ## [1.10.5](https://github.com/yoda-digital/iris-gateway/compare/v1.10.4...v1.10.5) (2026-03-12)
 
 ### Bug Fixes

@@ -133,4 +133,12 @@ describe("IrisClient SDK", () => {
     await client.governance.getPolicyStatus();
     expect(mockFetch.mock.calls[0][0]).toContain("/policy/status");
   });
+
+  it("governance.logAudit posts to /audit/log", async () => {
+    mockFetch.mockReturnValue(mockOk({ ok: true }));
+    const r = await client.governance.logAudit({ tool: "vault.store", sessionId: "s1", durationMs: 42 });
+    expect(r.ok).toBe(true);
+    expect(mockFetch.mock.calls[0][1].method).toBe("POST");
+    expect(mockFetch.mock.calls[0][0]).toContain("/audit/log");
+  });
 });

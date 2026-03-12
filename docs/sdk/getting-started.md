@@ -62,7 +62,7 @@ if (!allowed) throw new Error(`Blocked: ${reason}`);
 |--------|-------------|
 | `search({ query, limit?, sessionId? })` | Semantic search over vault |
 | `store({ sessionId, content, type?, source? })` | Store a fact/memory |
-| `extract({ sessionID, context[] })` | Extract facts from context strings |
+| `extract({ sessionId, context[] })` | Extract facts from context strings |
 | `context({ sessionId, query? })` | Get assembled context for a session |
 | `storeBatch({ entries[] })` | Store multiple facts at once |
 | `deleteMemory(id)` | Delete a memory entry by ID |
@@ -108,8 +108,7 @@ await iris.vault.store(...);          // step 0
 await iris.governance.checkPolicy(..); // step 1
 await iris.channels.sendMessage(...);  // step 2
 
-// Later: retrieve the trace
-// { turn_id, steps: [{ tool, args, result, duration_ms, step_index }] }
+// Trace retrieval via SDK not yet implemented.
 ```
 
 ## Auth

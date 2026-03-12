@@ -37,7 +37,7 @@ This means: the AI calls tools → plugin makes HTTP POST to `http://127.0.0.1:1
 Platform message
   → Channel adapter normalizes to InboundMessage
   → SecurityGate checks DM policy (open/pairing/allowlist)
-  → Auto-reply engine checks for template matches
+  → Auto-reply engine checks for template matches (src/auto-reply/)
   → SessionMap resolves (channelId, chatId, chatType) → OpenCode session ID
   → OpenCode bridge sends prompt to AI
   → AI processes, calls tools via plugin hooks
@@ -56,26 +56,31 @@ This single file is the bridge between OpenCode and Iris. It contains:
 - **Dynamic plugin tools** — reads `~/.iris/plugin-tools.json` manifest and registers wrappers
 - **Dynamic CLI tools** — reads `~/.iris/cli-tools.json` manifest and registers grouped tools with action enums
 
-### Tool Server (`src/bridge/tool-server.ts`)
+### Tool Server (`src/bridge/tool-server.ts` + `src/bridge/routers/`)
 
-Hono HTTP server (port 19877) that handles all tool execution. This is the largest file in the codebase. Routes are organized by domain:
-- `/tool/*` — channel operations (send-message, send-media, channel-action, user-info)
-- `/vault/*` — memory CRUD, search, context injection, batch storage
-- `/governance/*` — rule evaluation, status
-- `/policy/*` — master policy check, permission check, audit
-- `/skills/*` — CRUD, validation, suggestion matching
-- `/agents/*` — CRUD, validation
-- `/rules/*` — AGENTS.md read/update/append
-- `/tools/*` — custom tools discovery and scaffolding
-- `/canvas/*` — Canvas UI updates
-- `/session/*` — system prompt context building (includes intelligence context via PromptAssembler)
+Hono HTTP server (port 19877) that handles all tool execution. Routes are split into domain routers under `src/bridge/routers/`:
+- `routers/channels.ts` — `/tool/*` channel operations (send-message, send-media, channel-action, user-info)
+- `routers/vault.ts` — `/vault/*` memory CRUD, search, context injection, batch storage
+- `routers/governance.ts` — `/governance/*`, `/policy/*`, `/rules/*`, `/agents/*`, `/skills/*`
+- `routers/intelligence.ts` — `/goals/*`, `/arcs/*`, `/traces`, `/proactive/*`, `/onboarding/*`
+- `routers/cli.ts` — `/cli/:toolName` sandboxed binary calls
+- `routers/system.ts` — `/session/*`, `/heartbeat/*`, `/audit/*`, `/usage/*`, `/canvas/*`, `/tools/*`
+
+Key routes:
+- `/traces` — execution trace debugging (added in v1.12.0)
 - `/goals/*` — goal CRUD (create, update, complete, pause, resume, abandon, list)
 - `/arcs/*` — narrative arc management (list, resolve, add-memory)
-- `/cli/:toolName` — CLI tool execution (sandboxed binary calls)
-- `/onboarding/*` — profile enrichment
-- `/proactive/*` — intent CRUD, quota, dormancy
-- `/heartbeat/*` — health status, trigger
-- `/audit/*`, `/usage/*` — logging and tracking
+- `/session/*` — system prompt context building (includes intelligence context via PromptAssembler)
+
+### Bridge Infrastructure (`src/bridge/`)
+
+Beyond tool-server and session-map, the bridge has several critical components:
+- **`supervisor.ts`** — `BridgeSupervisor`: health monitoring, circuit breaking, and restart logic. Max 5 restarts with exponential backoff (1s → 30s). Queues messages during restart window (max 50).
+- **`circuit-breaker.ts`** — circuit breaker pattern for OpenCode client resilience
+- **`opencode-client.ts`** — the actual HTTP/WS client to the OpenCode process
+- **`message-queue.ts`** — buffers inbound messages during bridge restarts
+- **`stream-coalescer.ts`** — coalesces streaming response chunks
+- **`event-handler.ts`** — bridge event dispatch
 
 ### Enforcement Hierarchy
 
@@ -100,7 +105,7 @@ Adaptive health monitoring (`src/heartbeat/`). Five checkers (bridge, channels, 
 
 ### Intelligence Layer
 
-Seven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pure Node.js + SQLite:
+Eleven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pure Node.js + SQLite:
 
 - **IntelligenceBus** (`bus.ts`) — typed synchronous event emitter connecting all subsystems.
 - **IntelligenceStore** (`store.ts`) — single SQLite store managing 6 tables (derived_signals, inference_log, proactive_outcomes, memory_arcs, arc_entries, goals).
@@ -108,6 +113,7 @@ Seven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pur
 - **TriggerEvaluator** (`triggers/evaluator.ts`) — synchronous regex/signal rules in the message pipeline.
 - **OutcomeAnalyzer** (`outcomes/analyzer.ts`) — category-segmented engagement tracking with timing patterns.
 - **ArcDetector** (`arcs/detector.ts`) — detects narrative threads from keyword overlap.
+- **ArcLifecycle** (`arcs/lifecycle.ts`) — persistent arc state management.
 - **GoalLifecycle** (`goals/lifecycle.ts`) — persistent goal state machine (active/paused/completed/abandoned).
 - **CrossChannelResolver** (`cross-channel/resolver.ts`) — unified presence/preference detection.
 - **TrendDetector** (`health/trend-detector.ts`) — linear regression on heartbeat metrics.
@@ -115,6 +121,32 @@ Seven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pur
 - **PromptAssembler** (`prompt-assembler.ts`) — builds structured prompt sections from all intelligence sources.
 
 Initialized in `lifecycle.ts` after onboarding. Wired into the message pipeline (adapter handler) for inference + trigger evaluation + engagement marking + arc detection.
+
+### Auto-Reply Engine (`src/auto-reply/`)
+
+`TemplateEngine` processes inbound messages against config-defined templates before they reach the AI. Templates support regex/keyword matching, channel/chat-type filtering, cooldowns, once-only firing, and priority ordering. Checked in the message router after security gating.
+
+### Cron Service (`src/cron/`)
+
+`CronService` (using `croner` library) manages scheduled jobs stored in SQLite. Each job creates an OpenCode session, delivers the scheduled prompt, and routes the response to a configured channel. `CronRunLogger` tracks execution history. Jobs are persisted across restarts.
+
+### Instance Coordinator (`src/instance/coordinator.ts`)
+
+`InstanceCoordinator` enables multiple iris-gateway instances to share a single SQLite database safely. Uses a `instance_locks` table with TTL-based leader election (10s TTL, 4s renewal). Only the leader runs singleton operations (cron, intelligence sweep, proactive engine). Each instance gets a unique ID via `IRIS_INSTANCE_ID` env var or auto UUID.
+
+### Media (`src/media/`)
+
+Media handling subsystem: fetch remote media (fetch.ts), MIME type detection (mime.ts), compression (compress.ts), parsing (parse.ts), HTTP media server (server.ts), and local store (store.ts). Used by channel adapters for inbound/outbound media messages.
+
+### SDK (`src/sdk/client.ts`)
+
+`IrisClient` — typed HTTP client for the tool-server API (port 19877). Designed for out-of-process plugins and external integrations. Covers vault search/store/extract, goals, arcs, proactive intents, governance, sessions, and execution traces. Published as a versioned npm package (see `exports` field in `package.json`).
+
+```ts
+import IrisClient from "@yoda-digital/iris-gateway/sdk";
+const iris = new IrisClient({ baseUrl: "http://localhost:19877" });
+const { results } = await iris.vault.search({ query: "project goals", limit: 5 });
+```
 
 ### CLI Tools
 
@@ -156,9 +188,15 @@ Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline
 |------|------|
 | `src/gateway/lifecycle.ts` | Wires everything together — the dependency injection root |
 | `.opencode/plugin/iris.ts` | THE plugin — all tools + hooks in one file |
-| `src/bridge/tool-server.ts` | Largest file — all HTTP tool endpoints |
+| `src/bridge/tool-server.ts` | Tool server entry point — mounts domain routers |
+| `src/bridge/routers/` | Domain routers — each file owns a slice of the tool-server API |
+| `src/bridge/supervisor.ts` | Bridge health, circuit breaking, restart with exponential backoff |
 | `src/bridge/message-router.ts` | Inbound message routing pipeline + first-contact detection |
 | `src/bridge/session-map.ts` | Session identity resolution |
+| `src/sdk/client.ts` | IrisClient — typed HTTP SDK for external/plugin integrations |
+| `src/cron/service.ts` | CronService — scheduled job execution via croner |
+| `src/instance/coordinator.ts` | InstanceCoordinator — multi-instance leader election via SQLite TTL |
+| `src/auto-reply/engine.ts` | TemplateEngine — keyword/pattern auto-replies before AI routing |
 | `src/config/schema.ts` + `types.ts` | Config shape — update both together |
 | `src/cli/executor.ts` | Sandboxed CLI binary runner |
 | `src/cli/registry.ts` | Config-driven tool-to-command mapper |

@@ -198,3 +198,12 @@ See `iris.config.example.json` → `"models"` section for the canonical list of 
 ### Why This Matters
 
 The git log shows 8+ commits that are just `fix(model): switch to X`. These clutter history, make bisects harder, and mix infrastructure concerns with code changes. Config belongs in config files, not in commits.
+
+## Publishing to npm
+
+Releases are automated via `semantic-release`. To enable publishing:
+
+1. Generate an npm access token with **Automation** type at [npmjs.com](https://www.npmjs.com/settings)
+2. Add it as `NPM_TOKEN` in GitHub repo Settings → Secrets and variables → Actions
+
+Once set, every merge to `main` that triggers a release will publish automatically.

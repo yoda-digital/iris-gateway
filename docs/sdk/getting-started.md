@@ -13,9 +13,6 @@ npm install @yoda-digital/iris-gateway
 # or
 pnpm add @yoda-digital/iris-gateway
 ```
-
-> **Note for repo owners:** Publishing to npm requires an `NPM_TOKEN` secret in GitHub repo Settings → Secrets → Actions. Semantic-release publishes automatically on each release once the secret is set.
-
 Then import the SDK client via the `./sdk` export path:
 
 ```ts

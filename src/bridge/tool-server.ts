@@ -260,6 +260,11 @@ export class ToolServer {
   }
 
   async stop(): Promise<void> {
+    if (this.turnStateTimer) {
+      clearInterval(this.turnStateTimer);
+      this.turnStateTimer = null;
+    }
+    this.turnState.clear();
     if (this.server) {
       this.server.close();
       this.server = null;

@@ -1,3 +1,9 @@
+## [1.10.5](https://github.com/yoda-digital/iris-gateway/compare/v1.10.4...v1.10.5) (2026-03-12)
+
+### Bug Fixes
+
+* [#132](https://github.com/yoda-digital/iris-gateway/issues/132) — clear turnStateTimer and turnState in stop() to prevent resource leak ([#136](https://github.com/yoda-digital/iris-gateway/issues/136)) ([5ffa9c8](https://github.com/yoda-digital/iris-gateway/commit/5ffa9c8c128923294cbaf855d39b51c4dd383e90))
+
 ## [1.10.4](https://github.com/yoda-digital/iris-gateway/compare/v1.10.3...v1.10.4) (2026-03-12)
 
 ### Bug Fixes

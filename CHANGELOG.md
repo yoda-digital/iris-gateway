@@ -1,3 +1,9 @@
+## [1.11.4](https://github.com/yoda-digital/iris-gateway/compare/v1.11.3...v1.11.4) (2026-03-12)
+
+### Bug Fixes
+
+* [#139](https://github.com/yoda-digital/iris-gateway/issues/139) — publish IrisClient as versioned npm package via exports field ([#140](https://github.com/yoda-digital/iris-gateway/issues/140)) ([700e31f](https://github.com/yoda-digital/iris-gateway/commit/700e31fc512b2bfff2d5199c6af660af2bdcfd18))
+
 ## [1.11.3](https://github.com/yoda-digital/iris-gateway/compare/v1.11.2...v1.11.3) (2026-03-12)
 
 ### Bug Fixes

@@ -195,9 +195,10 @@ export class VaultStore {
 
   listAuditLog(params: { limit?: number; sessionId?: string | null; turnId?: string | null }): AuditEntry[] {
     if (params.turnId) {
+      const limit = Math.max(1, Math.min(params.limit ?? 200, 1000));
       const rows = this.db
-        .prepare("SELECT * FROM audit_log WHERE turn_id = ? ORDER BY step_index ASC, timestamp ASC")
-        .all(params.turnId) as Record<string, unknown>[];
+        .prepare("SELECT * FROM audit_log WHERE turn_id = ? ORDER BY step_index ASC, timestamp ASC LIMIT ?")
+        .all(params.turnId, limit) as Record<string, unknown>[];
       return rows.map((r) => this.toAudit(r));
     }
     if (params.sessionId) {

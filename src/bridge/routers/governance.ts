@@ -54,7 +54,8 @@ export function governanceRouter(deps: GovernanceDeps): Hono {
   app.get("/traces/:turn_id", (c) => {
     if (!vaultStore) return c.json({ steps: [] });
     const turnId = c.req.param("turn_id");
-    const steps = vaultStore.listAuditLog({ turnId });
+    const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "200", 10) || 200, 1), 1000);
+    const steps = vaultStore.listAuditLog({ turnId, limit });
     return c.json({ turnId, steps });
   });
 

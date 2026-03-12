@@ -1,3 +1,9 @@
+## [1.12.2](https://github.com/yoda-digital/iris-gateway/compare/v1.12.1...v1.12.2) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** intercept needs-changes-loop label — Claude implements fixes, not Codex ([239af28](https://github.com/yoda-digital/iris-gateway/commit/239af2828b8dbe6e13106ac5d69bcce1761c896e))
+
 ## [1.12.1](https://github.com/yoda-digital/iris-gateway/compare/v1.12.0...v1.12.1) (2026-03-12)
 
 ### Bug Fixes

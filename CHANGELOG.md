@@ -1,3 +1,10 @@
+## [1.11.3](https://github.com/yoda-digital/iris-gateway/compare/v1.11.2...v1.11.3) (2026-03-12)
+
+### Bug Fixes
+
+* **ci:** allow anastasia-istrati[bot] to trigger Claude Code Review ([abeaaf2](https://github.com/yoda-digital/iris-gateway/commit/abeaaf2b111bd8c52b7e0ae524f9ce041736fda7))
+* **ci:** allow anastasia-istrati[bot] to trigger Claude reviews ([242f327](https://github.com/yoda-digital/iris-gateway/commit/242f3276ef1a4f5db3499a2b9e0e2fc9ef47cf92))
+
 ## [1.11.2](https://github.com/yoda-digital/iris-gateway/compare/v1.11.1...v1.11.2) (2026-03-12)
 
 ### Refactoring

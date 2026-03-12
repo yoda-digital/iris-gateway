@@ -1,3 +1,9 @@
+## [1.12.0](https://github.com/yoda-digital/iris-gateway/compare/v1.11.4...v1.12.0) (2026-03-12)
+
+### Features
+
+* **sdk:** expose /traces endpoints in IrisClient — closes [#137](https://github.com/yoda-digital/iris-gateway/issues/137) ([#143](https://github.com/yoda-digital/iris-gateway/issues/143)) ([6afecbc](https://github.com/yoda-digital/iris-gateway/commit/6afecbce23be73fdcc10cdc89890f526136a7049))
+
 ## [1.11.4](https://github.com/yoda-digital/iris-gateway/compare/v1.11.3...v1.11.4) (2026-03-12)
 
 ### Bug Fixes

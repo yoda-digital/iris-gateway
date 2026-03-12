@@ -602,7 +602,7 @@ describe("ToolServer stop/restart lifecycle", () => {
   it("clears turnStateTimer on stop()", async () => {
     // Access private field via casting to verify cleanup
     const s = server as any;
-    // Timer should be set after start
+    // Timer is initialized in the constructor via setupMiddleware() → startTurnStateEviction()
     expect(s.turnStateTimer).not.toBeNull();
     await server.stop();
     expect(s.turnStateTimer).toBeNull();

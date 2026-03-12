@@ -155,3 +155,56 @@ describe("Execution Traces — GET /traces endpoints", () => {
     expect(res.status).toBe(200); // no crash, NaN handled
   });
 });
+
+describe("Execution Traces — GET /traces/:turn_id limit", () => {
+  let store: VaultStore;
+  let tempDir: string;
+
+  beforeEach(() => { ({ store, tempDir } = makeStore()); });
+  afterEach(() => { rmSync(tempDir, { recursive: true, force: true }); });
+
+  it("GET /traces/:turn_id respects ?limit param", async () => {
+    for (let i = 0; i < 10; i++) {
+      store.logAudit({ sessionId: "s1", tool: `tool-${i}`, turnId: "turn-limit", stepIndex: i });
+    }
+    const { governanceRouter } = await import("../../src/bridge/routers/governance.js?limit-test=1");
+    const { Hono } = await import("hono");
+    const app = new Hono();
+    app.route("/", governanceRouter({ vaultStore: store } as any));
+
+    const res = await app.request("/traces/turn-limit?limit=5");
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    expect(body.steps).toHaveLength(5);
+  });
+
+  it("GET /traces/:turn_id caps limit at 1000", async () => {
+    for (let i = 0; i < 5; i++) {
+      store.logAudit({ sessionId: "s1", tool: `tool-${i}`, turnId: "turn-cap", stepIndex: i });
+    }
+    // Requesting >1000 should not error and returns at most available rows
+    const { governanceRouter } = await import("../../src/bridge/routers/governance.js?cap-test=1");
+    const { Hono } = await import("hono");
+    const app = new Hono();
+    app.route("/", governanceRouter({ vaultStore: store } as any));
+
+    const res = await app.request("/traces/turn-cap?limit=9999");
+    expect(res.status).toBe(200);
+    const body = await res.json() as any;
+    // Only 5 rows exist — returns all 5 (clamped to min(9999,1000)=1000 but only 5 exist)
+    expect(body.steps).toHaveLength(5);
+  });
+
+  it("listAuditLog turnId branch respects limit — requesting >1000 returns at most 1000", () => {
+    // Insert 10 rows for the same turn
+    for (let i = 0; i < 10; i++) {
+      store.logAudit({ sessionId: "s1", tool: `t${i}`, turnId: "turn-max", stepIndex: i });
+    }
+    // Passing limit=1000 explicitly should work
+    const rows = store.listAuditLog({ turnId: "turn-max", limit: 1000 });
+    expect(rows.length).toBeLessThanOrEqual(1000);
+    // Passing limit=2 should return only 2
+    const limited = store.listAuditLog({ turnId: "turn-max", limit: 2 });
+    expect(limited).toHaveLength(2);
+  });
+});

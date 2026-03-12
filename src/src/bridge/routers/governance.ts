@@ -45,26 +45,8 @@ export function governanceRouter(deps: GovernanceDeps): Hono {
       args: typeof body.args === "string" ? body.args : JSON.stringify(body.args ?? null),
       result: typeof body.result === "string" ? body.result : JSON.stringify(body.result ?? null),
       durationMs: body.durationMs ?? null,
-      turnId: body.turnId ?? body.turn_id ?? null,
-      stepIndex: body.stepIndex ?? body.step_index ?? null,
     });
     return c.json({ ok: true });
-  });
-
-  app.get("/traces/:turn_id", (c) => {
-    if (!vaultStore) return c.json({ steps: [] });
-    const turnId = c.req.param("turn_id");
-    const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "200", 10) || 200, 1), 1000);
-    const steps = vaultStore.listAuditLog({ turnId, limit });
-    return c.json({ turnId, steps });
-  });
-
-  app.get("/traces", (c) => {
-    if (!vaultStore) return c.json({ entries: [] });
-    const session = c.req.query("session");
-    const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "50", 10) || 50, 1), 1000);
-    const entries = vaultStore.listAuditLog({ sessionId: session ?? null, limit });
-    return c.json({ entries });
   });
 
   app.post("/usage/record", async (c) => {
@@ -122,6 +104,38 @@ export function governanceRouter(deps: GovernanceDeps): Hono {
     const compliant = results.every((r) => r.compliant);
     return c.json({ enabled: true, compliant, results });
   });
+
+  // ── Execution Traces ──
+
+  app.get("/traces/:turn_id", (c) => {
+    if (!vaultStore) return c.json({ error: "vault not configured" }, 503);
+    const turnId = c.req.param("turn_id");
+    const rows = vaultStore.listAuditLog({ limit: 200 });
+    const steps = rows
+      .filter((r: any) => r.turn_id === turnId)
+      .sort((a: any, b: any) => (a.step_index ?? 0) - (b.step_index ?? 0));
+    return c.json({ turn_id: turnId, steps });
+  });
+
+  app.get("/traces", (c) => {
+    if (!vaultStore) return c.json({ error: "vault not configured" }, 503);
+    const session = c.req.query("session");
+    const limit = Math.min(Number(c.req.query("limit") ?? "20"), 100);
+    const rows = vaultStore.listAuditLog({ limit: 500 });
+    const filtered = session ? rows.filter((r: any) => r.session_id === session) : rows;
+    // Group by turn_id
+    const turns = new Map<string, any[]>();
+    for (const row of filtered.slice(0, limit * 10)) {
+      const key = (row as any).turn_id ?? `no-turn-${row.id}`;
+      if (!turns.has(key)) turns.set(key, []);
+      turns.get(key)!.push(row);
+    }
+    const result = Array.from(turns.entries())
+      .slice(0, limit)
+      .map(([turn_id, steps]) => ({ turn_id, steps: steps.length, first: steps[steps.length - 1]?.timestamp }));
+    return c.json({ turns: result });
+  });
+
 
   return app;
 }

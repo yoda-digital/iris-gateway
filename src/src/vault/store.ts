@@ -193,20 +193,7 @@ export class VaultStore {
       );
   }
 
-  listAuditLog(params: { limit?: number; sessionId?: string | null; turnId?: string | null }): AuditEntry[] {
-    if (params.turnId) {
-      const limit = Math.min(params.limit ?? 200, 1000);
-      const rows = this.db
-        .prepare("SELECT * FROM audit_log WHERE turn_id = ? ORDER BY step_index ASC, timestamp ASC LIMIT ?")
-        .all(params.turnId, limit) as Record<string, unknown>[];
-      return rows.map((r) => this.toAudit(r));
-    }
-    if (params.sessionId) {
-      const rows = this.db
-        .prepare("SELECT * FROM audit_log WHERE session_id = ? ORDER BY timestamp DESC LIMIT ?")
-        .all(params.sessionId, params.limit ?? 50) as Record<string, unknown>[];
-      return rows.map((r) => this.toAudit(r));
-    }
+  listAuditLog(params: { limit?: number }): AuditEntry[] {
     const rows = this.db
       .prepare("SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?")
       .all(params.limit ?? 50) as Record<string, unknown>[];
@@ -278,8 +265,6 @@ export class VaultStore {
       args: (row["args"] as string) ?? null,
       result: (row["result"] as string) ?? null,
       durationMs: (row["duration_ms"] as number) ?? null,
-      turnId: (row["turn_id"] as string) ?? null,
-      stepIndex: (row["step_index"] as number) ?? null,
     };
   }
 

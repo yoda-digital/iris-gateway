@@ -13,7 +13,6 @@ npm install @yoda-digital/iris-gateway
 # or
 pnpm add @yoda-digital/iris-gateway
 ```
-
 Then import the SDK client via the `./sdk` export path:
 
 ```ts

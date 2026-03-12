@@ -21,7 +21,8 @@
     "start": "node --env-file=.env dist/index.js gateway run",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

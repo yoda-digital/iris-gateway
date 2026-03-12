@@ -572,3 +572,60 @@ describe("ToolServer auto-instrumentation middleware", () => {
     expect(indices).toEqual([0, 1]);
   });
 });
+
+describe("ToolServer stop/restart lifecycle", () => {
+  let tmpDir: string;
+  let db: VaultDB;
+  let vaultStore: VaultStore;
+  let logger: ReturnType<typeof mockLogger>;
+  let server: ToolServer;
+  let port: number;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    tmpDir = mkdtempSync(join(tmpdir(), "iris-lifecycle-"));
+    db = new VaultDB(tmpDir);
+    vaultStore = new VaultStore(db);
+    logger = mockLogger();
+    port = 47800 + Math.floor(Math.random() * 30);
+    server = new ToolServer({ registry: mockRegistry(mockAdapter()), logger, port, vaultStore });
+    await server.start();
+  });
+
+  afterEach(async () => {
+    if (server) await server.stop();
+    db.close();
+    rmSync(tmpDir, { recursive: true, force: true });
+    vi.useRealTimers();
+  });
+
+  it("clears turnStateTimer on stop()", async () => {
+    // Access private field via casting to verify cleanup
+    const s = server as any;
+    // Timer is initialized in the constructor via setupMiddleware() → startTurnStateEviction()
+    expect(s.turnStateTimer).not.toBeNull();
+    await server.stop();
+    expect(s.turnStateTimer).toBeNull();
+  });
+
+  it("clears turnState map on stop()", async () => {
+    const s = server as any;
+    // Manually insert a fake entry into turnState
+    s.turnState.set("sess-lifecycle", { turnId: "t1", stepIndex: 0, lastMs: Date.now() });
+    expect(s.turnState.size).toBe(1);
+    await server.stop();
+    expect(s.turnState.size).toBe(0);
+  });
+
+  it("turnState guard resets after stop() — new eviction can be started", async () => {
+    const s = server as any;
+    await server.stop();
+    expect(s.turnStateTimer).toBeNull();
+    // Guard is reset: calling startTurnStateEviction again should work
+    s.startTurnStateEviction();
+    expect(s.turnStateTimer).not.toBeNull();
+    // Clean up
+    clearInterval(s.turnStateTimer);
+    s.turnStateTimer = null;
+  });
+});

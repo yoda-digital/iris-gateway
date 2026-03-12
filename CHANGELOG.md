@@ -1,3 +1,9 @@
+## [1.11.1](https://github.com/yoda-digital/iris-gateway/compare/v1.11.0...v1.11.1) (2026-03-12)
+
+### Bug Fixes
+
+* **vault:** close [#135](https://github.com/yoda-digital/iris-gateway/issues/135) + close [#131](https://github.com/yoda-digital/iris-gateway/issues/131) — limit clamp + audit_log indexes ([a0ae26b](https://github.com/yoda-digital/iris-gateway/commit/a0ae26b1211af69087da84cae0a6b66b4aa49a98))
+
 ## [1.11.0](https://github.com/yoda-digital/iris-gateway/compare/v1.10.5...v1.11.0) (2026-03-12)
 
 ### Features

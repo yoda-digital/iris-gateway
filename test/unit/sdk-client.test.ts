@@ -141,4 +141,28 @@ describe("IrisClient SDK", () => {
     expect(mockFetch.mock.calls[0][1].method).toBe("POST");
     expect(mockFetch.mock.calls[0][0]).toContain("/audit/log");
   });
+
+  it("governance.getTrace calls GET /traces/:turnId", async () => {
+    mockFetch.mockReturnValue(mockOk({ turnId: "t1", steps: [] }));
+    const r = await client.governance.getTrace("t1");
+    expect(r.turnId).toBe("t1");
+    expect(mockFetch.mock.calls[0][0]).toContain("/traces/t1");
+    expect(mockFetch.mock.calls[0][1].method).toBe("GET");
+  });
+
+  it("governance.listTraces calls GET /traces with query params", async () => {
+    mockFetch.mockReturnValue(mockOk({ entries: [] }));
+    await client.governance.listTraces({ session: "s1", limit: 10 });
+    const url: string = mockFetch.mock.calls[0][0];
+    expect(url).toContain("/traces");
+    expect(url).toContain("session=s1");
+    expect(url).toContain("limit=10");
+  });
+
+  it("governance.listTraces works with no params", async () => {
+    mockFetch.mockReturnValue(mockOk({ entries: [] }));
+    await client.governance.listTraces();
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/traces$/);
+  });
+
 });

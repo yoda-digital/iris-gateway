@@ -42,6 +42,9 @@ export interface PolicyCheckResult  { allowed: boolean; reason?: string; modifie
 export interface AuditLogParams     { tool: string; sessionId?: string; args?: unknown; result?: unknown; durationMs?: number; turnId?: string }
 export interface AuditLogResult     { ok: boolean }
 
+export interface AuditStep          { id: number; timestamp: number; sessionId: string | null; tool: string; args: string | null; result: string | null; durationMs: number | null; turnId: string | null; stepIndex: number | null }
+export interface TraceResult        { turnId: string; steps: AuditStep[] }
+export interface TracesListResult   { entries: AuditStep[] }
 export interface PolicyStatus       { rules: unknown[]; enabled: boolean }
 export interface HeartbeatStatus    { status: string; lastRun?: number }
 
@@ -87,6 +90,14 @@ class GovernanceApi {
 
   checkPolicy(p: PolicyCheckParams): Promise<PolicyCheckResult> { return this.t.post("/policy/check-tool", p); }
   logAudit(p: AuditLogParams):       Promise<AuditLogResult>    { return this.t.post("/audit/log",         p); }
+  getTrace(turnId: string):          Promise<TraceResult>       { return this.t.get(`/traces/${turnId}`);    }
+  listTraces(p?: { session?: string; limit?: number }): Promise<TracesListResult> {
+    const qs = new URLSearchParams();
+    if (p?.session) qs.set("session", p.session);
+    if (p?.limit)   qs.set("limit",   String(p.limit));
+    const q = qs.toString();
+    return this.t.get(`/traces${q ? "?" + q : ""}`);
+  }
   getPolicyStatus():                 Promise<PolicyStatus>      { return this.t.get("/policy/status");        }
 }
 

@@ -1,3 +1,9 @@
+## [1.10.4](https://github.com/yoda-digital/iris-gateway/compare/v1.10.3...v1.10.4) (2026-03-12)
+
+### Bug Fixes
+
+* [#133](https://github.com/yoda-digital/iris-gateway/issues/133) — add row limit to GET /traces/:turn_id (default 200, max 1000) ([#134](https://github.com/yoda-digital/iris-gateway/issues/134)) ([385514f](https://github.com/yoda-digital/iris-gateway/commit/385514f637c5700d331fe0824f614c4eb170edcb))
+
 ## [1.10.3](https://github.com/yoda-digital/iris-gateway/compare/v1.10.2...v1.10.3) (2026-03-11)
 
 ### Bug Fixes

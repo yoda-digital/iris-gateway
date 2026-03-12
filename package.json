@@ -69,10 +69,6 @@
     "vitest": "^3.0.0"
   },
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
     "./sdk": {
       "import": "./dist/sdk/client.js",
       "types": "./dist/sdk/client.d.ts"

@@ -20,7 +20,7 @@ Then import the SDK client via the `./sdk` export path:
 import IrisClient from "@yoda-digital/iris-gateway/sdk";
 ```
 
-> **Note:** The SDK export (`/sdk`) is a zero-dependency typed HTTP client. You don't need to pull in the full gateway runtime to use it.
+> **Note:** The `/sdk` module itself has no internal imports — it only uses the built-in `fetch` API. However, installing `@yoda-digital/iris-gateway` via npm includes the full gateway dependency tree (discord.js, grammy, better-sqlite3, etc.). Use this SDK in environments where the gateway is already present, or copy `src/sdk/client.ts` directly into your project for a truly minimal footprint.
 
 ## Quick Start
 

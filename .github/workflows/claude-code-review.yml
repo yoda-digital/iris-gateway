@@ -42,7 +42,7 @@ jobs:
             **Verdict: NOT MERGEABLE** followed by reasons
 
       - name: Apply verdict label
-        if: always()
+        if: steps.claude-review.conclusion == 'success'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,12 +51,11 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Fetch the most recent review comment from anastasia-istrati[bot]
-            const { data: comments } = await github.rest.issues.listComments({
-              owner, repo, issue_number: prNumber,
-              per_page: 100
+            // Fetch ALL review comments from anastasia-istrati[bot] (paginated)
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: prNumber
             });
-            const botComments = comments.filter(c => c.user.login === 'anastasia-istrati[bot]');
+            const botComments = allComments.filter(c => c.user.login === 'anastasia-istrati[bot]');
             if (!botComments.length) {
               core.info('No bot review comment found, skipping label apply.');
               return;
@@ -106,11 +105,17 @@ jobs:
             await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: [labelInfo.name] });
             core.info(`Applied label: ${labelInfo.name}`);
 
-            // For NOT MERGEABLE, add a comment notifying PR author
+            // For NOT MERGEABLE, add a comment notifying PR author (dedup: skip if already posted)
             if (verdict === 'NOT MERGEABLE') {
-              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-              await github.rest.issues.createComment({
-                owner, repo, issue_number: prNumber,
-                body: `@${pr.user.login} — This PR has been marked **NOT MERGEABLE** by the automated Claude review. Please address the blockers in the review comment before requesting a re-review.`
-              });
+              const alreadyNotified = allComments.some(c =>
+                c.user.login === 'anastasia-istrati[bot]' &&
+                c.body.includes('has been marked **NOT MERGEABLE**')
+              );
+              if (!alreadyNotified) {
+                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: prNumber,
+                  body: `@${pr.user.login} — This PR has been marked **NOT MERGEABLE** by the automated Claude review. Please address the blockers in the review comment before requesting a re-review.`
+                });
+              }
             }

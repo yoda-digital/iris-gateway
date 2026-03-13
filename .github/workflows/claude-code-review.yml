@@ -108,8 +108,7 @@ jobs:
             // For NOT MERGEABLE, add a comment notifying PR author (dedup: skip if already posted)
             if (verdict === 'NOT MERGEABLE') {
               const alreadyNotified = allComments.some(c =>
-                c.user.login === 'anastasia-istrati[bot]' &&
-                c.body.includes('has been marked **NOT MERGEABLE**')
+                c.body && c.body.includes('has been marked **NOT MERGEABLE**')
               );
               if (!alreadyNotified) {
                 const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });

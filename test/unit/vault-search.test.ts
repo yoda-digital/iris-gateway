@@ -71,4 +71,38 @@ describe("VaultSearch", () => {
     const results = search.search("quantum physics black holes");
     expect(results).toHaveLength(0);
   });
+
+  it("searches FTS with channelId filter", () => {
+    store.addMemory({
+      sessionId: "s3",
+      senderId: "u3",
+      channelId: "telegram",
+      type: "fact",
+      content: "TypeScript is strongly typed",
+      source: "user_stated",
+    });
+    const results = search.search("TypeScript", { channelId: "telegram" });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.every((r) => r.channelId === "telegram")).toBe(true);
+  });
+
+  it("searches FTS with type filter on non-empty query", () => {
+    const results = search.search("TypeScript", { type: "fact" });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.every((r) => r.type === "fact")).toBe(true);
+  });
+
+  it("filteredList filters by channelId", () => {
+    store.addMemory({
+      sessionId: "s4",
+      senderId: "u4",
+      channelId: "discord",
+      type: "fact",
+      content: "Discord user prefers voice chat",
+      source: "user_stated",
+    });
+    const results = search.search("", { channelId: "discord" });
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results.every((r) => r.channelId === "discord")).toBe(true);
+  });
 });

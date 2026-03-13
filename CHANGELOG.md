@@ -1,3 +1,9 @@
+## [1.12.5](https://github.com/yoda-digital/iris-gateway/compare/v1.12.4...v1.12.5) (2026-03-13)
+
+### Bug Fixes
+
+* **opencode:** align .opencode/ with strict config validation ([4c4df95](https://github.com/yoda-digital/iris-gateway/commit/4c4df95da00d2ec3c3623590f8c492e146c787d4))
+
 ## [1.12.4](https://github.com/yoda-digital/iris-gateway/compare/v1.12.3...v1.12.4) (2026-03-13)
 
 ### Bug Fixes

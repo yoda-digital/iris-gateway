@@ -545,6 +545,59 @@ describe("ToolServer auto-instrumentation middleware", () => {
     expect(entries[1].stepIndex).toBe(0);
   });
 
+  it("honors custom turnIdleWindowMs boundaries", async () => {
+    // Spin up a separate ToolServer with a 500ms idle window
+    const customPort = port + 500;
+    const customDir = mkdtempSync(join(tmpdir(), "iris-custom-window-"));
+    const customDb = new VaultDB(customDir);
+    const customVaultStore = new VaultStore(customDb);
+    const customServer = new ToolServer({
+      registry: mockRegistry(mockAdapter()),
+      logger: mockLogger(),
+      port: customPort,
+      vaultStore: customVaultStore,
+      turnIdleWindowMs: 500,
+    });
+    await customServer.start();
+
+    const customBase = `http://127.0.0.1:${customPort}`;
+    const headers = { "Content-Type": "application/json" };
+    const body = JSON.stringify({ content: "test", type: "fact", senderId: "u1", sessionId: "sess-custom" });
+
+    let mockedNow = 2_000_000;
+    const spy = vi.spyOn(Date, "now").mockImplementation(() => mockedNow);
+
+    try {
+      // First request
+      await fetch(`${customBase}/vault/store`, { method: "POST", headers, body });
+
+      // Within 500ms → same turn
+      mockedNow += 400;
+      await fetch(`${customBase}/vault/store`, { method: "POST", headers, body });
+
+      // Beyond 500ms → new turn
+      mockedNow += 600;
+      await fetch(`${customBase}/vault/store`, { method: "POST", headers, body });
+
+      const entries = customVaultStore.listAuditLog({ sessionId: "sess-custom", limit: 10 });
+      expect(entries).toHaveLength(3);
+
+      // listAuditLog returns timestamp DESC: entries[0]=req#3, entries[1]=req#2, entries[2]=req#1
+      // req#1 and req#2 are within 500ms window → same turn
+      // req#3 is 600ms after req#2 → new turn
+      expect(entries[1].turnId).toBe(entries[2].turnId);       // req#2 shares turn with req#1
+      expect(entries[0].turnId).not.toBe(entries[1].turnId);   // req#3 is a new turn
+      expect(entries[2].stepIndex).toBe(0);  // req#1: first step
+      expect(entries[1].stepIndex).toBe(1);  // req#2: second step in same turn
+      expect(entries[0].stepIndex).toBe(0);  // req#3: new turn resets index
+    } finally {
+      spy.mockRestore();
+      await customServer.stop();
+      customDb.close();
+      rmSync(customDir, { recursive: true, force: true });
+    }
+  });
+
   it("does not write an audit entry when sessionId is absent", async () => {
     const body = JSON.stringify({ content: "test", type: "fact", senderId: "u1" }); // no sessionId
     await fetch(`${base}/vault/store`, {

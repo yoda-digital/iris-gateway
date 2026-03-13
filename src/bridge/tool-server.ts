@@ -54,6 +54,8 @@ export interface ToolServerDeps {
   arcDetector?: ArcDetector | null;
   outcomeAnalyzer?: OutcomeAnalyzer | null;
   promptAssembler?: PromptAssembler | null;
+  /** Idle window (ms) before a new turn ID is assigned. Default: 2000 */
+  turnIdleWindowMs?: number;
 }
 
 export class ToolServer {
@@ -63,6 +65,7 @@ export class ToolServer {
   private readonly port: number;
   // Mutable ref so setHeartbeatEngine updates the systemRouter closure
   private readonly heartbeatRef: { engine: HeartbeatEngine | null };
+  private readonly turnIdleWindowMs: number;
 
   constructor(deps: ToolServerDeps);
   constructor(registry: ChannelRegistry, logger: Logger, port?: number);
@@ -84,6 +87,7 @@ export class ToolServer {
     this.heartbeatRef = { engine: deps.heartbeatEngine ?? null };
 
     this.app = new Hono();
+    this.turnIdleWindowMs = deps.turnIdleWindowMs ?? 2000;
     this.setupMiddleware(deps.logger, deps.vaultStore);
     this.mountRouters(deps);
   }
@@ -148,7 +152,7 @@ export class ToolServer {
         if (sessionId) {
           const now = start;
           let state = this.turnState.get(sessionId);
-          if (!state || (now - state.lastMs) > 2000) {
+          if (!state || (now - state.lastMs) > this.turnIdleWindowMs) {
             state = { turnId: randomUUID(), stepIndex: 0, lastMs: now };
             this.turnState.set(sessionId, state);
           } else {

@@ -130,10 +130,6 @@
     "external_directory": "deny"
   },
   "share": "disabled",
-  "server": {
-    "port": 4096,
-    "hostname": "127.0.0.1"
-  },
   "mcp": {
     "sequential-thinking": {
       "type": "local",

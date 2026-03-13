@@ -20,14 +20,6 @@ It is **not** a general-purpose bot framework. It is not a library. It is not a 
 
 Every file has one job. Not one job plus a few helpers.
 
-Current violations being tracked:
-- `src/bridge/tool-server.ts` — 1550 lines, 40+ endpoints across unrelated domains. See issue #2.
-- `.opencode/plugin/iris.ts` — 1082 lines, everything in one file. See issue #3.
-- `src/gateway/lifecycle.ts` — 723 lines, DI root + initialization + shutdown + validation. See issue #5.
-- `src/intelligence/store.ts` — 558 lines, 6 unrelated table domains. See issue #6.
-
-These are not features. They are debt. They will be split.
-
 **Hard limit: 500 lines per file. No exceptions. No "but it's complicated".**
 
 If you're approaching 500 lines, you haven't decomposed the problem. Stop. Think. Split.
@@ -63,13 +55,11 @@ The test suite exists for a reason. Failing tests are not "known issues" — the
 - Coverage floor: 70%. Don't let it drop.
 - New features ship with tests. No exceptions.
 
-Current violations: 6 known failures in `test/integration/pipeline.test.ts` and `test/integration/message-router.test.ts`. See issue #1. These are P0. Fix them first.
-
 ### 5. Domain Ownership
 
 Each subsystem owns its data. The fact that everything shares a SQLite file does not mean everything shares a store class.
 
-Current `src/intelligence/store.ts` manages 6 tables across 6 domains. This will be split into:
+`src/intelligence/store.ts` has been split into domain-scoped stores:
 - `src/intelligence/inference/store.ts` — derived_signals, inference_log
 - `src/intelligence/outcomes/store.ts` — proactive_outcomes
 - `src/intelligence/arcs/store.ts` — memory_arcs, arc_entries
@@ -111,14 +101,13 @@ No circular dependencies. No importing from a higher layer. If you need somethin
 
 ## Milestone Roadmap
 
-### v1.1 — Stability & Test Integrity (due 2026-04-30)
-The test suite is green. The god files are split. Debt is tracked.
+### v1.1 — Stability & Test Integrity ✅ (completed v1.8.x–v1.12.x)
+The test suite is green (1259/1259 passing, 82% coverage). All tracked violations resolved.
 
-Blockers to release:
-- Fix 6 pre-existing test failures (issue #1) — P0, ships first
-- Split tool-server.ts into domain routers (issue #2) — P0
-- Decompose iris.ts plugin (issue #3) — P1
-- Model selection in config only (issue #4) — P1
+- ✅ Fixed 6 pre-existing test failures (issue #1)
+- ✅ Split tool-server.ts into domain routers (issue #2)
+- ✅ Decomposed iris.ts plugin (issue #3)
+- ✅ Model selection in config only (issue #4)
 
 ### v1.2 — Architecture Hardening (due 2026-06-30)
 Clean layers. Documented APIs. Resilient connections.

@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
   step_index  INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_session_id  ON audit_log (session_id);
-CREATE INDEX IF NOT EXISTS idx_audit_log_turn_id     ON audit_log (turn_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp   ON audit_log (timestamp DESC);
 
 CREATE TABLE IF NOT EXISTS governance_log (
@@ -175,6 +174,11 @@ export class VaultDB {
         this.db.exec("ALTER TABLE audit_log ADD COLUMN step_index INTEGER");
       }
     }
+    // Create turn_id index here (not in SCHEMA_SQL) so it runs after the column
+    // is guaranteed to exist — both for new installs and migrated databases.
+    this.db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_audit_log_turn_id ON audit_log (turn_id)",
+    );
   }
 
   raw(): Database.Database {

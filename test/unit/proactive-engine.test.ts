@@ -259,4 +259,133 @@ describe("PulseEngine", () => {
 
     expect(router.sendResponse).not.toHaveBeenCalled();
   });
+
+  describe("isQuietHours via executeTrigger", () => {
+    it("skips trigger during quiet hours (wrap-around: start > end)", async () => {
+      const wrapConfig = {
+        ...DEFAULT_CONFIG,
+        quietHours: { start: 22, end: 6 },
+      };
+
+      const wrapEngine = new PulseEngine({
+        store: intentStore,
+        bridge: bridge as any,
+        router: router as any,
+        sessionMap: sessionMap as any,
+        vaultStore,
+        registry: registry as any,
+        logger: mockLogger(),
+        config: wrapConfig,
+      });
+
+      // Freeze time to 23:00 (inside wrap-around quiet hours)
+      const frozenDate = new Date();
+      frozenDate.setHours(23, 0, 0, 0);
+      vi.setSystemTime(frozenDate);
+
+      intentStore.addTrigger({
+        type: "dormant_user",
+        channelId: "telegram",
+        chatId: "chat1",
+        senderId: "user1",
+        context: "User inactive",
+        executeAt: Date.now() - 1000,
+      });
+
+      await wrapEngine.tick();
+
+      expect(bridge.sendAndWait).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("skips trigger during quiet hours when using valid IANA timezone", async () => {
+      // Store profile with a timezone where the frozen time is within quiet hours
+      vaultStore.upsertProfile({
+        senderId: "user2",
+        channelId: "telegram",
+        timezone: "UTC",
+      });
+
+      const tzConfig = {
+        ...DEFAULT_CONFIG,
+        quietHours: { start: 22, end: 8 },
+      };
+
+      const tzEngine = new PulseEngine({
+        store: intentStore,
+        bridge: bridge as any,
+        router: router as any,
+        sessionMap: sessionMap as any,
+        vaultStore,
+        registry: registry as any,
+        logger: mockLogger(),
+        config: tzConfig,
+      });
+
+      // Freeze time to 23:00 UTC (quiet hours)
+      const frozenDate = new Date();
+      frozenDate.setUTCHours(23, 0, 0, 0);
+      vi.setSystemTime(frozenDate);
+
+      intentStore.addTrigger({
+        type: "dormant_user",
+        channelId: "telegram",
+        chatId: "chat1",
+        senderId: "user2",
+        context: "User inactive",
+        executeAt: Date.now() - 1000,
+      });
+
+      await tzEngine.tick();
+
+      expect(bridge.sendAndWait).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("falls back to system hour when invalid timezone is stored", async () => {
+      vaultStore.upsertProfile({
+        senderId: "user3",
+        channelId: "telegram",
+        timezone: "Invalid/Timezone",
+      });
+
+      const activeConfig = {
+        ...DEFAULT_CONFIG,
+        // Use a range that won't overlap with test execution hours (run at noon-ish)
+        quietHours: { start: 3, end: 4 },
+      };
+
+      const fbEngine = new PulseEngine({
+        store: intentStore,
+        bridge: bridge as any,
+        router: router as any,
+        sessionMap: sessionMap as any,
+        vaultStore,
+        registry: registry as any,
+        logger: mockLogger(),
+        config: activeConfig,
+      });
+
+      // Set time to noon — outside quiet hours 03-04, so trigger should proceed
+      const noon = new Date();
+      noon.setHours(12, 0, 0, 0);
+      vi.setSystemTime(noon);
+
+      intentStore.addTrigger({
+        type: "dormant_user",
+        channelId: "telegram",
+        chatId: "chat1",
+        senderId: "user3",
+        context: "User inactive",
+        executeAt: Date.now() - 1000,
+      });
+
+      await fbEngine.tick();
+
+      // With fallback to system hour (12), should NOT be in quiet hours (3-4)
+      // so bridge.sendAndWait should have been called (trigger executes)
+      expect(bridge.sendAndWait).toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
 });

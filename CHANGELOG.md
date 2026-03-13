@@ -1,3 +1,9 @@
+## [1.12.6](https://github.com/yoda-digital/iris-gateway/compare/v1.12.5...v1.12.6) (2026-03-13)
+
+### Bug Fixes
+
+* [#145](https://github.com/yoda-digital/iris-gateway/issues/145) — auto-apply verdict labels after Claude code review ([#146](https://github.com/yoda-digital/iris-gateway/issues/146)) ([835dcc4](https://github.com/yoda-digital/iris-gateway/commit/835dcc497e61850d2b1f5f35cc5887035bac2487))
+
 ## [1.12.5](https://github.com/yoda-digital/iris-gateway/compare/v1.12.4...v1.12.5) (2026-03-13)
 
 ### Bug Fixes

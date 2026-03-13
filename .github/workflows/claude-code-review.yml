@@ -40,3 +40,81 @@ jobs:
             **Verdict: MERGEABLE**
             **Verdict: NEEDS CHANGES** followed by numbered list
             **Verdict: NOT MERGEABLE** followed by reasons
+
+      - name: Apply verdict label
+        if: steps.claude-review.conclusion == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Fetch ALL review comments from anastasia-istrati[bot] (paginated)
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: prNumber
+            });
+            const botComments = allComments.filter(c => c.user.login === 'anastasia-istrati[bot]');
+            if (!botComments.length) {
+              core.info('No bot review comment found, skipping label apply.');
+              return;
+            }
+            const latestComment = botComments[botComments.length - 1];
+            const body = latestComment.body || '';
+
+            // Parse verdict from the final bold verdict line
+            let verdict = null;
+            if (/\*\*Verdict:\s*NEEDS CHANGES\*\*/i.test(body)) verdict = 'NEEDS CHANGES';
+            else if (/\*\*Verdict:\s*NOT MERGEABLE\*\*/i.test(body)) verdict = 'NOT MERGEABLE';
+            else if (/\*\*Verdict:\s*MERGEABLE\*\*/i.test(body)) verdict = 'MERGEABLE';
+
+            if (!verdict) {
+              core.info('No verdict found in latest review comment.');
+              return;
+            }
+            core.info(`Verdict detected: ${verdict}`);
+
+            // Ensure labels exist, create if missing
+            const labelMap = {
+              'NEEDS CHANGES': { name: 'needs-changes-loop', color: 'e4e669', description: 'Needs changes before merge' },
+              'NOT MERGEABLE': { name: 'blocked', color: 'd73a4a', description: 'Blocked from merging' },
+              'MERGEABLE': { name: 'mergeable', color: '0e8a16', description: 'Approved and ready to merge' }
+            };
+            const labelInfo = labelMap[verdict];
+
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: labelInfo.name });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({ owner, repo, name: labelInfo.name, color: labelInfo.color, description: labelInfo.description });
+                core.info(`Created label: ${labelInfo.name}`);
+              }
+            }
+
+            // Remove conflicting labels
+            const conflictingLabels = ['needs-changes-loop', 'blocked', 'mergeable'].filter(l => l !== labelInfo.name);
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: prNumber });
+            for (const lbl of currentLabels) {
+              if (conflictingLabels.includes(lbl.name)) {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: lbl.name });
+              }
+            }
+
+            // Apply the verdict label
+            await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: [labelInfo.name] });
+            core.info(`Applied label: ${labelInfo.name}`);
+
+            // For NOT MERGEABLE, add a comment notifying PR author (dedup: skip if already posted)
+            if (verdict === 'NOT MERGEABLE') {
+              const alreadyNotified = allComments.some(c =>
+                c.body && c.body.includes('has been marked **NOT MERGEABLE**')
+              );
+              if (!alreadyNotified) {
+                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: prNumber,
+                  body: `@${pr.user.login} — This PR has been marked **NOT MERGEABLE** by the automated Claude review. Please address the blockers in the review comment before requesting a re-review.`
+                });
+              }
+            }

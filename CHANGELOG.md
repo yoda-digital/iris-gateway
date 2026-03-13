@@ -1,3 +1,9 @@
+## [1.12.7](https://github.com/yoda-digital/iris-gateway/compare/v1.12.6...v1.12.7) (2026-03-13)
+
+### Bug Fixes
+
+* [#151](https://github.com/yoda-digital/iris-gateway/issues/151) — add unit tests for engine.ts isQuietHours and vault/search.ts error paths ([#152](https://github.com/yoda-digital/iris-gateway/issues/152)) ([e113917](https://github.com/yoda-digital/iris-gateway/commit/e1139170dc689b5360f8e20595793f4f8ed277fa))
+
 ## [1.12.6](https://github.com/yoda-digital/iris-gateway/compare/v1.12.5...v1.12.6) (2026-03-13)
 
 ### Bug Fixes

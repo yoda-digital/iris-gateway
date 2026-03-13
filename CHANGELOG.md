@@ -1,3 +1,9 @@
+## [1.12.4](https://github.com/yoda-digital/iris-gateway/compare/v1.12.3...v1.12.4) (2026-03-13)
+
+### Bug Fixes
+
+* **vault:** move turn_id index creation after column migration — closes [#148](https://github.com/yoda-digital/iris-gateway/issues/148) ([a94883a](https://github.com/yoda-digital/iris-gateway/commit/a94883a7623327e01babe58586685be49bb15b9d))
+
 ## [1.12.3](https://github.com/yoda-digital/iris-gateway/compare/v1.12.2...v1.12.3) (2026-03-13)
 
 ### Refactoring

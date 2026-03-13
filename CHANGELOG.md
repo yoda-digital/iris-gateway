@@ -1,3 +1,9 @@
+## [1.12.3](https://github.com/yoda-digital/iris-gateway/compare/v1.12.2...v1.12.3) (2026-03-13)
+
+### Refactoring
+
+* **tool-server:** make turn-grouping idle window configurable — closes [#138](https://github.com/yoda-digital/iris-gateway/issues/138) ([#144](https://github.com/yoda-digital/iris-gateway/issues/144)) ([281d726](https://github.com/yoda-digital/iris-gateway/commit/281d726aac2ec7d94c297a410178e935906a30da))
+
 ## [1.12.2](https://github.com/yoda-digital/iris-gateway/compare/v1.12.1...v1.12.2) (2026-03-12)
 
 ### Bug Fixes

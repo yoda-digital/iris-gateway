@@ -1,3 +1,9 @@
+## [1.12.8](https://github.com/yoda-digital/iris-gateway/compare/v1.12.7...v1.12.8) (2026-03-14)
+
+### Bug Fixes
+
+* **ci:** replace deprecated direct_prompt with prompt in claude.yml ([a82dcae](https://github.com/yoda-digital/iris-gateway/commit/a82dcaef766acec7e78d37fb05bb1d5213e538fc))
+
 ## [1.12.7](https://github.com/yoda-digital/iris-gateway/compare/v1.12.6...v1.12.7) (2026-03-13)
 
 ### Bug Fixes

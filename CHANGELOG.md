@@ -1,3 +1,9 @@
+## [1.12.10](https://github.com/yoda-digital/iris-gateway/compare/v1.12.9...v1.12.10) (2026-03-14)
+
+### Bug Fixes
+
+* **ci:** copy repo .claude/settings.json to runner home before Claude runs ([7ef0e18](https://github.com/yoda-digital/iris-gateway/commit/7ef0e180c9e15dc4fa355330c966042db5a1d5e0))
+
 ## [1.12.9](https://github.com/yoda-digital/iris-gateway/compare/v1.12.8...v1.12.9) (2026-03-14)
 
 ### Bug Fixes

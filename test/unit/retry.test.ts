@@ -57,4 +57,18 @@ describe("retry", () => {
     );
     expect(attempts).toEqual([0, 1, 2]);
   });
+
+  it("aborts during inter-retry sleep", async () => {
+    const controller = new AbortController();
+    const retryPromise = retry(
+      async () => {
+        throw new Error("fail");
+      },
+      { maxAttempts: 5, baseDelayMs: 500, signal: controller.signal },
+    );
+    // Let the first attempt run and enter the sleep phase
+    await new Promise<void>((r) => setTimeout(r, 20));
+    controller.abort(new Error("cancelled mid-sleep"));
+    await expect(retryPromise).rejects.toThrow("cancelled mid-sleep");
+  });
 });

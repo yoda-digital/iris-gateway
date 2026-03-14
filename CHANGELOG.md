@@ -1,3 +1,9 @@
+## [1.12.9](https://github.com/yoda-digital/iris-gateway/compare/v1.12.8...v1.12.9) (2026-03-14)
+
+### Bug Fixes
+
+* **ci:** add allowedTools + bypassPermissions to needs-changes-loop trigger ([dce21c4](https://github.com/yoda-digital/iris-gateway/commit/dce21c4033f6d741c8e52a8e2a1c24da52f57105))
+
 ## [1.12.8](https://github.com/yoda-digital/iris-gateway/compare/v1.12.7...v1.12.8) (2026-03-14)
 
 ### Bug Fixes

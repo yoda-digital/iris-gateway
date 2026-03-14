@@ -57,5 +57,6 @@ jobs:
           allowed_bots: "anastasia-istrati[bot]"
           additional_permissions: |
             actions: read
+          show_full_output: true
           prompt: |
             ${{ github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop' && format('A "needs-changes-loop" label was added to PR #{0}. Read the latest Claude review comment on this PR, implement ALL requested fixes directly using bash/edit tools, commit with a descriptive message, and push to the branch. Use git push origin HEAD. After pushing, post a summary comment of what was fixed.', github.event.pull_request.number) || '' }}

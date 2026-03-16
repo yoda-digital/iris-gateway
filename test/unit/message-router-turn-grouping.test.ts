@@ -152,7 +152,7 @@ describe("MessageRouter — idle window flush and error recovery edge paths", ()
       await router.handleInbound(makeInboundMessage({ channelId: "mock", text: "hello" }));
 
       // Flush any pending timers/microtasks from the outbound queue
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(500);
 
       const sends = adapter.calls.filter(c => c.method === "sendText");
       expect(sends.length).toBe(0);

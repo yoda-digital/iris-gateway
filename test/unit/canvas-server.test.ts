@@ -132,7 +132,6 @@ describe("CanvasServer", () => {
       await expect(server.stop()).resolves.toBeUndefined();
       // logger.info("Canvas server stopped") must NOT be called when nothing is running
       expect(mockLogger.info).not.toHaveBeenCalledWith(
-        expect.objectContaining({}),
         "Canvas server stopped",
       );
     });

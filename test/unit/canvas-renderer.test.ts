@@ -67,6 +67,5 @@ describe("renderCanvasHTML", () => {
     const wsUrl = 'ws://localhost/ws?token=abc"123';
     const html = renderCanvasHTML("test", wsUrl);
     expect(html).toContain(JSON.stringify(wsUrl));
-    expect(html).toContain('\\"');
   });
 });

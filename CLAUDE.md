@@ -231,3 +231,27 @@ Iris uses **ONLY free OpenRouter models**. No exceptions.
 - ❌ `openai/gpt-4o` — NEVER. Requires paid API key.
 
 When updating model references, default presets, or wizard options: **always use free OpenRouter models only**.
+
+## CI Security — Claude Code Permissions
+
+The `.claude/settings.json` file restricts what Claude Code can do in CI to prevent prompt injection attacks.
+
+### Allowed Operations
+- **Bash:** scoped to specific tools (`git`, `pnpm`, `npm`, `npx`, `tsc`, `vitest`, `node`, standard Unix utils like `cat`, `ls`, `grep`, `sed`, etc.)
+- **Edit/Read/Glob/Grep/MultiEdit:** unrestricted (read-only risk is minimal)
+- **Write:** restricted to `/home/runner/work/**` (repo workspace) and `/tmp/iris-*`
+
+### Denied Operations
+- **Network:** `curl`, `wget`, `ssh`, `scp`, `nc`, `netcat` — prevents secret exfiltration
+- **Shell injection vectors:** `bash -c *`, `sh -c *`, `eval *`, `exec *`
+- **Sensitive reads:** `~/.ssh/`, `~/.aws/`, `/etc/shadow`, `env`/`printenv` output piping
+- **Sensitive writes:** `~/.ssh/`, `~/.aws/`, `/etc/`, `/usr/`
+
+### Label Protection
+The `needs-changes-loop` label triggers Claude Code CI. To reduce abuse surface:
+- Only maintainers should apply this label (enforced via `.github/CODEOWNERS` + branch protection)
+- Configure via: Repository Settings → Branches → Add ruleset → Restrict who can push/apply labels
+
+### Threat Model
+A contributor with label access + a malicious PR body could trigger arbitrary bash execution via `Bash(*)`. The scoped allowlist reduces the blast radius to only safe development operations.
+

@@ -80,5 +80,8 @@
     "docs/sdk/**",
     "README.md",
     "CHANGELOG.md"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,3 +1,9 @@
+## [1.13.1](https://github.com/yoda-digital/iris-gateway/compare/v1.13.0...v1.13.1) (2026-03-17)
+
+### Bug Fixes
+
+* **docs:** trigger npm publish after token rotation ([445ac8e](https://github.com/yoda-digital/iris-gateway/commit/445ac8e414ff48534cfbf8fd90d2bcdb1878cd7c))
+
 ## [1.13.0](https://github.com/yoda-digital/iris-gateway/compare/v1.12.14...v1.13.0) (2026-03-17)
 
 ### Features

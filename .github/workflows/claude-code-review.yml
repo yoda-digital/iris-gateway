@@ -63,7 +63,10 @@ jobs:
               owner, repo, issue_number: prNumber
             });
             const botComments = allComments.filter(c => 
-              c.user.login === 'github-actions[bot]' || c.user.login === 'anastasia-istrati[bot]'
+              (c.user.login === 'github-actions[bot]' || c.user.login === 'anastasia-istrati[bot]') &&
+              !c.body.startsWith('@claude') &&
+              !c.body.includes('Review checklist:') &&
+              !c.body.includes('canonical branch HEAD')
             );
             if (!botComments.length) {
               core.info('No bot review comment found, skipping label apply.');

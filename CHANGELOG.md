@@ -1,3 +1,9 @@
+## [1.13.2](https://github.com/yoda-digital/iris-gateway/compare/v1.13.1...v1.13.2) (2026-03-17)
+
+### Bug Fixes
+
+* **release:** retrigger publish with automation npm token ([38d595a](https://github.com/yoda-digital/iris-gateway/commit/38d595a72492a61fd71e6a5b77c83f47e86ecaf2))
+
 ## [1.13.1](https://github.com/yoda-digital/iris-gateway/compare/v1.13.0...v1.13.1) (2026-03-17)
 
 ### Bug Fixes

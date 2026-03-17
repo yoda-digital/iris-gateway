@@ -1,3 +1,9 @@
+## [1.12.14](https://github.com/yoda-digital/iris-gateway/compare/v1.12.13...v1.12.14) (2026-03-17)
+
+### Bug Fixes
+
+* exclude review request comments from verdict parsing ([e0086cd](https://github.com/yoda-digital/iris-gateway/commit/e0086cd1849193b88963edae49d3cff74f96ebd0))
+
 ## [1.12.13](https://github.com/yoda-digital/iris-gateway/compare/v1.12.12...v1.12.13) (2026-03-17)
 
 ### Bug Fixes

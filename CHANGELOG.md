@@ -1,3 +1,9 @@
+## [1.12.12](https://github.com/yoda-digital/iris-gateway/compare/v1.12.11...v1.12.12) (2026-03-17)
+
+### Bug Fixes
+
+* [#160](https://github.com/yoda-digital/iris-gateway/issues/160) — add unit tests for src/canvas/ module ([c6521d1](https://github.com/yoda-digital/iris-gateway/commit/c6521d1d3bcd8a7a50fe059fb7970b0069907329))
+
 ## [1.12.11](https://github.com/yoda-digital/iris-gateway/compare/v1.12.10...v1.12.11) (2026-03-17)
 
 ### Bug Fixes

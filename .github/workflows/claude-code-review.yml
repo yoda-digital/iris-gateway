@@ -28,6 +28,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_bots: "anastasia-istrati[bot]"
           prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Review this PR thoroughly. Check:
             1. Correctness — logic errors, edge cases, race conditions
             2. Test coverage — are new behaviors tested? are tests meaningful?
@@ -41,60 +44,9 @@ jobs:
             **Verdict: NEEDS CHANGES** followed by numbered list
             **Verdict: NOT MERGEABLE** followed by reasons
 
-      - name: Post review comment
-        if: steps.claude-review.conclusion == 'success'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const prNumber = context.payload.pull_request.number;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            // Read Claude Code execution output
-            const executionFile = '${{ steps.claude-review.outputs.execution_file }}';
-            if (!executionFile || !fs.existsSync(executionFile)) {
-              core.warning('No execution file found, skipping review comment post.');
-              return;
-            }
-
-            const executionData = JSON.parse(fs.readFileSync(executionFile, 'utf8'));
-            
-            // Extract final response from Claude (last assistant message)
-            const messages = executionData.messages || [];
-            const lastAssistantMsg = messages.reverse().find(m => m.role === 'assistant');
-            
-            if (!lastAssistantMsg || !lastAssistantMsg.content) {
-              core.warning('No assistant response found in execution output.');
-              return;
-            }
-
-            // Extract text content (handle both string and array formats)
-            let reviewBody = '';
-            if (typeof lastAssistantMsg.content === 'string') {
-              reviewBody = lastAssistantMsg.content;
-            } else if (Array.isArray(lastAssistantMsg.content)) {
-              reviewBody = lastAssistantMsg.content
-                .filter(block => block.type === 'text')
-                .map(block => block.text)
-                .join('\n\n');
-            }
-
-            if (!reviewBody.trim()) {
-              core.warning('Review body is empty.');
-              return;
-            }
-
-            // Post the review as a comment
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: prNumber,
-              body: reviewBody
-            });
-
-            core.info('Review comment posted successfully.');
+            Post your review using `gh pr comment` to add a top-level comment with your verdict and findings.
+          claude_args: |
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep"
 
       - name: Apply verdict label
         if: steps.claude-review.conclusion == 'success'

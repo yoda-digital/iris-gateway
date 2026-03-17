@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/yoda-digital/iris-gateway/compare/v1.12.14...v1.13.0) (2026-03-17)
+
+### Features
+
+* **npm:** publish @yoda-digital/iris-gateway to npm registry ([59a8b6b](https://github.com/yoda-digital/iris-gateway/commit/59a8b6b342bea8b4b32ed01f589dd0b6f348ba34))
+
 ## [1.12.14](https://github.com/yoda-digital/iris-gateway/compare/v1.12.13...v1.12.14) (2026-03-17)
 
 ### Bug Fixes

@@ -58,11 +58,13 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Fetch ALL review comments from anastasia-istrati[bot] (paginated)
+            // Fetch ALL review comments from github-actions[bot] or anastasia-istrati[bot] (paginated)
             const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: prNumber
             });
-            const botComments = allComments.filter(c => c.user.login === 'anastasia-istrati[bot]');
+            const botComments = allComments.filter(c => 
+              c.user.login === 'github-actions[bot]' || c.user.login === 'anastasia-istrati[bot]'
+            );
             if (!botComments.length) {
               core.info('No bot review comment found, skipping label apply.');
               return;

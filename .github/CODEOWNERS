@@ -1,0 +1,11 @@
+# CODEOWNERS — controls who must review changes to sensitive files
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: all files require maintainer review
+* @nalyk
+
+# CI/CD and security-sensitive files require explicit maintainer approval
+.github/workflows/ @nalyk
+.github/CODEOWNERS @nalyk
+.claude/settings.json @nalyk
+CLAUDE.md @nalyk

@@ -59,8 +59,7 @@ describe("renderCanvasHTML", () => {
   it("properly escapes sessionId special characters", () => {
     const sessionId = 'test"session';
     const html = renderCanvasHTML(sessionId, "ws://localhost/ws");
-    // JSON.stringify should escape the quotes
-    expect(html).toContain('\\"');
+    // JSON.stringify should escape the quotes — verify the full escaped value appears in output
     expect(html).toContain(JSON.stringify(sessionId));
   });
 

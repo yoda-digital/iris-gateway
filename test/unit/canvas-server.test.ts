@@ -126,13 +126,32 @@ describe("CanvasServer", () => {
     });
   });
 
-  describe("start and stop", () => {
-    it("has start method", () => {
-      expect(typeof server.start).toBe("function");
+  describe("stop", () => {
+    it("is a no-op when server has not been started", async () => {
+      // server is freshly constructed in beforeEach — stop() should resolve cleanly
+      await expect(server.stop()).resolves.toBeUndefined();
+      // logger.info("Canvas server stopped") must NOT be called when nothing is running
+      expect(mockLogger.info).not.toHaveBeenCalledWith(
+        expect.objectContaining({}),
+        "Canvas server stopped",
+      );
     });
 
-    it("has stop method", () => {
-      expect(typeof server.stop).toBe("function");
+    it("logs and nullifies server on stop after start", async () => {
+      // Inject a fake server object to simulate a running state without binding a real port
+      const fakeClose = vi.fn();
+      (server as unknown as { server: { close: () => void } | null }).server = {
+        close: fakeClose,
+      };
+
+      await server.stop();
+
+      expect(fakeClose).toHaveBeenCalledOnce();
+      expect(mockLogger.info).toHaveBeenCalledWith("Canvas server stopped");
+      // Internal server ref must be null after stop
+      expect(
+        (server as unknown as { server: unknown }).server,
+      ).toBeNull();
     });
   });
 });

@@ -4,7 +4,7 @@
 
 Run a personal AI with memory, goals, and proactive nudges on your own server, at zero model cost, using [OpenRouter's free tier](https://openrouter.ai).
 
-[![Version](https://img.shields.io/badge/version-1.11.0-blue)](https://github.com/yoda-digital/iris-gateway/releases)
+[![npm](https://img.shields.io/npm/v/@yoda-digital/iris-gateway)](https://www.npmjs.com/package/@yoda-digital/iris-gateway)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Coverage](https://img.shields.io/badge/coverage-%3E75%25-brightgreen)](docs/configuration.md)
@@ -19,12 +19,24 @@ Run a personal AI with memory, goals, and proactive nudges on your own server, a
 - 🔒 **Master policy enforcement** — structural ceiling for tool access, agent modes, and permission grants — config-driven, immutable at runtime
 - 🔌 **Extensible** — write plugins, add CLI tools, create custom skills with trigger-based activation
 - 📦 **SDK client** — typed HTTP client for building external integrations against tool-server API
+- 🔀 **Multi-instance support** — run multiple nodes against the same SQLite database with automatic leader election
 
 ---
 
 ## Quick Start
 
-Get Iris talking on Telegram in under 10 minutes:
+### Install from npm (recommended)
+
+```bash
+npm install -g @yoda-digital/iris-gateway
+# or
+pnpm add -g @yoda-digital/iris-gateway
+
+iris init        # interactive setup wizard
+iris gateway run # start the gateway
+```
+
+### Clone and run from source
 
 ```bash
 # 1. Clone and install
@@ -227,9 +239,9 @@ iris send <ch> <to> <msg> # One-shot message without starting the gateway
 | [docs/deployment.md](docs/deployment.md) | Docker, systemd, nginx reverse proxy, Prometheus metrics |
 | [docs/deployment/multi-instance.md](docs/deployment/multi-instance.md) | Multi-instance leader election, WAL mode, instance identity |
 | [docs/iris-model-reference.md](docs/iris-model-reference.md) | Model capabilities matrix, fallback chains, speed profiles |
+| [docs/sdk/getting-started.md](docs/sdk/getting-started.md) | SDK client — build external plugins in under 30 minutes |
+| [docs/tool-api.md](docs/tool-api.md) | Tool-server API reference — every endpoint with request/response types |
 | [CHANGELOG.md](CHANGELOG.md) | Full version history |
-
----
 
 ---
 
@@ -237,8 +249,14 @@ iris send <ch> <to> <msg> # One-shot message without starting the gateway
 
 Build external plugins and integrations using the typed HTTP client:
 
+```bash
+npm install @yoda-digital/iris-gateway
+# or
+pnpm add @yoda-digital/iris-gateway
+```
+
 ```typescript
-import IrisClient from "@iris-gateway/src/sdk/client.js";
+import IrisClient from "@yoda-digital/iris-gateway/sdk";
 
 const iris = new IrisClient({ baseUrl: "http://localhost:19877" });
 
@@ -255,6 +273,8 @@ const trace = await iris.governance.getTraces("turn-abc-123");
 Full SDK documentation: [docs/sdk/getting-started.md](docs/sdk/getting-started.md)
 
 Tool-server API reference: [docs/tool-api.md](docs/tool-api.md)
+
+---
 
 ## License
 

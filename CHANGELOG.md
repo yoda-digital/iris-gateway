@@ -1,3 +1,9 @@
+## [1.13.3](https://github.com/yoda-digital/iris-gateway/compare/v1.13.2...v1.13.3) (2026-03-17)
+
+### Bug Fixes
+
+* **npm:** rename scope from [@yoda-digital](https://github.com/yoda-digital) to [@yoda](https://github.com/yoda).digital ([afe9fd8](https://github.com/yoda-digital/iris-gateway/commit/afe9fd882c7c14ed8c2ecc2206eea91afcc31772))
+
 ## [1.13.2](https://github.com/yoda-digital/iris-gateway/compare/v1.13.1...v1.13.2) (2026-03-17)
 
 ### Bug Fixes

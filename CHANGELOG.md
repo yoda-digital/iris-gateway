@@ -1,3 +1,9 @@
+## [1.12.13](https://github.com/yoda-digital/iris-gateway/compare/v1.12.12...v1.12.13) (2026-03-17)
+
+### Bug Fixes
+
+* [#157](https://github.com/yoda-digital/iris-gateway/issues/157) — restrict Claude Code CI permissions, add CODEOWNERS ([4832572](https://github.com/yoda-digital/iris-gateway/commit/4832572a324fddc1bf2129abf7f7143abc74a574)), closes [#159](https://github.com/yoda-digital/iris-gateway/issues/159) [#161](https://github.com/yoda-digital/iris-gateway/issues/161)
+
 ## [1.12.12](https://github.com/yoda-digital/iris-gateway/compare/v1.12.11...v1.12.12) (2026-03-17)
 
 ### Bug Fixes

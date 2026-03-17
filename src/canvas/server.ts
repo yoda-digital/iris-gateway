@@ -66,7 +66,7 @@ export class CanvasServer {
     this.app.get(
       "/ws/:sessionId",
       upgradeWebSocket((c) => {
-        const sessionId = c.req.param("sessionId");
+        const sessionId = c.req.param("sessionId")!;
         const session = this.getSession(sessionId);
         let unsub: (() => void) | null = null;
 

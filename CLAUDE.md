@@ -254,3 +254,4 @@ The `needs-changes-loop` label triggers Claude Code CI. To reduce abuse surface:
 
 ### Threat Model
 A contributor with label access + a malicious PR body could trigger arbitrary bash execution via `Bash(*)`. The scoped allowlist reduces the blast radius to only safe development operations.
+

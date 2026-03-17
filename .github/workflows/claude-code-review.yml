@@ -45,8 +45,7 @@ jobs:
             **Verdict: NOT MERGEABLE** followed by reasons
 
             Post your review using `gh pr comment` to add a top-level comment with your verdict and findings.
-          claude_args: |
-            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep"
+          claude_args: "--allowedTools \"Bash(gh pr comment *),Bash(gh pr diff *),Bash(gh pr view *),Read,Grep\""
 
       - name: Apply verdict label
         if: steps.claude-review.conclusion == 'success'

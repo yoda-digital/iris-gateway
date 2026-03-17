@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CanvasServer } from "../../src/canvas/server.js";
 import type { Logger } from "../../src/logging/logger.js";
+import type { TextComponent } from "../../src/canvas/components.js";
 
 describe("CanvasServer", () => {
   let mockLogger: Logger;
@@ -64,7 +65,7 @@ describe("CanvasServer", () => {
       server.updateComponent("test-4", { type: "text", id: "t1", content: "Updated" });
       const session = server.getSession("test-4");
       expect(session.getComponents()).toHaveLength(1);
-      expect((session.getComponents()[0] as any).content).toBe("Updated");
+      expect((session.getComponents()[0] as TextComponent).content).toBe("Updated");
     });
 
     it("creates session if not exists", () => {
@@ -127,11 +128,11 @@ describe("CanvasServer", () => {
 
   describe("start and stop", () => {
     it("has start method", () => {
-      expect(typeof (server as any).start).toBe("function");
+      expect(typeof server.start).toBe("function");
     });
 
     it("has stop method", () => {
-      expect(typeof (server as any).stop).toBe("function");
+      expect(typeof server.stop).toBe("function");
     });
   });
 });

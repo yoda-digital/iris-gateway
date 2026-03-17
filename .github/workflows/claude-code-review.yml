@@ -28,6 +28,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           allowed_bots: "anastasia-istrati[bot]"
           prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Review this PR thoroughly. Check:
             1. Correctness — logic errors, edge cases, race conditions
             2. Test coverage — are new behaviors tested? are tests meaningful?
@@ -41,6 +44,10 @@ jobs:
             **Verdict: NEEDS CHANGES** followed by numbered list
             **Verdict: NOT MERGEABLE** followed by reasons
 
+            Post your review using `gh pr comment` to add a top-level comment with your verdict and findings.
+          claude_args: |
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep"
+
       - name: Apply verdict label
         if: steps.claude-review.conclusion == 'success'
         uses: actions/github-script@v7
@@ -51,11 +58,13 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Fetch ALL review comments from anastasia-istrati[bot] (paginated)
+            // Fetch ALL review comments from github-actions[bot] or anastasia-istrati[bot] (paginated)
             const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: prNumber
             });
-            const botComments = allComments.filter(c => c.user.login === 'anastasia-istrati[bot]');
+            const botComments = allComments.filter(c => 
+              c.user.login === 'github-actions[bot]' || c.user.login === 'anastasia-istrati[bot]'
+            );
             if (!botComments.length) {
               core.info('No bot review comment found, skipping label apply.');
               return;

@@ -1,3 +1,9 @@
+## [1.12.11](https://github.com/yoda-digital/iris-gateway/compare/v1.12.10...v1.12.11) (2026-03-17)
+
+### Bug Fixes
+
+* [#158](https://github.com/yoda-digital/iris-gateway/issues/158) — remove debug show_full_output flag from claude.yml ([#161](https://github.com/yoda-digital/iris-gateway/issues/161)) ([d78471c](https://github.com/yoda-digital/iris-gateway/commit/d78471c0caa694c9a5cf0811f29cbfd80bb6c304))
+
 ## [1.12.10](https://github.com/yoda-digital/iris-gateway/compare/v1.12.9...v1.12.10) (2026-03-14)
 
 ### Bug Fixes

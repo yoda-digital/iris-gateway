@@ -4,7 +4,7 @@
 
 Run a personal AI with memory, goals, and proactive nudges on your own server, at zero model cost, using [OpenRouter's free tier](https://openrouter.ai).
 
-[![npm](https://img.shields.io/npm/v/@yoda-digital/iris-gateway)](https://www.npmjs.com/package/@yoda-digital/iris-gateway)
+[![npm](https://img.shields.io/npm/v/@yoda.digital/iris-gateway)](https://www.npmjs.com/package/@yoda.digital/iris-gateway)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Coverage](https://img.shields.io/badge/coverage-%3E75%25-brightgreen)](docs/configuration.md)
@@ -28,9 +28,9 @@ Run a personal AI with memory, goals, and proactive nudges on your own server, a
 ### Install from npm (recommended)
 
 ```bash
-npm install -g @yoda-digital/iris-gateway
+npm install -g @yoda.digital/iris-gateway
 # or
-pnpm add -g @yoda-digital/iris-gateway
+pnpm add -g @yoda.digital/iris-gateway
 
 iris init        # interactive setup wizard
 iris gateway run # start the gateway
@@ -250,13 +250,13 @@ iris send <ch> <to> <msg> # One-shot message without starting the gateway
 Build external plugins and integrations using the typed HTTP client:
 
 ```bash
-npm install @yoda-digital/iris-gateway
+npm install @yoda.digital/iris-gateway
 # or
-pnpm add @yoda-digital/iris-gateway
+pnpm add @yoda.digital/iris-gateway
 ```
 
 ```typescript
-import IrisClient from "@yoda-digital/iris-gateway/sdk";
+import IrisClient from "@yoda.digital/iris-gateway/sdk";
 
 const iris = new IrisClient({ baseUrl: "http://localhost:19877" });
 

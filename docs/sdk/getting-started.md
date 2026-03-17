@@ -9,22 +9,22 @@ Iris runs a tool-server on port 19877. The SDK is a typed HTTP client for that A
 ## Install
 
 ```bash
-npm install @yoda-digital/iris-gateway
+npm install @yoda.digital/iris-gateway
 # or
-pnpm add @yoda-digital/iris-gateway
+pnpm add @yoda.digital/iris-gateway
 ```
 Then import the SDK client via the `./sdk` export path:
 
 ```ts
-import IrisClient from "@yoda-digital/iris-gateway/sdk";
+import IrisClient from "@yoda.digital/iris-gateway/sdk";
 ```
 
-> **Note:** The `/sdk` module itself has no internal imports — it only uses the built-in `fetch` API. However, installing `@yoda-digital/iris-gateway` via npm includes the full gateway dependency tree (discord.js, grammy, better-sqlite3, etc.). Use this SDK in environments where the gateway is already present, or copy `src/sdk/client.ts` directly into your project for a truly minimal footprint.
+> **Note:** The `/sdk` module itself has no internal imports — it only uses the built-in `fetch` API. However, installing `@yoda.digital/iris-gateway` via npm includes the full gateway dependency tree (discord.js, grammy, better-sqlite3, etc.). Use this SDK in environments where the gateway is already present, or copy `src/sdk/client.ts` directly into your project for a truly minimal footprint.
 
 ## Quick Start
 
 ```ts
-import IrisClient from "@yoda-digital/iris-gateway/sdk";
+import IrisClient from "@yoda.digital/iris-gateway/sdk";
 
 const iris = new IrisClient({
   baseUrl: "http://localhost:19877",

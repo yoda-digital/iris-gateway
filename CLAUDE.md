@@ -143,7 +143,7 @@ Media handling subsystem: fetch remote media (fetch.ts), MIME type detection (mi
 `IrisClient` — typed HTTP client for the tool-server API (port 19877). Designed for out-of-process plugins and external integrations. Covers vault search/store/extract, goals, arcs, proactive intents, governance, sessions, and execution traces. Published as a versioned npm package (see `exports` field in `package.json`).
 
 ```ts
-import IrisClient from "@yoda-digital/iris-gateway/sdk";
+import IrisClient from "@yoda.digital/iris-gateway/sdk";
 const iris = new IrisClient({ baseUrl: "http://localhost:19877" });
 const { results } = await iris.vault.search({ query: "project goals", limit: 5 });
 ```

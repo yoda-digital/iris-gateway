@@ -1,7 +1,7 @@
 ---
 description: Deep reasoning subagent for complex multi-step tasks requiring 5+ tool calls
 mode: subagent
-model: openrouter/qwen/qwen3-coder:free
+model: openrouter/hunter-alpha
 steps: 25
 tools:
   send_message: true

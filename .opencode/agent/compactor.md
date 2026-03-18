@@ -1,7 +1,7 @@
 ---
 description: Session compaction subagent — extracts facts from long conversations
 mode: subagent
-model: openrouter/deepseek/deepseek-r1-0528:free
+model: openrouter/hunter-alpha
 steps: 10
 tools:
   vault_search: true

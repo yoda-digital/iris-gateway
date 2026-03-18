@@ -1,7 +1,7 @@
 ---
 description: Content moderation subagent — fast safety checks
 mode: subagent
-model: openrouter/openrouter/aurora-alpha
+model: openrouter/hunter-alpha
 tools:
   channel_action: true
   governance_status: true

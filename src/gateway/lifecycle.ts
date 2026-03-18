@@ -116,6 +116,35 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
         ocConfig.small_model = models.small;
         changed = true;
       }
+      // Register unknown models in provider.openrouter.models with default capabilities.
+      // OpenCode silently fails if a model is not in the providers map — no tool calls,
+      // no context limits known — results in empty responses after prompt_async.
+      const newModels = [models.primary, models.small].filter(Boolean) as string[];
+      for (const modelId of newModels) {
+        // Only handle openrouter/* models
+        const orPrefix = "openrouter/";
+        if (!modelId.startsWith(orPrefix)) continue;
+        const orModelId = modelId.slice(orPrefix.length); // strip "openrouter/" prefix
+
+        const providerModels = ocConfig.provider?.openrouter?.models ?? {};
+        if (!providerModels[orModelId]) {
+          // Copy capabilities from the current primary model as a baseline, or use safe defaults
+          const existingKeys = Object.keys(providerModels);
+          const baseline = existingKeys.length > 0
+            ? { ...providerModels[existingKeys[0]] }
+            : { attachment: true, tool_call: true, limit: { context: 131072, output: 16384 } };
+          delete baseline.name; // don't copy the name from the baseline model
+          baseline.name = orModelId;
+
+          if (!ocConfig.provider) ocConfig.provider = {};
+          if (!ocConfig.provider.openrouter) ocConfig.provider.openrouter = { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
+          if (!ocConfig.provider.openrouter.models) ocConfig.provider.openrouter.models = {};
+          ocConfig.provider.openrouter.models[orModelId] = baseline;
+          changed = true;
+          logger.info(`Registered new model in opencode.json provider map: ${orModelId}`);
+        }
+      }
+
       if (changed) {
         writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
         logger.info("Synced models from iris.config.json to opencode.json", {

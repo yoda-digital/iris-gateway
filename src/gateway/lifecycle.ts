@@ -118,10 +118,17 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       }
       if (changed) {
         writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
+        console.log(`\n  ✔ Model sync: iris.config.json → opencode.json`);
+        console.log(`    primary:  ${ocConfig.model}`);
+        console.log(`    small:    ${ocConfig.small_model ?? "(unchanged)"}\n`);
         logger.info("Synced models from iris.config.json to opencode.json", {
           model: ocConfig.model,
           small_model: ocConfig.small_model,
         });
+      } else {
+        console.log(`\n  ✔ Models already in sync (no change to opencode.json)`);
+        console.log(`    primary:  ${ocConfig.model}`);
+        console.log(`    small:    ${ocConfig.small_model ?? "none"}\n`);
       }
     } catch (err) {
       logger.warn("Could not sync models to opencode.json", { err });

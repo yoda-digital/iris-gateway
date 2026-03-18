@@ -20,6 +20,14 @@ export interface IrisConfig {
   readonly onboarding?: OnboardingConfig;
   readonly heartbeat?: HeartbeatConfig;
   readonly cli?: import("../cli/types.js").CliConfig;
+  readonly models?: {
+    readonly primary?: string;
+    readonly small?: string;
+    readonly reasoning?: string;
+    readonly tool_call?: string;
+    readonly subagent?: string;
+    readonly [key: string]: string | undefined;
+  };
 }
 
 export interface CanvasConfig {

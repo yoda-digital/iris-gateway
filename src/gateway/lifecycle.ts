@@ -100,7 +100,35 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   // 3. Ensure state directory
   const stateDir = ensureDir(getStateDir());
 
-  // 4. Start OpenCode bridge
+  // 4. Sync iris.config.json models → opencode.json (before bridge starts)
+  if (config.models && typeof config.models === "object") {
+    const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");
+    try {
+      const ocConfig = JSON.parse(readFileSync(ocPath, "utf-8"));
+      let changed = false;
+      const models = config.models as Record<string, string>;
+
+      if (models.primary && ocConfig.model !== models.primary) {
+        ocConfig.model = models.primary;
+        changed = true;
+      }
+      if (models.small && ocConfig.small_model !== models.small) {
+        ocConfig.small_model = models.small;
+        changed = true;
+      }
+      if (changed) {
+        writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
+        logger.info("Synced models from iris.config.json to opencode.json", {
+          model: ocConfig.model,
+          small_model: ocConfig.small_model,
+        });
+      }
+    } catch (err) {
+      logger.warn("Could not sync models to opencode.json", { err });
+    }
+  }
+
+  // 4b. Start OpenCode bridge
   const bridge = new OpenCodeBridge(config.opencode, logger);
   await bridge.start();
 

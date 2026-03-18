@@ -38,7 +38,7 @@ describe("irisConfigSchema — top-level defaults", () => {
 
   it("logging defaults: level=info", () => {
     const cfg = parseConfig({});
-    expect(cfg.logging.level).toBe("info");
+    expect(cfg.logging?.level).toBe("info");
   });
 
   it("governance defaults: enabled=false, rules=[], directives=[]", () => {
@@ -90,7 +90,7 @@ describe("irisConfigSchema — valid full configs", () => {
 
   it("accepts logging level=debug", () => {
     const cfg = parseConfig({ logging: { level: "debug" } });
-    expect(cfg.logging.level).toBe("debug");
+    expect(cfg.logging?.level).toBe("debug");
   });
 
   it("accepts a valid cron entry", () => {
@@ -345,7 +345,7 @@ describe("cliSchema", () => {
 // 9. Edge cases
 // ---------------------------------------------------------------------------
 describe("irisConfigSchema — edge cases", () => {
-  it("empty string model IDs in channel token are accepted (optional)", () => {
+  it("empty string channel bot token is accepted (token is optional)", () => {
     // token is optional — empty string still passes string type check
     const result = safeParse({
       channels: { tg: { type: "telegram", enabled: true, token: "" } },

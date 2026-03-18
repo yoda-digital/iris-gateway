@@ -128,13 +128,14 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
 
         const providerModels = ocConfig.provider?.openrouter?.models ?? {};
         if (!providerModels[orModelId]) {
-          // Copy capabilities from the current primary model as a baseline, or use safe defaults
-          const existingKeys = Object.keys(providerModels);
-          const baseline = existingKeys.length > 0
-            ? { ...providerModels[existingKeys[0]] }
-            : { attachment: true, tool_call: true, limit: { context: 131072, output: 16384 } };
-          delete baseline.name; // don't copy the name from the baseline model
-          baseline.name = orModelId;
+          // Use safe minimal defaults — never copy interleaved/reasoning flags from other models
+          // as they are model-specific and cause silent hangs when mismatched.
+          const baseline: Record<string, unknown> = {
+            name: orModelId,
+            attachment: true,
+            tool_call: true,
+            limit: { context: 131072, output: 16384 },
+          };
 
           if (!ocConfig.provider) ocConfig.provider = {};
           if (!ocConfig.provider.openrouter) ocConfig.provider.openrouter = { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };

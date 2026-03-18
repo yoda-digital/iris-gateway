@@ -118,18 +118,34 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       }
       if (changed) {
         writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
-        console.log(`\n  ✔ Model sync: iris.config.json → opencode.json`);
-        console.log(`    primary:  ${ocConfig.model}`);
-        console.log(`    small:    ${ocConfig.small_model ?? "(unchanged)"}\n`);
         logger.info("Synced models from iris.config.json to opencode.json", {
           model: ocConfig.model,
           small_model: ocConfig.small_model,
         });
-      } else {
-        console.log(`\n  ✔ Models already in sync (no change to opencode.json)`);
-        console.log(`    primary:  ${ocConfig.model}`);
-        console.log(`    small:    ${ocConfig.small_model ?? "none"}\n`);
       }
+
+      // Also sync primary model into agent frontmatter — agent model: overrides opencode.json
+      if (models.primary) {
+        const agentDir = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "agent");
+        try {
+          const { readdirSync } = await import("node:fs");
+          const agentFiles = readdirSync(agentDir).filter((f: string) => f.endsWith(".md"));
+          for (const file of agentFiles) {
+            const agentPath = join(agentDir, file);
+            const content = readFileSync(agentPath, "utf-8");
+            if (content.startsWith("---") && /^model:/m.test(content)) {
+              const updated = content.replace(/^(model:\s*)(.+)$/m, `$1${models.primary}`);
+              if (updated !== content) {
+                writeFileSync(agentPath, updated);
+                logger.info(`Synced model in .opencode/agent/${file}`, { model: models.primary });
+              }
+            }
+          }
+        } catch { /* agent dir may not exist — skip */ }
+      }
+
+      const finalModel = models.primary ?? ocConfig.model ?? "unknown";
+      console.log(`\n  ✔ Model: ${finalModel}\n`);
     } catch (err) {
       logger.warn("Could not sync models to opencode.json", { err });
     }

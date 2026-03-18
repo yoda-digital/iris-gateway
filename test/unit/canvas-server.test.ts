@@ -3,11 +3,23 @@ import { CanvasServer } from "../../src/canvas/server.js";
 import type { Logger } from "../../src/logging/logger.js";
 import type { TextComponent } from "../../src/canvas/components.js";
 
+// Hoist mock vars so they're available in the vi.mock() factory (which is hoisted before imports)
+const { mockServe, mockFakeServer } = vi.hoisted(() => {
+  const mockFakeServer = { close: vi.fn() };
+  return { mockFakeServer, mockServe: vi.fn().mockReturnValue(mockFakeServer) };
+});
+
+// Mock @hono/node-server so start() never binds a real port in unit tests
+vi.mock("@hono/node-server", () => ({ serve: mockServe }));
+
 describe("CanvasServer", () => {
   let mockLogger: Logger;
   let server: CanvasServer;
 
   beforeEach(() => {
+    mockServe.mockClear();
+    mockFakeServer.close.mockClear();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -155,17 +167,19 @@ describe("CanvasServer", () => {
   });
 
   describe("start", () => {
-    it("logs Canvas server started with port", async () => {
-      const fakeClose = vi.fn();
-      const fakeServerObj = { close: fakeClose } as unknown as ReturnType<typeof import("@hono/node-server").serve>;
+    it("calls serve with correct config and logs 'Canvas server started'", async () => {
+      // Bypass injectWebSocket — avoid calling the real ws upgrade with a fake server object
+      (server as unknown as { wsUpgrade: unknown }).wsUpgrade = null;
 
-      // Patch the internal server ref directly — simulates what serve() returns
-      (server as unknown as { server: unknown }).server = fakeServerObj;
-      // Manually call the logger since we can't bind a real port in unit tests
-      // Instead we test via the stop() path which goes through the same lifecycle
-      await server.stop();
-      expect(fakeClose).toHaveBeenCalledOnce();
-      expect(mockLogger.info).toHaveBeenCalledWith("Canvas server stopped");
+      await server.start();
+
+      expect(mockServe).toHaveBeenCalledWith(
+        expect.objectContaining({ port: 19878, hostname: "localhost" }),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { port: 19878 },
+        "Canvas server started",
+      );
     });
 
     it("wsUpgrade is set after construction", () => {

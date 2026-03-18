@@ -248,6 +248,13 @@ export const irisConfigSchema = z.object({
     port: z.number().int().positive().default(19880),
     hostname: z.string().default("127.0.0.1"),
   }).optional(),
+  models: z.object({
+    primary: z.string().optional(),
+    small: z.string().optional(),
+    reasoning: z.string().optional(),
+    tool_call: z.string().optional(),
+    subagent: z.string().optional(),
+  }).catchall(z.string()).optional(),
   autoReply: z.object({
     enabled: z.boolean().default(false),
     templates: z.array(z.object({

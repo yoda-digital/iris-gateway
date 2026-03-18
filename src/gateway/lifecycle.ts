@@ -116,33 +116,61 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
         ocConfig.small_model = models.small;
         changed = true;
       }
-      // Register unknown models in provider.openrouter.models with default capabilities.
-      // OpenCode silently fails if a model is not in the providers map — no tool calls,
-      // no context limits known — results in empty responses after prompt_async.
+      // Register unknown models in provider.openrouter.models.
+      // OpenCode silently fails on unknown models — no tool calls, empty responses.
+      // We query the OpenRouter /models API to get real capabilities (context window, etc.)
+      // and register each model correctly. Falls back to safe defaults if API unreachable.
       const newModels = [models.primary, models.small].filter(Boolean) as string[];
       for (const modelId of newModels) {
-        // Only handle openrouter/* models
         const orPrefix = "openrouter/";
         if (!modelId.startsWith(orPrefix)) continue;
-        const orModelId = modelId.slice(orPrefix.length); // strip "openrouter/" prefix
+        const orModelId = modelId.slice(orPrefix.length);
 
         const providerModels = ocConfig.provider?.openrouter?.models ?? {};
         if (!providerModels[orModelId]) {
-          // Use safe minimal defaults — never copy interleaved/reasoning flags from other models
-          // as they are model-specific and cause silent hangs when mismatched.
-          const baseline: Record<string, unknown> = {
-            name: orModelId,
+          // Query OpenRouter for real model capabilities
+          let contextWindow = 131072;
+          let maxOutput = 16384;
+          let supportsTools = true;
+          let modelName = orModelId;
+
+          try {
+            const apiKey = process.env["OPENROUTER_API_KEY"];
+            if (apiKey) {
+              const resp = await fetch(
+                `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
+                { headers: { Authorization: `Bearer ${apiKey}` } }
+              );
+              if (resp.ok) {
+                const data = await resp.json() as Record<string, unknown>;
+                if (typeof data.context_length === "number") contextWindow = data.context_length;
+                const topProvider = data.top_provider as Record<string, unknown> | undefined;
+                if (typeof topProvider?.max_completion_tokens === "number") maxOutput = topProvider.max_completion_tokens;
+                if (Array.isArray(data.supported_parameters)) {
+                  supportsTools = (data.supported_parameters as string[]).includes("tools");
+                }
+                if (typeof data.name === "string") modelName = data.name;
+                logger.info(`Fetched capabilities for ${orModelId} from OpenRouter`, { contextWindow, maxOutput, supportsTools });
+              }
+            }
+          } catch { /* API unreachable — use safe defaults */ }
+
+          const entry: Record<string, unknown> = {
+            name: modelName,
             attachment: true,
-            tool_call: true,
-            limit: { context: 131072, output: 16384 },
+            tool_call: supportsTools,
+            limit: { context: contextWindow, output: maxOutput },
           };
+          // Note: interleaved/reasoning flags are intentionally NOT set here.
+          // They are model-specific (e.g. DeepSeek-R1 reasoning_content) and must be
+          // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
 
           if (!ocConfig.provider) ocConfig.provider = {};
           if (!ocConfig.provider.openrouter) ocConfig.provider.openrouter = { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
           if (!ocConfig.provider.openrouter.models) ocConfig.provider.openrouter.models = {};
-          ocConfig.provider.openrouter.models[orModelId] = baseline;
+          ocConfig.provider.openrouter.models[orModelId] = entry;
           changed = true;
-          logger.info(`Registered new model in opencode.json provider map: ${orModelId}`);
+          logger.info(`Registered model in opencode.json: ${orModelId}`, { contextWindow, maxOutput, supportsTools });
         }
       }
 

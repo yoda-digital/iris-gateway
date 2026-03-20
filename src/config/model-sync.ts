@@ -125,17 +125,24 @@ export async function syncModelsToOpenCode(
   }
 
   // Write opencode.json if changed
+  let writeSucceeded = false;
   if (changed) {
     try {
       writeFileSync(ocPath, JSON.stringify(ocJson, null, 2));
+      writeSucceeded = true;
     } catch (writeErr) {
       logger.warn({ err: writeErr }, "Could not write opencode.json — model sync changes not persisted");
     }
-    logger.info(
-      { model: ocJson.model, small_model: ocJson.small_model },
-      "Synced models from iris.config.json to opencode.json",
-    );
+    if (writeSucceeded) {
+      logger.info(
+        { model: ocJson.model, small_model: ocJson.small_model },
+        "Synced models from iris.config.json to opencode.json",
+      );
+    }
   }
+
+  // Skip frontmatter sync if opencode.json write failed — avoids partially-synced gateway state
+  if (changed && !writeSucceeded) return false;
 
   // 3. Sync primary model into agent frontmatter
   // agent model: overrides opencode.json — must be kept in sync

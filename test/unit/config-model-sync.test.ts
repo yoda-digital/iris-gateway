@@ -65,24 +65,24 @@ describe("syncModelsToOpenCode", () => {
 
   it("syncs primary and small models into opencode.json", async () => {
     const config = makeConfig({
-      models: { primary: "anthropic/claude-sonnet-4-5", small: "anthropic/claude-haiku-3-5" },
+      models: { primary: "openrouter/qwen/qwen3-coder:free", small: "openrouter/hunter-alpha" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
     const result = await syncModelsToOpenCode(config, config.opencode, logger);
     expect(result).toBe(true);
     const written = JSON.parse(readFileSync(ocPath, "utf-8"));
-    expect(written.model).toBe("anthropic/claude-sonnet-4-5");
-    expect(written.small_model).toBe("anthropic/claude-haiku-3-5");
+    expect(written.model).toBe("openrouter/qwen/qwen3-coder:free");
+    expect(written.small_model).toBe("openrouter/hunter-alpha");
   });
 
   it("returns false when models already match opencode.json", async () => {
     writeFileSync(
       ocPath,
-      JSON.stringify({ model: "anthropic/claude-sonnet-4-5", small_model: "anthropic/claude-haiku-3-5" }, null, 2),
+      JSON.stringify({ model: "mistral/mistral-large", small_model: "mistral/mistral-small" }, null, 2),
     );
     const config = makeConfig({
-      models: { primary: "anthropic/claude-sonnet-4-5", small: "anthropic/claude-haiku-3-5" },
+      models: { primary: "mistral/mistral-large", small: "mistral/mistral-small" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
@@ -110,7 +110,7 @@ describe("syncModelsToOpenCode", () => {
 
   it("skips non-openrouter models in auto-registration", async () => {
     const config = makeConfig({
-      models: { primary: "anthropic/claude-opus-4-5" },
+      models: { primary: "openai/gpt-4o" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
@@ -126,19 +126,19 @@ describe("syncModelsToOpenCode", () => {
     const agentMd = join(agentDir, "default.md");
     writeFileSync(agentMd, "---\nmodel: old-model\n---\nSystem prompt here.");
     const config = makeConfig({
-      models: { primary: "anthropic/claude-sonnet-4-5" },
+      models: { primary: "openrouter/qwen/qwen3-coder:free" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
     await syncModelsToOpenCode(config, config.opencode, logger);
     const content = readFileSync(agentMd, "utf-8");
-    expect(content).toContain("model: anthropic/claude-sonnet-4-5");
+    expect(content).toContain("model: openrouter/qwen/qwen3-coder:free");
   });
 
   it("returns false when opencode.json is missing or unreadable", async () => {
     const emptyDir = mkdtempSync(join(tmpdir(), "iris-model-sync-empty-"));
     const config = makeConfig({
-      models: { primary: "anthropic/claude-sonnet-4-5" },
+      models: { primary: "openrouter/qwen/qwen3-coder:free" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: emptyDir },
     });
     const logger = makeLogger();

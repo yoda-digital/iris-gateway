@@ -461,6 +461,8 @@ describe("OpenCode readiness check (issue #176)", () => {
         try {
           const healthy = await bridge.checkHealth();
           if (healthy) {
+            const gracePeriodMs = Number(process.env.OPENCODE_WARMUP_GRACE_MS) || 1000;
+            await new Promise(resolve => setTimeout(resolve, gracePeriodMs));
             warmupDone = true;
             break;
           }

@@ -222,6 +222,8 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     try {
       const healthy = await bridge.checkHealth();
       if (healthy) {
+        const gracePeriodMs = Number(process.env.OPENCODE_WARMUP_GRACE_MS) || 1000;
+        await new Promise(resolve => setTimeout(resolve, gracePeriodMs));
         warmupDone = true;
         logger.info("OpenCode ready (health check passed)");
         break;

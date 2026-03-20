@@ -156,17 +156,22 @@ platform message
 
 ### Intelligence Layer
 
-Seven deterministic subsystems — zero LLM cost, pure Node.js + SQLite:
+Twelve deterministic subsystems — zero LLM cost, pure Node.js + SQLite:
 
 | Subsystem | What it does |
 |-----------|-------------|
+| **Intelligence Bus** | Typed synchronous event emitter connecting all subsystems |
 | **Signal Inference Engine** | Derives timezone, language, engagement trend, session patterns from raw signals |
 | **Event-Driven Triggers** | Structural pattern detection: temporal markers, dormancy, engagement drops. Language-agnostic. |
 | **Outcome-Aware Proactive Loop** | Tracks engagement by category (task/work/health/hobby/social). AI-assigned, not keyword-guessed. |
-| **Memory Arcs** | Temporal threads tracking evolving situations. Auto-stale after 14 days, configurable. |
+| **Arc Detector** | Detects narrative threads from keyword overlap across messages |
+| **Memory Arcs** | Persistent arc state management. Temporal threads tracking evolving situations. Auto-stale after 14 days. |
 | **Goal Tracking** | Persistent goals with state machine, success criteria, next-action queue, due-date alerts |
-| **Cross-Channel Intelligence** | Unified presence detection across all channels |
-| **Self-Tuning Heartbeat** | Linear regression trend detection, predictive threshold breach, health-aware proactive throttling |
+| **Cross-Channel Intelligence** | Unified presence/preference detection across all channels |
+| **Prompt Assembler** | Builds structured prompt sections from all intelligence sources (arcs, goals, outcomes, health) |
+| **Trend Detector** | Linear regression on heartbeat metrics for predictive threshold breach |
+| **Health Gate** | Throttles proactive activity based on real-time system health score |
+| **Self-Tuning Heartbeat** | Adaptive health monitoring with 3-tier interval tightening (60s → 15s → 5s as health degrades) |
 
 ### Multi-Instance Support
 

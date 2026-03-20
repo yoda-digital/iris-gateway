@@ -52,7 +52,7 @@ The test suite exists for a reason. Failing tests are not "known issues" — the
 **Rules:**
 - `pnpm test` must exit 0 on every commit to main
 - No PR merged with failing tests
-- Coverage floor: 70%. Don't let it drop.
+- Coverage floor: 75%. Don't let it drop.
 - New features ship with tests. No exceptions.
 
 ### 5. Domain Ownership
@@ -121,10 +121,10 @@ Clean layers. Documented APIs. Resilient connections.
 ### v2.0 — Platform Evolution (due 2026-12-31)
 Platform-quality: metrics, SDK, multi-instance.
 
-- Prometheus metrics endpoint (issue #10)
-- Plugin SDK for external developers
-- Multi-instance support
-- Distributed architecture investigation
+- ✅ Plugin SDK for external developers — `IrisClient` published as `@yoda.digital/iris-gateway/sdk` (closes #100)
+- ✅ Multi-instance support — shared SQLite WAL + advisory leader election via `InstanceCoordinator` (closes #101)
+- ✅ Distributed architecture investigation — spike complete (closes #104)
+- ⏳ Prometheus metrics endpoint (issue #10) — remaining work
 
 ---
 
@@ -144,7 +144,7 @@ semantic-release handles versioning. Conventional commits are enforced. Don't fi
 |----------|------|
 | File size | Hard limit: 500 lines. No exceptions. |
 | Test suite | `pnpm test` exits 0. Always. |
-| Coverage | Minimum 70%. Don't let it drop. |
+| Coverage | Minimum 75%. Don't let it drop. |
 | Model config | No model identifiers in source code. |
 | Known failures | This category does not exist. Fix or delete. |
 | Commit format | Conventional commits. semantic-release validates. |

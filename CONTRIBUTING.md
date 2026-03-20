@@ -46,7 +46,7 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`
 
 Breaking changes: add `!` after type or `BREAKING CHANGE:` in body.
 
-### 4. Every new feature needs tests. Coverage stays at or above 70%.
+### 4. Every new feature needs tests. Coverage stays at or above 75%.
 
 Ship tests with your feature. Not in a follow-up PR. Not "when I have time." With the feature. If you can't write tests for it, you don't understand it well enough to ship it.
 
@@ -97,7 +97,7 @@ refactor/tool-server-routers
 2. `pnpm build` succeeds. Non-negotiable.
 3. No files over 500 lines in your diff. Check it.
 4. Commit messages are conventional. Every single one.
-5. If adding a feature: coverage hasn't dropped below 70%.
+5. If adding a feature: coverage hasn't dropped below 75%.
 
 ### What Reviewers Check
 
@@ -117,6 +117,20 @@ No discussion, no feedback loop — just rejected:
 - Non-conventional commit messages on main
 - PRs without tests for new features
 - PRs that add "known failures" to documentation
+
+---
+
+### CI Labels
+
+| Label | Effect | Who can apply |
+|-------|--------|---------------|
+| `needs-changes-loop` | Triggers Claude Code to implement requested changes automatically | Maintainers only |
+| `awaiting-review` | Signals PR is ready for human review | Author |
+| `mergeable` | Final approval — safe to merge | Maintainers |
+
+**`needs-changes-loop`** — when Claude Code leaves a review verdict of NEEDS CHANGES, this label is applied automatically by CI (`.github/workflows/claude.yml`). It causes the full pipeline to re-run with Claude implementing the requested changes and pushing a new commit.
+
+⚠️ **Security note:** Only maintainers should have label-apply access. This label triggers Claude Code execution with Bash access scoped to the repo workspace. The allowlist in `.claude/settings.json` restricts what commands Claude can run — but do not expand it without understanding the threat model. A contributor with label access and a malicious PR body could trigger unintended bash execution within the scoped allowlist.
 
 ---
 

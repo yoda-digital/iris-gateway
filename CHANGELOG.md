@@ -1,3 +1,9 @@
+## [1.13.9](https://github.com/yoda-digital/iris-gateway/compare/v1.13.8...v1.13.9) (2026-03-20)
+
+### Bug Fixes
+
+* **model-sync:** add 5s AbortController timeout to OpenRouter capability fetch ([#192](https://github.com/yoda-digital/iris-gateway/issues/192)) ([a106192](https://github.com/yoda-digital/iris-gateway/commit/a10619215433105252fd1686a6820e7dae5ce753))
+
 ## [1.13.8](https://github.com/yoda-digital/iris-gateway/compare/v1.13.7...v1.13.8) (2026-03-20)
 
 ### Bug Fixes

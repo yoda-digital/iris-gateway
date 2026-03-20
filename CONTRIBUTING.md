@@ -46,7 +46,7 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `build`, `ci`
 
 Breaking changes: add `!` after type or `BREAKING CHANGE:` in body.
 
-### 4. Every new feature needs tests. Coverage stays at or above 70%.
+### 4. Every new feature needs tests. Coverage stays at or above 75%.
 
 Ship tests with your feature. Not in a follow-up PR. Not "when I have time." With the feature. If you can't write tests for it, you don't understand it well enough to ship it.
 
@@ -97,7 +97,7 @@ refactor/tool-server-routers
 2. `pnpm build` succeeds. Non-negotiable.
 3. No files over 500 lines in your diff. Check it.
 4. Commit messages are conventional. Every single one.
-5. If adding a feature: coverage hasn't dropped below 70%.
+5. If adding a feature: coverage hasn't dropped below 75%.
 
 ### What Reviewers Check
 

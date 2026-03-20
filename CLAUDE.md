@@ -192,7 +192,7 @@ Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline
 | File | Role |
 |------|------|
 | `src/gateway/lifecycle.ts` | Wires everything together — the dependency injection root. Model-sync delegated to `src/config/model-sync.ts`. |
-| `src/config/model-sync.ts` | Syncs `iris.config.json` model list → `opencode.json` + agent frontmatter at startup. Emits `logger.warn` for legacy slash-format model keys. |
+| `src/config/model-sync.ts` | Syncs `iris.config.json` model list → `opencode.json` + agent frontmatter at startup. Emits `logger.warn` on config read/write errors or API failures during model sync. |
 | `.opencode/plugin/iris.ts` | THE plugin — all tools + hooks in one file |
 | `src/bridge/tool-server.ts` | Tool server entry point — mounts domain routers |
 | `src/bridge/routers/` | Domain routers — each file owns a slice of the tool-server API |

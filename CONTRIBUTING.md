@@ -124,11 +124,11 @@ No discussion, no feedback loop — just rejected:
 
 | Label | Effect | Who can apply |
 |-------|--------|---------------|
-| `needs-changes-loop` | Triggers Claude Code to implement requested changes automatically | Maintainers only |
+| `needs-changes-loop` | Triggers Claude Code to implement requested changes automatically | CI (automatic), Maintainers (manual) |
 | `awaiting-review` | Signals PR is ready for human review | Author |
 | `mergeable` | Final approval — safe to merge | Maintainers |
 
-**`needs-changes-loop`** — when Claude Code leaves a review verdict of NEEDS CHANGES, this label is applied automatically by CI (`.github/workflows/claude.yml`). It causes the full pipeline to re-run with Claude implementing the requested changes and pushing a new commit.
+**`needs-changes-loop`** — when Claude Code leaves a review verdict of NEEDS CHANGES, this label is applied automatically by `.github/workflows/claude-code-review.yml`. It then triggers `.github/workflows/claude.yml`, which implements the requested changes and pushes a new commit.
 
 ⚠️ **Security note:** Only maintainers should have label-apply access. This label triggers Claude Code execution with Bash access scoped to the repo workspace. The allowlist in `.claude/settings.json` restricts what commands Claude can run — but do not expand it without understanding the threat model. A contributor with label access and a malicious PR body could trigger unintended bash execution within the scoped allowlist.
 

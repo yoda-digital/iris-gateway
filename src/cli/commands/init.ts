@@ -19,9 +19,26 @@ function detectOpenCode(): string | null {
   return null;
 }
 
+/** Timeout for token validation API calls in the init wizard. */
+const TOKEN_VALIDATION_TIMEOUT_MS = 8_000;
+
+/** fetch() wrapper with AbortController timeout. Returns null on timeout or network error. */
+async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = TOKEN_VALIDATION_TIMEOUT_MS): Promise<Response | null> {
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ac.signal });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function validateTelegramToken(token: string): Promise<boolean> {
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const res = await fetchWithTimeout(`https://api.telegram.org/bot${token}/getMe`);
+    if (!res) return false;
     const json = (await res.json()) as { ok: boolean };
     return json.ok === true;
   } catch {
@@ -31,10 +48,10 @@ async function validateTelegramToken(token: string): Promise<boolean> {
 
 async function validateDiscordToken(token: string): Promise<boolean> {
   try {
-    const res = await fetch("https://discord.com/api/v10/users/@me", {
+    const res = await fetchWithTimeout("https://discord.com/api/v10/users/@me", {
       headers: { Authorization: `Bot ${token}` },
     });
-    return res.ok;
+    return res?.ok === true;
   } catch {
     return false;
   }
@@ -42,13 +59,14 @@ async function validateDiscordToken(token: string): Promise<boolean> {
 
 async function validateSlackAppToken(token: string): Promise<boolean> {
   try {
-    const res = await fetch("https://slack.com/api/apps.connections.open", {
+    const res = await fetchWithTimeout("https://slack.com/api/apps.connections.open", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
+    if (!res) return false;
     const json = (await res.json()) as { ok: boolean };
     return json.ok === true;
   } catch {

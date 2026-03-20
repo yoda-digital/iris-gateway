@@ -1,3 +1,9 @@
+## [1.13.10](https://github.com/yoda-digital/iris-gateway/compare/v1.13.9...v1.13.10) (2026-03-20)
+
+### Bug Fixes
+
+* **media,cli:** add fetch timeouts to fetchTelegramFile() and init token validators ([a003dde](https://github.com/yoda-digital/iris-gateway/commit/a003dde276f4ee337af4a55b55695e6757d4c532)), closes [#193](https://github.com/yoda-digital/iris-gateway/issues/193)
+
 ## [1.13.9](https://github.com/yoda-digital/iris-gateway/compare/v1.13.8...v1.13.9) (2026-03-20)
 
 ### Bug Fixes

@@ -1,3 +1,13 @@
+## [1.13.7](https://github.com/yoda-digital/iris-gateway/compare/v1.13.6...v1.13.7) (2026-03-20)
+
+### Bug Fixes
+
+* **lifecycle:** replace ping readiness check with checkHealth() polling ([#179](https://github.com/yoda-digital/iris-gateway/issues/179)) ([abe1eb0](https://github.com/yoda-digital/iris-gateway/commit/abe1eb04c51cecbde083fdad44714423097653db)), closes [yoda-digital/iris-gateway#176](https://github.com/yoda-digital/iris-gateway/issues/176)
+
+### Refactoring
+
+* **gateway:** extract model-sync logic to src/config/model-sync.ts ([#180](https://github.com/yoda-digital/iris-gateway/issues/180)) ([50db842](https://github.com/yoda-digital/iris-gateway/commit/50db842969f5f2c84ce0f513bb2853dc1996691b)), closes [yoda-digital/iris-gateway#173](https://github.com/yoda-digital/iris-gateway/issues/173)
+
 ## [1.13.6](https://github.com/yoda-digital/iris-gateway/compare/v1.13.5...v1.13.6) (2026-03-20)
 
 ### Bug Fixes

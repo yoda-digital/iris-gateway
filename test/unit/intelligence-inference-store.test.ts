@@ -131,7 +131,7 @@ describe("InferenceStore", () => {
     });
 
     it("getLastInferenceRun ignores other senders", () => {
-      store.logInference({ ruleId: "r4", senderId: "s-other", result: "ok", details: null, executedAt: 9999 });
+      store.logInference({ ruleId: "r4", senderId: "s-other", result: "produced", details: null, executedAt: 9999 });
       expect(store.getLastInferenceRun("r4", "s-mine")).toBeNull();
     });
   });

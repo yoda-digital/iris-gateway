@@ -3,11 +3,23 @@ import { CanvasServer } from "../../src/canvas/server.js";
 import type { Logger } from "../../src/logging/logger.js";
 import type { TextComponent } from "../../src/canvas/components.js";
 
+// Hoist mock vars so they're available in the vi.mock() factory (which is hoisted before imports)
+const { mockServe, mockFakeServer } = vi.hoisted(() => {
+  const mockFakeServer = { close: vi.fn() };
+  return { mockFakeServer, mockServe: vi.fn().mockReturnValue(mockFakeServer) };
+});
+
+// Mock @hono/node-server so start() never binds a real port in unit tests
+vi.mock("@hono/node-server", () => ({ serve: mockServe }));
+
 describe("CanvasServer", () => {
   let mockLogger: Logger;
   let server: CanvasServer;
 
   beforeEach(() => {
+    mockServe.mockClear();
+    mockFakeServer.close.mockClear();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -151,6 +163,128 @@ describe("CanvasServer", () => {
       expect(
         (server as unknown as { server: unknown }).server,
       ).toBeNull();
+    });
+  });
+
+  describe("start", () => {
+    it("calls serve with correct config and logs 'Canvas server started'", async () => {
+      // Bypass injectWebSocket — avoid calling the real ws upgrade with a fake server object
+      (server as unknown as { wsUpgrade: unknown }).wsUpgrade = null;
+
+      await server.start();
+
+      expect(mockServe).toHaveBeenCalledWith(
+        expect.objectContaining({ port: 19878, hostname: "localhost" }),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        { port: 19878 },
+        "Canvas server started",
+      );
+    });
+
+    it("wsUpgrade is set after construction", () => {
+      // wsUpgrade is set during setupRoutes() inside constructor
+      const wsUpgrade = (server as unknown as { wsUpgrade: unknown }).wsUpgrade;
+      expect(wsUpgrade).not.toBeNull();
+      expect(typeof wsUpgrade).toBe("function");
+    });
+  });
+
+  describe("HTTP REST endpoints via app.request", () => {
+    // Access private Hono app — no live port needed
+    const getApp = (s: CanvasServer) =>
+      (s as unknown as { app: import("hono").Hono }).app;
+
+    it("POST /api/message adds assistant message to named session", async () => {
+      const app = getApp(server);
+      const res = await app.request("/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "rest-1", text: "Hello via API" }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as { ok: boolean };
+      expect(body.ok).toBe(true);
+      const session = server.getSession("rest-1");
+      expect(session.getMessages()).toHaveLength(1);
+      expect(session.getMessages()[0].text).toBe("Hello via API");
+    });
+
+    it("POST /api/message uses default session when no sessionId provided", async () => {
+      const app = getApp(server);
+      const res = await app.request("/api/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "No session" }),
+      });
+      expect(res.status).toBe(200);
+      const session = server.getSession("default");
+      expect(session.getMessages()).toHaveLength(1);
+    });
+
+    it("GET /api/sessions returns all registered sessions", async () => {
+      server.getSession("list-1");
+      server.getSession("list-2");
+      const app = getApp(server);
+      const res = await app.request("/api/sessions");
+      expect(res.status).toBe(200);
+      const body = await res.json() as { sessions: { id: string }[] };
+      const ids = body.sessions.map((s) => s.id);
+      expect(ids).toContain("list-1");
+      expect(ids).toContain("list-2");
+    });
+
+    it("POST /api/canvas/update adds a component to the session", async () => {
+      const app = getApp(server);
+      const res = await app.request("/api/canvas/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "upd-1",
+          component: { type: "text", id: "c1", content: "Injected" },
+        }),
+      });
+      expect(res.status).toBe(200);
+      expect(server.getSession("upd-1").getComponents()).toHaveLength(1);
+    });
+
+    it("POST /api/canvas/update clears all components when clear=true", async () => {
+      server.updateComponent("upd-2", { type: "text", id: "c1", content: "A" });
+      server.updateComponent("upd-2", { type: "text", id: "c2", content: "B" });
+      const app = getApp(server);
+      const res = await app.request("/api/canvas/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "upd-2", clear: true }),
+      });
+      expect(res.status).toBe(200);
+      expect(server.getSession("upd-2").getComponents()).toHaveLength(0);
+    });
+
+    it("POST /api/canvas/update removes a specific component by id", async () => {
+      server.updateComponent("upd-3", { type: "text", id: "keep", content: "Keep" });
+      server.updateComponent("upd-3", { type: "text", id: "remove-me", content: "Remove" });
+      const app = getApp(server);
+      const res = await app.request("/api/canvas/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "upd-3", remove: "remove-me" }),
+      });
+      expect(res.status).toBe(200);
+      const comps = server.getSession("upd-3").getComponents();
+      expect(comps).toHaveLength(1);
+      expect(comps[0].id).toBe("keep");
+    });
+
+    it("POST /api/canvas/update defaults to 'default' session when no sessionId", async () => {
+      const app = getApp(server);
+      const res = await app.request("/api/canvas/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ component: { type: "text", id: "d1", content: "Default" } }),
+      });
+      expect(res.status).toBe(200);
+      expect(server.getSession("default").getComponents()).toHaveLength(1);
     });
   });
 });

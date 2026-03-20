@@ -20,6 +20,60 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Mark PR as awaiting-review
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const isDraft = context.payload.pull_request.draft;
+            const event = context.payload.action;
+
+            // Remove awaiting-review if PR was converted to draft
+            if (event === 'converted_to_draft') {
+              try {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: 'awaiting-review' });
+                core.info('Removed awaiting-review (PR converted to draft)');
+              } catch (e) {
+                if (e.status !== 404) core.warning(`Failed to remove awaiting-review: ${e.message}`);
+              }
+              return;
+            }
+
+            // Skip draft PRs — no review until ready
+            if (isDraft) {
+              core.info('PR is draft — skipping awaiting-review');
+              return;
+            }
+
+            // Ensure label exists
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: 'awaiting-review' });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({ owner, repo, name: 'awaiting-review', color: '0075ca', description: 'Awaiting code review' });
+                core.info('Created awaiting-review label');
+              } else {
+                throw e;
+              }
+            }
+
+            // Remove stale verdict labels — a new push invalidates the previous review
+            const staleLabels = ['mergeable', 'needs-changes-loop', 'blocked'];
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: prNumber });
+            for (const lbl of currentLabels) {
+              if (staleLabels.includes(lbl.name)) {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: lbl.name });
+                core.info(`Removed stale label: ${lbl.name}`);
+              }
+            }
+
+            // Apply awaiting-review to signal review is in progress
+            await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['awaiting-review'] });
+            core.info('Applied awaiting-review label');
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -48,50 +102,6 @@ jobs:
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep"
 
-      - name: Mark PR as awaiting-review
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = context.payload.pull_request.number;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const isDraft = context.payload.pull_request.draft;
-            const event = context.payload.action;
-
-            // Remove awaiting-review if PR was converted to draft
-            if (event === 'converted_to_draft') {
-              try {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: 'awaiting-review' });
-              } catch (_) {}
-              return;
-            }
-
-            // Skip draft PRs
-            if (isDraft) return;
-
-            // Ensure label exists
-            try {
-              await github.rest.issues.getLabel({ owner, repo, name: 'awaiting-review' });
-            } catch (e) {
-              if (e.status === 404) {
-                await github.rest.issues.createLabel({ owner, repo, name: 'awaiting-review', color: '0075ca', description: 'Awaiting code review' });
-              }
-            }
-
-            // Remove verdict labels that are now stale (new push invalidates previous review)
-            const staleLabels = ['mergeable', 'needs-changes-loop', 'blocked'];
-            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: prNumber });
-            for (const lbl of currentLabels) {
-              if (staleLabels.includes(lbl.name)) {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: lbl.name });
-              }
-            }
-
-            // Apply awaiting-review
-            await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['awaiting-review'] });
-            core.info('Applied awaiting-review label');
-
       - name: Apply verdict label
         if: steps.claude-review.conclusion == 'success'
         uses: actions/github-script@v7
@@ -106,7 +116,7 @@ jobs:
             const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: prNumber
             });
-            const botComments = allComments.filter(c => 
+            const botComments = allComments.filter(c =>
               (c.user.login === 'github-actions[bot]' || c.user.login === 'anastasia-istrati[bot]') &&
               !c.body.startsWith('@claude') &&
               !c.body.includes('Review checklist:') &&
@@ -131,7 +141,7 @@ jobs:
             }
             core.info(`Verdict detected: ${verdict}`);
 
-            // Ensure labels exist, create if missing
+            // Ensure verdict label exists, create if missing
             const labelMap = {
               'NEEDS CHANGES': { name: 'needs-changes-loop', color: 'e4e669', description: 'Needs changes before merge' },
               'NOT MERGEABLE': { name: 'blocked', color: 'd73a4a', description: 'Blocked from merging' },
@@ -145,15 +155,18 @@ jobs:
               if (e.status === 404) {
                 await github.rest.issues.createLabel({ owner, repo, name: labelInfo.name, color: labelInfo.color, description: labelInfo.description });
                 core.info(`Created label: ${labelInfo.name}`);
+              } else {
+                throw e;
               }
             }
 
-            // Remove conflicting labels (including awaiting-review — review is now done)
+            // Remove conflicting labels — review is complete, awaiting-review can go
             const conflictingLabels = ['needs-changes-loop', 'blocked', 'mergeable', 'awaiting-review'].filter(l => l !== labelInfo.name);
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: prNumber });
             for (const lbl of currentLabels) {
               if (conflictingLabels.includes(lbl.name)) {
                 await github.rest.issues.removeLabel({ owner, repo, issue_number: prNumber, name: lbl.name });
+                core.info(`Removed label: ${lbl.name}`);
               }
             }
 
@@ -161,7 +174,7 @@ jobs:
             await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: [labelInfo.name] });
             core.info(`Applied label: ${labelInfo.name}`);
 
-            // For NOT MERGEABLE, add a comment notifying PR author (dedup: skip if already posted)
+            // For NOT MERGEABLE, notify PR author (dedup: skip if already posted)
             if (verdict === 'NOT MERGEABLE') {
               const alreadyNotified = allComments.some(c =>
                 c.body && c.body.includes('has been marked **NOT MERGEABLE**')

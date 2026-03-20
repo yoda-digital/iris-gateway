@@ -1,3 +1,9 @@
+## [1.13.8](https://github.com/yoda-digital/iris-gateway/compare/v1.13.7...v1.13.8) (2026-03-20)
+
+### Bug Fixes
+
+* [#186](https://github.com/yoda-digital/iris-gateway/issues/186) — update coverage floor from 70% to 75% in docs ([#191](https://github.com/yoda-digital/iris-gateway/issues/191)) ([c4d732e](https://github.com/yoda-digital/iris-gateway/commit/c4d732e36b59ed342139790f8c9db2af3027b1b7))
+
 ## [1.13.7](https://github.com/yoda-digital/iris-gateway/compare/v1.13.6...v1.13.7) (2026-03-20)
 
 ### Bug Fixes

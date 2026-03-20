@@ -1,3 +1,9 @@
+## [1.13.5](https://github.com/yoda-digital/iris-gateway/compare/v1.13.4...v1.13.5) (2026-03-20)
+
+### Bug Fixes
+
+* [#167](https://github.com/yoda-digital/iris-gateway/issues/167) — add unit tests for src/config/schema.ts (≥20 tests, full coverage) ([#168](https://github.com/yoda-digital/iris-gateway/issues/168)) ([80613c0](https://github.com/yoda-digital/iris-gateway/commit/80613c057985744cf444b3395c1e832ec10e4357))
+
 ## [1.13.4](https://github.com/yoda-digital/iris-gateway/compare/v1.13.3...v1.13.4) (2026-03-20)
 
 ### Bug Fixes

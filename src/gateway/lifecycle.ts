@@ -222,18 +222,9 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     try {
       const healthy = await bridge.checkHealth();
       if (healthy) {
-        const testSession = await bridge.createSession("__readiness_check__");
-        try {
-          await bridge.sendMessage(testSession.id, "ping");
-          warmupDone = true;
-        } catch {
-          // Provider init may fail on first attempt; retry after delay
-        }
-        await bridge.deleteSession(testSession.id);
-        if (warmupDone) {
-          logger.info("OpenCode ready (providers warmed up)");
-          break;
-        }
+        warmupDone = true;
+        logger.info("OpenCode ready (health check passed)");
+        break;
       }
     } catch {
       // Not ready yet

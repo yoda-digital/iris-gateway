@@ -384,14 +384,14 @@ describe("startGateway", () => {
     expect(registerShutdownHandlers).toHaveBeenCalled();
   });
 
-  it("bridge warmup: stops polling when checkHealth returns true and sendMessage succeeds", async () => {
+  it("bridge warmup: stops polling when checkHealth returns true — no session or message created", async () => {
     const bridge = makeBridge();
     vi.mocked(OpenCodeBridge).mockImplementation(() => bridge as any);
     await startGateway();
     expect(bridge.checkHealth).toHaveBeenCalled();
-    expect(bridge.createSession).toHaveBeenCalledWith("__readiness_check__");
-    expect(bridge.sendMessage).toHaveBeenCalled();
-    expect(bridge.deleteSession).toHaveBeenCalled();
+    expect(bridge.createSession).not.toHaveBeenCalled();
+    expect(bridge.sendMessage).not.toHaveBeenCalled();
+    expect(bridge.deleteSession).not.toHaveBeenCalled();
   });
 
   it("initializes intentStore when proactive.enabled=true", async () => {

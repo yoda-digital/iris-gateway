@@ -174,6 +174,21 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
         }
       }
 
+      // Validate existing openrouter model keys for legacy format (should not contain "/" prefix).
+      // Auto-registration writes keys as "model-name" (e.g. "hunter-alpha"), NOT "openrouter/model-name".
+      // A key containing "openrouter/" indicates a stale entry written before auto-registration was introduced.
+      const providerModels = ocConfig.provider?.openrouter?.models ?? {};
+      for (const key of Object.keys(providerModels)) {
+        if (key.startsWith("openrouter/")) {
+          logger.warn(
+            { key },
+            `Legacy model key detected in opencode.json: "${key}" uses full provider prefix — ` +
+            `OpenCode will strip "openrouter/" and look for "${key.slice("openrouter/".length)}" which may not exist. ` +
+            `Rename key to "${key.slice("openrouter/".length)}" to match auto-registration convention.`,
+          );
+        }
+      }
+
       if (changed) {
         writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
         logger.info({

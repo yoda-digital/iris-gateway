@@ -48,6 +48,7 @@ import type { HealthGate } from "../intelligence/health/gate.js";
 import type { PromptAssembler } from "../intelligence/prompt-assembler.js";
 import { join } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
+import { syncModelsToOpenCode } from "../config/model-sync.js";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -101,113 +102,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   const stateDir = ensureDir(getStateDir());
 
   // 4. Sync iris.config.json models → opencode.json (before bridge starts)
-  if (config.models && typeof config.models === "object") {
-    const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");
-    try {
-      const ocConfig = JSON.parse(readFileSync(ocPath, "utf-8"));
-      let changed = false;
-      const models = config.models as Record<string, string>;
-
-      if (models.primary && ocConfig.model !== models.primary) {
-        ocConfig.model = models.primary;
-        changed = true;
-      }
-      if (models.small && ocConfig.small_model !== models.small) {
-        ocConfig.small_model = models.small;
-        changed = true;
-      }
-      // Register unknown models in provider.openrouter.models.
-      // OpenCode silently fails on unknown models — no tool calls, empty responses.
-      // We query the OpenRouter /models API to get real capabilities (context window, etc.)
-      // and register each model correctly. Falls back to safe defaults if API unreachable.
-      const newModels = [models.primary, models.small].filter(Boolean) as string[];
-      for (const modelId of newModels) {
-        const orPrefix = "openrouter/";
-        if (!modelId.startsWith(orPrefix)) continue;
-        const orModelId = modelId.slice(orPrefix.length);
-
-        const providerModels = ocConfig.provider?.openrouter?.models ?? {};
-        if (!providerModels[orModelId]) {
-          // Query OpenRouter for real model capabilities
-          let contextWindow = 131072;
-          let maxOutput = 16384;
-          let supportsTools = true;
-          let modelName = orModelId;
-
-          try {
-            const apiKey = process.env["OPENROUTER_API_KEY"];
-            if (apiKey) {
-              const resp = await fetch(
-                `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
-                { headers: { Authorization: `Bearer ${apiKey}` } }
-              );
-              if (resp.ok) {
-                const data = await resp.json() as Record<string, unknown>;
-                if (typeof data.context_length === "number") contextWindow = data.context_length;
-                const topProvider = data.top_provider as Record<string, unknown> | undefined;
-                if (typeof topProvider?.max_completion_tokens === "number") maxOutput = topProvider.max_completion_tokens;
-                if (Array.isArray(data.supported_parameters)) {
-                  supportsTools = (data.supported_parameters as string[]).includes("tools");
-                }
-                if (typeof data.name === "string") modelName = data.name;
-                logger.info({ contextWindow, maxOutput, supportsTools }, `Fetched capabilities for ${orModelId} from OpenRouter`);
-              }
-            }
-          } catch { /* API unreachable — use safe defaults */ }
-
-          const entry: Record<string, unknown> = {
-            name: modelName,
-            attachment: true,
-            tool_call: supportsTools,
-            limit: { context: contextWindow, output: maxOutput },
-          };
-          // Note: interleaved/reasoning flags are intentionally NOT set here.
-          // They are model-specific (e.g. DeepSeek-R1 reasoning_content) and must be
-          // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
-
-          if (!ocConfig.provider) ocConfig.provider = {};
-          if (!ocConfig.provider.openrouter) ocConfig.provider.openrouter = { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
-          if (!ocConfig.provider.openrouter.models) ocConfig.provider.openrouter.models = {};
-          ocConfig.provider.openrouter.models[orModelId] = entry;
-          changed = true;
-          logger.info({ contextWindow, maxOutput, supportsTools }, `Registered model in opencode.json: ${orModelId}`);
-        }
-      }
-
-      if (changed) {
-        writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
-        logger.info({
-          model: ocConfig.model,
-          small_model: ocConfig.small_model,
-        }, "Synced models from iris.config.json to opencode.json");
-      }
-
-      // Also sync primary model into agent frontmatter — agent model: overrides opencode.json
-      if (models.primary) {
-        const agentDir = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "agent");
-        try {
-          const { readdirSync } = await import("node:fs");
-          const agentFiles = readdirSync(agentDir).filter((f: string) => f.endsWith(".md"));
-          for (const file of agentFiles) {
-            const agentPath = join(agentDir, file);
-            const content = readFileSync(agentPath, "utf-8");
-            if (content.startsWith("---") && /^model:/m.test(content)) {
-              const updated = content.replace(/^(model:\s*)(.+)$/m, `$1${models.primary}`);
-              if (updated !== content) {
-                writeFileSync(agentPath, updated);
-                logger.info({ model: models.primary }, `Synced model in .opencode/agent/${file}`);
-              }
-            }
-          }
-        } catch { /* agent dir may not exist — skip */ }
-      }
-
-      const finalModel = models.primary ?? ocConfig.model ?? "unknown";
-      console.log(`\n  ✔ Model: ${finalModel}\n`);
-    } catch (err) {
-      logger.warn({ err }, "Could not sync models to opencode.json");
-    }
-  }
+  await syncModelsToOpenCode(config, config.opencode, logger);
 
   // 4a. Validate opencode.json model keys for legacy format (runs unconditionally, regardless of config.models).
   // Auto-registration writes keys as "model-name" (e.g. "hunter-alpha"), NOT "openrouter/model-name".

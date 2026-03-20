@@ -150,7 +150,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
                   supportsTools = (data.supported_parameters as string[]).includes("tools");
                 }
                 if (typeof data.name === "string") modelName = data.name;
-                logger.info(`Fetched capabilities for ${orModelId} from OpenRouter`, { contextWindow, maxOutput, supportsTools });
+                logger.info({ contextWindow, maxOutput, supportsTools }, `Fetched capabilities for ${orModelId} from OpenRouter`);
               }
             }
           } catch { /* API unreachable — use safe defaults */ }
@@ -170,16 +170,16 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
           if (!ocConfig.provider.openrouter.models) ocConfig.provider.openrouter.models = {};
           ocConfig.provider.openrouter.models[orModelId] = entry;
           changed = true;
-          logger.info(`Registered model in opencode.json: ${orModelId}`, { contextWindow, maxOutput, supportsTools });
+          logger.info({ contextWindow, maxOutput, supportsTools }, `Registered model in opencode.json: ${orModelId}`);
         }
       }
 
       if (changed) {
         writeFileSync(ocPath, JSON.stringify(ocConfig, null, 2));
-        logger.info("Synced models from iris.config.json to opencode.json", {
+        logger.info({
           model: ocConfig.model,
           small_model: ocConfig.small_model,
-        });
+        }, "Synced models from iris.config.json to opencode.json");
       }
 
       // Also sync primary model into agent frontmatter — agent model: overrides opencode.json
@@ -195,7 +195,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
               const updated = content.replace(/^(model:\s*)(.+)$/m, `$1${models.primary}`);
               if (updated !== content) {
                 writeFileSync(agentPath, updated);
-                logger.info(`Synced model in .opencode/agent/${file}`, { model: models.primary });
+                logger.info({ model: models.primary }, `Synced model in .opencode/agent/${file}`);
               }
             }
           }
@@ -205,7 +205,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       const finalModel = models.primary ?? ocConfig.model ?? "unknown";
       console.log(`\n  ✔ Model: ${finalModel}\n`);
     } catch (err) {
-      logger.warn("Could not sync models to opencode.json", { err });
+      logger.warn({ err }, "Could not sync models to opencode.json");
     }
   }
 

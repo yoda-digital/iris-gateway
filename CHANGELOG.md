@@ -1,3 +1,17 @@
+## [1.13.4](https://github.com/yoda-digital/iris-gateway/compare/v1.13.3...v1.13.4) (2026-03-20)
+
+### Bug Fixes
+
+* **config:** add models field to Zod schema — was stripped at parse time ([5a828d1](https://github.com/yoda-digital/iris-gateway/commit/5a828d1a22b54f0fad4b2ec85a9b7fee9f4ff1d7))
+* **config:** auto-register unknown models in opencode.json provider map ([f1bbbf7](https://github.com/yoda-digital/iris-gateway/commit/f1bbbf74595f8948e56ed25b636f09b20ef54b46))
+* **config:** query OpenRouter API for real model capabilities at registration ([865a404](https://github.com/yoda-digital/iris-gateway/commit/865a404cbe8fdbb89cabd2a2f8f49a5500b12707))
+* **config:** show active model clearly in console at startup ([e01743c](https://github.com/yoda-digital/iris-gateway/commit/e01743c52c12af31b43e74a7200108b14907f796))
+* **config:** sync iris.config.json models to opencode.json at startup ([04f1970](https://github.com/yoda-digital/iris-gateway/commit/04f19704947646618e33330757a87c1dc46e2f63))
+* **config:** sync primary model to .opencode/agent/ frontmatter ([7cd6052](https://github.com/yoda-digital/iris-gateway/commit/7cd6052e37e49099792112e1cb45f1e5b010f976))
+* **config:** update models to use openrouter/hunter-alpha across agents and opencode.json ([9cb2eca](https://github.com/yoda-digital/iris-gateway/commit/9cb2eca5f41084d86c6bba0a3b7ea283a4cb2c8f))
+* **config:** use safe minimal defaults when registering unknown models ([924c227](https://github.com/yoda-digital/iris-gateway/commit/924c22789d5a38bfd003c7cd9d35ba0500e1b153))
+* **lifecycle:** swap pino v9 logger call order (obj, msg) to fix TS2769 overload errors ([dd0c6c9](https://github.com/yoda-digital/iris-gateway/commit/dd0c6c9ee4a3d07afceaca30fba8d457b80c50c4)), closes [#171](https://github.com/yoda-digital/iris-gateway/issues/171)
+
 ## [1.13.3](https://github.com/yoda-digital/iris-gateway/compare/v1.13.2...v1.13.3) (2026-03-17)
 
 ### Bug Fixes

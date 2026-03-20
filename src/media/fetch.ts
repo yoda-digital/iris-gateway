@@ -1,4 +1,6 @@
 const DEFAULT_TIMEOUT_MS = 30_000;
+/** Timeout for Telegram getFile metadata API call (not the download itself). */
+const TELEGRAM_GETFILE_TIMEOUT_MS = 10_000;
 const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
 export interface FetchMediaOptions {
@@ -72,9 +74,16 @@ export async function fetchTelegramFile(
   botToken: string,
   fileId: string,
 ): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
-  // Get file path from Telegram API
+  // Get file path from Telegram API (metadata call — 10s timeout)
   const apiUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`;
-  const response = await fetch(apiUrl);
+  const ac = new AbortController();
+  const timeoutId = setTimeout(() => ac.abort(), TELEGRAM_GETFILE_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, { signal: ac.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!response.ok) {
     throw new Error(`Telegram getFile failed: ${response.status}`);
   }

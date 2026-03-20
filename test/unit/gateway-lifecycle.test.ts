@@ -436,3 +436,81 @@ describe("GatewayContext type contract", () => {
   });
 
 });
+
+// ─── Readiness check tests (issue #176) ──────────────────────────────────────
+
+describe("OpenCode readiness check (issue #176)", () => {
+  it("does NOT call bridge.sendMessage() during warmup — uses checkHealth() only", () => {
+    // Simulate the warmup loop logic directly to verify sendMessage is never called
+    const bridge = makeBridge();
+
+    // checkHealth returns false twice, then true
+    bridge.checkHealth
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    // Replicate the fixed warmup logic
+    async function runWarmup() {
+      const READY_TIMEOUT_MS = 60_000;
+      const READY_POLL_MS = 500;
+      const readyStart = Date.now();
+      let warmupDone = false;
+
+      while (Date.now() - readyStart < READY_TIMEOUT_MS) {
+        try {
+          const healthy = await bridge.checkHealth();
+          if (healthy) {
+            const gracePeriodMs = Number(process.env.OPENCODE_WARMUP_GRACE_MS) || 1000;
+            await new Promise(resolve => setTimeout(resolve, gracePeriodMs));
+            warmupDone = true;
+            break;
+          }
+        } catch {
+          // Not ready yet
+        }
+        await new Promise((r) => setTimeout(r, READY_POLL_MS));
+      }
+      return warmupDone;
+    }
+
+    return runWarmup().then((warmupDone) => {
+      expect(warmupDone).toBe(true);
+      expect(bridge.sendMessage).not.toHaveBeenCalled();
+      expect(bridge.createSession).not.toHaveBeenCalled();
+      expect(bridge.deleteSession).not.toHaveBeenCalled();
+      expect(bridge.checkHealth).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  it("warmupDone stays false when checkHealth never returns true within timeout", () => {
+    const bridge = makeBridge();
+    bridge.checkHealth.mockResolvedValue(false);
+
+    async function runWarmupWithShortTimeout() {
+      const READY_TIMEOUT_MS = 50; // very short for test speed
+      const READY_POLL_MS = 10;
+      const readyStart = Date.now();
+      let warmupDone = false;
+
+      while (Date.now() - readyStart < READY_TIMEOUT_MS) {
+        try {
+          const healthy = await bridge.checkHealth();
+          if (healthy) {
+            warmupDone = true;
+            break;
+          }
+        } catch {
+          // Not ready yet
+        }
+        await new Promise((r) => setTimeout(r, READY_POLL_MS));
+      }
+      return warmupDone;
+    }
+
+    return runWarmupWithShortTimeout().then((warmupDone) => {
+      expect(warmupDone).toBe(false);
+      expect(bridge.sendMessage).not.toHaveBeenCalled();
+    });
+  });
+});

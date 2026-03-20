@@ -237,21 +237,21 @@ describe("startGateway()", () => {
     expect(bridgeMock.start).toHaveBeenCalledTimes(1);
   });
 
-  it("warms up OpenCode bridge before proceeding", async () => {
+  it("warms up OpenCode bridge using checkHealth() only — no session or message created", async () => {
     loadConfig.mockReturnValue(makeMinimalConfig());
     const { startGateway } = await import("../../src/gateway/lifecycle.js");
     await startGateway();
     expect(bridgeMock.checkHealth).toHaveBeenCalled();
-    expect(bridgeMock.createSession).toHaveBeenCalledWith("__readiness_check__");
-    expect(bridgeMock.sendMessage).toHaveBeenCalledWith("warmup-sess-1", "ping");
-    expect(bridgeMock.deleteSession).toHaveBeenCalledWith("warmup-sess-1");
+    expect(bridgeMock.createSession).not.toHaveBeenCalled();
+    expect(bridgeMock.sendMessage).not.toHaveBeenCalled();
+    expect(bridgeMock.deleteSession).not.toHaveBeenCalled();
   });
 
   it("logs OpenCode ready when warmup succeeds", async () => {
     loadConfig.mockReturnValue(makeMinimalConfig());
     const { startGateway } = await import("../../src/gateway/lifecycle.js");
     await startGateway();
-    expect(loggerMock.info).toHaveBeenCalledWith("OpenCode ready (providers warmed up)");
+    expect(loggerMock.info).toHaveBeenCalledWith("OpenCode ready (health check passed)");
   });
 
   it("logs warmup timeout warning when bridge never becomes healthy", async () => {

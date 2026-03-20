@@ -119,7 +119,7 @@ describe("InferenceStore", () => {
 
   describe("logInference edge cases", () => {
     it("stores null result and null details", () => {
-      store.logInference({ ruleId: "r2", senderId: "s1", result: null, details: null, executedAt: 2000 });
+      store.logInference({ ruleId: "r2", senderId: "s1", result: "skipped", details: null, executedAt: 2000 });
       const last = store.getLastInferenceRun("r2", "s1");
       expect(last).toBe(2000);
     });

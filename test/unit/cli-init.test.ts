@@ -434,7 +434,7 @@ describe("InitCommand: config structure", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("written config has models.primary", async () => {
+  it("written config has the correct basic structure", async () => {
     await setupHappyPathMocks();
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
@@ -442,30 +442,10 @@ describe("InitCommand: config structure", () => {
     await cmd.execute();
 
     const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
-    expect(config).toHaveProperty("models.primary");
-  });
-
-  it("written config has models.small", async () => {
-    await setupHappyPathMocks();
-
-    const { InitCommand } = await import("../../src/cli/commands/init.js");
-    const cmd = new InitCommand();
-    await cmd.execute();
-
-    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
-    expect(config).toHaveProperty("models.small");
-  });
-
-  it("written config has channels object", async () => {
-    await setupHappyPathMocks();
-
-    const { InitCommand } = await import("../../src/cli/commands/init.js");
-    const cmd = new InitCommand();
-    await cmd.execute();
-
-    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
-    expect(config).toHaveProperty("channels");
-    expect(typeof config.channels).toBe("object");
+    expect(config).toMatchObject({
+      models: { primary: expect.any(String), small: expect.any(String) },
+      channels: expect.any(Object),
+    });
   });
 
   it("telegram channel config uses env-var reference for token", async () => {

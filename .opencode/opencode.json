@@ -34,7 +34,7 @@
             "output": 8192
           }
         },
-        "openrouter/aurora-alpha": {
+        "aurora-alpha": {
           "name": "Aurora Alpha (Speed/Moderator)",
           "reasoning": false,
           "tool_call": true,

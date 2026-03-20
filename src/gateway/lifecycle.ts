@@ -209,6 +209,28 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     }
   }
 
+  // 4a. Validate opencode.json model keys for legacy format (runs unconditionally, regardless of config.models).
+  // Auto-registration writes keys as "model-name" (e.g. "hunter-alpha"), NOT "openrouter/model-name".
+  // A key containing "openrouter/" indicates a stale entry written before auto-registration was introduced.
+  {
+    const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");
+    try {
+      const ocConfig = JSON.parse(readFileSync(ocPath, "utf-8"));
+      const providerModels = (ocConfig.provider?.openrouter?.models ?? {}) as Record<string, unknown>;
+      for (const key of Object.keys(providerModels)) {
+        if (key.startsWith("openrouter/")) {
+          const newKey = key.slice("openrouter/".length);
+          logger.warn(
+            { key, newKey },
+            `Legacy model key detected in opencode.json: "${key}" uses full provider prefix — ` +
+            `OpenCode will look for "${newKey}" which may not exist. ` +
+            `Rename key to "${newKey}" to match auto-registration convention.`,
+          );
+        }
+      }
+    } catch { /* opencode.json may not exist yet — skip */ }
+  }
+
   // 4b. Start OpenCode bridge
   const bridge = new OpenCodeBridge(config.opencode, logger);
   await bridge.start();

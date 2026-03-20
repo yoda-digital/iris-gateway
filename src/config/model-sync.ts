@@ -6,7 +6,7 @@
  */
 
 import { join } from "node:path";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import type { IrisConfig } from "./types.js";
 import type { OpenCodeConfig } from "./types.js";
 import type { Logger } from "../logging/logger.js";
@@ -96,8 +96,8 @@ export async function syncModelsToOpenCode(
             );
           }
         }
-      } catch {
-        /* API unreachable — use safe defaults */
+      } catch (err) {
+        logger.warn({ err }, "Failed to fetch model capabilities from OpenRouter API — using safe defaults");
       }
 
       const entry: Record<string, unknown> = {
@@ -110,14 +110,9 @@ export async function syncModelsToOpenCode(
       // They are model-specific (e.g. DeepSeek-R1 reasoning_content) and must be
       // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
 
-      if (!ocJson.provider) ocJson.provider = {};
-      const provider = ocJson.provider as Record<string, unknown>;
-      if (!provider.openrouter) {
-        provider.openrouter = {
-          options: { baseURL: "https://openrouter.ai/api/v1" },
-          models: {},
-        };
-      }
+      ocJson.provider ??= {};
+      const provider = ocJson.provider as Record<string, any>;
+      provider.openrouter ??= { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
       const openrouterSection = provider.openrouter as Record<string, unknown>;
       if (!openrouterSection.models) openrouterSection.models = {};
       (openrouterSection.models as Record<string, unknown>)[orModelId] = entry;
@@ -131,7 +126,11 @@ export async function syncModelsToOpenCode(
 
   // Write opencode.json if changed
   if (changed) {
-    writeFileSync(ocPath, JSON.stringify(ocJson, null, 2));
+    try {
+      writeFileSync(ocPath, JSON.stringify(ocJson, null, 2));
+    } catch (writeErr) {
+      logger.warn({ err: writeErr }, "Could not write opencode.json — model sync changes not persisted");
+    }
     logger.info(
       { model: ocJson.model, small_model: ocJson.small_model },
       "Synced models from iris.config.json to opencode.json",
@@ -143,7 +142,6 @@ export async function syncModelsToOpenCode(
   if (models.primary) {
     const agentDir = join(ocConfig.projectDir ?? process.cwd(), ".opencode", "agent");
     try {
-      const { readdirSync } = await import("node:fs");
       const agentFiles = readdirSync(agentDir).filter((f: string) => f.endsWith(".md"));
       for (const file of agentFiles) {
         const agentPath = join(agentDir, file);

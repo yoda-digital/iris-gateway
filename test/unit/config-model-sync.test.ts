@@ -92,7 +92,7 @@ describe("syncModelsToOpenCode", () => {
 
   it("auto-registers openrouter models without OPENROUTER_API_KEY using safe defaults", async () => {
     // Ensure API key is absent so fallback defaults are used
-    delete process.env["OPENROUTER_API_KEY"];
+    vi.stubEnv("OPENROUTER_API_KEY", "");
     const config = makeConfig({
       models: { primary: "openrouter/anthropic/claude-sonnet-4-5" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },

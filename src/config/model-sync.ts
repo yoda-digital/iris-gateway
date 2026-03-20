@@ -37,6 +37,7 @@ export async function syncModelsToOpenCode(
   }
 
   let changed = false;
+  let writeSucceeded = false;
   const models = config.models as Record<string, string>;
 
   // 1. Sync primary / small model fields
@@ -53,92 +54,98 @@ export async function syncModelsToOpenCode(
   // OpenCode silently fails on unknown models — no tool calls, empty responses.
   // We query the OpenRouter /models API to get real capabilities (context window, etc.)
   // and register each model correctly. Falls back to safe defaults if API unreachable.
-  const newModels = [models.primary, models.small].filter(Boolean) as string[];
-  for (const modelId of newModels) {
-    const orPrefix = "openrouter/";
-    if (!modelId.startsWith(orPrefix)) continue;
-    const orModelId = modelId.slice(orPrefix.length);
+  //
+  // Guard: opencode.json may have malformed provider sections (e.g. `"provider": "string"`
+  // instead of an object). The ??= assignments below would throw TypeError in that case.
+  // Wrap the entire mutation + write block so any such error logs a warning and returns
+  // false instead of crashing startGateway().
+  try {
+    const newModels = [models.primary, models.small].filter(Boolean) as string[];
+    for (const modelId of newModels) {
+      const orPrefix = "openrouter/";
+      if (!modelId.startsWith(orPrefix)) continue;
+      const orModelId = modelId.slice(orPrefix.length);
 
-    const providerModels =
-      (ocJson.provider as Record<string, unknown> | undefined)?.openrouter as
-        | Record<string, unknown>
-        | undefined;
-    const existingModels = (providerModels?.models ?? {}) as Record<string, unknown>;
+      const providerModels =
+        (ocJson.provider as Record<string, unknown> | undefined)?.openrouter as
+          | Record<string, unknown>
+          | undefined;
+      const existingModels = (providerModels?.models ?? {}) as Record<string, unknown>;
 
-    if (!existingModels[orModelId]) {
-      // Query OpenRouter for real model capabilities
-      let contextWindow = 131072;
-      let maxOutput = 16384;
-      let supportsTools = true;
-      let modelName = orModelId;
+      if (!existingModels[orModelId]) {
+        // Query OpenRouter for real model capabilities
+        let contextWindow = 131072;
+        let maxOutput = 16384;
+        let supportsTools = true;
+        let modelName = orModelId;
 
-      try {
-        const apiKey = process.env["OPENROUTER_API_KEY"];
-        if (apiKey) {
-          const resp = await fetch(
-            `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
-            { headers: { Authorization: `Bearer ${apiKey}` } },
-          );
-          if (resp.ok) {
-            const data = (await resp.json()) as Record<string, unknown>;
-            if (typeof data.context_length === "number") contextWindow = data.context_length;
-            const topProvider = data.top_provider as Record<string, unknown> | undefined;
-            if (typeof topProvider?.max_completion_tokens === "number") {
-              maxOutput = topProvider.max_completion_tokens;
-            }
-            if (Array.isArray(data.supported_parameters)) {
-              supportsTools = (data.supported_parameters as string[]).includes("tools");
-            }
-            if (typeof data.name === "string") modelName = data.name;
-            logger.info(
-              { contextWindow, maxOutput, supportsTools },
-              `Fetched capabilities for ${orModelId} from OpenRouter`,
+        try {
+          const apiKey = process.env["OPENROUTER_API_KEY"];
+          if (apiKey) {
+            const resp = await fetch(
+              `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
+              { headers: { Authorization: `Bearer ${apiKey}` } },
             );
+            if (resp.ok) {
+              const data = (await resp.json()) as Record<string, unknown>;
+              if (typeof data.context_length === "number") contextWindow = data.context_length;
+              const topProvider = data.top_provider as Record<string, unknown> | undefined;
+              if (typeof topProvider?.max_completion_tokens === "number") {
+                maxOutput = topProvider.max_completion_tokens;
+              }
+              if (Array.isArray(data.supported_parameters)) {
+                supportsTools = (data.supported_parameters as string[]).includes("tools");
+              }
+              if (typeof data.name === "string") modelName = data.name;
+              logger.info(
+                { contextWindow, maxOutput, supportsTools },
+                `Fetched capabilities for ${orModelId} from OpenRouter`,
+              );
+            }
           }
+        } catch (err) {
+          logger.warn({ err }, "Failed to fetch model capabilities from OpenRouter API — using safe defaults");
         }
-      } catch (err) {
-        logger.warn({ err }, "Failed to fetch model capabilities from OpenRouter API — using safe defaults");
+
+        const entry: Record<string, unknown> = {
+          name: modelName,
+          attachment: true,
+          tool_call: supportsTools,
+          limit: { context: contextWindow, output: maxOutput },
+        };
+        // Note: interleaved/reasoning flags are intentionally NOT set here.
+        // They are model-specific (e.g. DeepSeek-R1 reasoning_content) and must be
+        // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
+
+        ocJson.provider ??= {};
+        const provider = ocJson.provider as Record<string, any>;
+        provider.openrouter ??= { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
+        const openrouterSection = provider.openrouter as Record<string, unknown>;
+        if (!openrouterSection.models) openrouterSection.models = {};
+        (openrouterSection.models as Record<string, unknown>)[orModelId] = entry;
+        changed = true;
+        logger.info(
+          { contextWindow, maxOutput, supportsTools },
+          `Registered model in opencode.json: ${orModelId}`,
+        );
       }
-
-      const entry: Record<string, unknown> = {
-        name: modelName,
-        attachment: true,
-        tool_call: supportsTools,
-        limit: { context: contextWindow, output: maxOutput },
-      };
-      // Note: interleaved/reasoning flags are intentionally NOT set here.
-      // They are model-specific (e.g. DeepSeek-R1 reasoning_content) and must be
-      // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
-
-      ocJson.provider ??= {};
-      const provider = ocJson.provider as Record<string, any>;
-      provider.openrouter ??= { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
-      const openrouterSection = provider.openrouter as Record<string, unknown>;
-      if (!openrouterSection.models) openrouterSection.models = {};
-      (openrouterSection.models as Record<string, unknown>)[orModelId] = entry;
-      changed = true;
-      logger.info(
-        { contextWindow, maxOutput, supportsTools },
-        `Registered model in opencode.json: ${orModelId}`,
-      );
     }
-  }
 
-  // Write opencode.json if changed
-  let writeSucceeded = false;
-  if (changed) {
-    try {
+    // Write opencode.json if changed
+    if (changed) {
       writeFileSync(ocPath, JSON.stringify(ocJson, null, 2));
       writeSucceeded = true;
-    } catch (writeErr) {
-      logger.warn({ err: writeErr }, "Could not write opencode.json — model sync changes not persisted");
-    }
-    if (writeSucceeded) {
       logger.info(
         { model: ocJson.model, small_model: ocJson.small_model },
         "Synced models from iris.config.json to opencode.json",
       );
     }
+  } catch (mutationErr) {
+    logger.warn(
+      { err: mutationErr },
+      "Failed to mutate opencode.json — malformed structure or write error. Model sync skipped.",
+    );
+    return false;
   }
 
   // Skip frontmatter sync if opencode.json write failed — avoids partially-synced gateway state

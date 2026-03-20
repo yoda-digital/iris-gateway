@@ -1,3 +1,9 @@
+## [1.13.6](https://github.com/yoda-digital/iris-gateway/compare/v1.13.5...v1.13.6) (2026-03-20)
+
+### Bug Fixes
+
+* [#170](https://github.com/yoda-digital/iris-gateway/issues/170) — expand canvas/server.ts and inference/store.ts test coverage ([#172](https://github.com/yoda-digital/iris-gateway/issues/172)) ([8882124](https://github.com/yoda-digital/iris-gateway/commit/88821242677cf632ade1c1c0d7b55f104a0b22ed))
+
 ## [1.13.5](https://github.com/yoda-digital/iris-gateway/compare/v1.13.4...v1.13.5) (2026-03-20)
 
 ### Bug Fixes

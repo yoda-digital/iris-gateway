@@ -124,11 +124,19 @@ No discussion, no feedback loop — just rejected:
 
 | Label | Effect | Who can apply |
 |-------|--------|---------------|
+| `awaiting-review` | Applied when review starts; removed when verdict is posted | CI (automatic) |
 | `needs-changes-loop` | Triggers Claude Code to implement requested changes automatically | CI (automatic), Maintainers (manual) |
-| `awaiting-review` | Signals PR is ready for human review | Author |
-| `mergeable` | Final approval — safe to merge | Maintainers |
+| `mergeable` | Final approval — safe to merge | CI (automatic) |
+| `blocked` | PR is blocked from merging | CI (automatic) |
 
-**`needs-changes-loop`** — when Claude Code leaves a review verdict of NEEDS CHANGES, this label is applied automatically by `.github/workflows/claude-code-review.yml`. It then triggers `.github/workflows/claude.yml`, which implements the requested changes and pushes a new commit.
+**Label lifecycle:**
+1. PR opened / new push → `awaiting-review` applied (stale verdict labels removed)
+2. Claude Code review completes → verdict label applied (`mergeable` / `needs-changes-loop` / `blocked`), `awaiting-review` removed
+3. `needs-changes-loop` → triggers `claude.yml` to implement fixes and push; cycle repeats from step 1
+
+**`awaiting-review`** — applied automatically by `.github/workflows/claude-code-review.yml` when a PR is opened, pushed to, or marked ready for review. Removed when a verdict is posted. Removed immediately if the PR is converted to draft.
+
+**`needs-changes-loop`** — applied automatically by `.github/workflows/claude-code-review.yml` when Claude Code verdict is NEEDS CHANGES. It then triggers `.github/workflows/claude.yml`, which implements the requested changes and pushes a new commit.
 
 ⚠️ **Security note:** Only maintainers should have label-apply access. This label triggers Claude Code execution with Bash access scoped to the repo workspace. The allowlist in `.claude/settings.json` restricts what commands Claude can run — but do not expand it without understanding the threat model. A contributor with label access and a malicious PR body could trigger unintended bash execution within the scoped allowlist.
 

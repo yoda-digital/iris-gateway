@@ -271,9 +271,9 @@ describe("lifecycle.ts — OpenRouter model registration (model-sync block)", ()
     );
 
     // Verify model entry structure
-    const written = JSON.parse(
-      vi.mocked(writeFileSync).mock.calls.find(([p]) => p === OC_PATH)![1] as string,
-    );
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(([p]) => p === OC_PATH);
+    expect(writeCall).toBeDefined();
+    const written = JSON.parse(writeCall![1] as string);
     expect(written.provider.openrouter.models["test-provider/some-model"]).toMatchObject({
       name: "Test Model Fancy Name",
       tool_call: true,
@@ -303,9 +303,9 @@ describe("lifecycle.ts — OpenRouter model registration (model-sync block)", ()
       expect.stringContaining("test-provider/some-model"),
     );
 
-    const written = JSON.parse(
-      vi.mocked(writeFileSync).mock.calls.find(([p]) => p === OC_PATH)![1] as string,
-    );
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(([p]) => p === OC_PATH);
+    expect(writeCall).toBeDefined();
+    const written = JSON.parse(writeCall![1] as string);
     const entry = written.provider.openrouter.models["test-provider/some-model"];
     expect(entry).toBeDefined();
     // Safe defaults
@@ -413,7 +413,9 @@ describe("lifecycle.ts — OpenRouter model registration (model-sync block)", ()
     const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(([p]) => p === OC_PATH);
     expect(writeCalls.length).toBeGreaterThan(0);
 
-    const written = JSON.parse(writeCalls[0]![1] as string);
+    const firstCall = writeCalls[0];
+    expect(firstCall).toBeDefined();
+    const written = JSON.parse(firstCall![1] as string);
     const entry = written.provider.openrouter.models["test-provider/some-model"];
     expect(entry).toBeDefined();
     // Safe defaults applied (no API fetch)

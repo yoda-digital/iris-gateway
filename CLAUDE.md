@@ -76,6 +76,7 @@ Key routes:
 
 Beyond tool-server and session-map, the bridge has several critical components:
 - **`supervisor.ts`** — `BridgeSupervisor`: health monitoring, circuit breaking, and restart logic. Max 5 restarts with exponential backoff (1s → 30s). Queues messages during restart window (max 50).
+- **Readiness check** (`lifecycle.ts`) — on startup, polls `bridge.checkHealth()` (HTTP GET /health to OpenCode) with a 60s timeout before accepting inbound messages. Pure HTTP polling — no session creation, no LLM messages, zero token cost. `sendMessage` is never called during warmup. Prior approach (sending a `__readiness_check__` ping message) was removed in #176 due to token waste and vault pollution.
 - **`circuit-breaker.ts`** — circuit breaker pattern for OpenCode client resilience
 - **`opencode-client.ts`** — the actual HTTP/WS client to the OpenCode process
 - **`message-queue.ts`** — buffers inbound messages during bridge restarts
@@ -105,10 +106,14 @@ Adaptive health monitoring (`src/heartbeat/`). Five checkers (bridge, channels, 
 
 ### Intelligence Layer
 
-Eleven deterministic subsystems in `src/intelligence/` — zero LLM cost, all pure Node.js + SQLite:
+Twelve deterministic subsystems in `src/intelligence/` — zero LLM cost, all pure Node.js + SQLite:
 
 - **IntelligenceBus** (`bus.ts`) — typed synchronous event emitter connecting all subsystems.
-- **IntelligenceStore** (`store.ts`) — single SQLite store managing 6 tables (derived_signals, inference_log, proactive_outcomes, memory_arcs, arc_entries, goals).
+- **IntelligenceStore** (`store.ts`) — thin facade delegating to four domain stores. Provides a unified interface; domain stores own schema and methods:
+  - **InferenceStore** (`inference/store.ts`) — derived_signals, inference_log
+  - **OutcomesStore** (`outcomes/store.ts`) — proactive_outcomes
+  - **ArcsStore** (`arcs/store.ts`) — memory_arcs, arc_entries
+  - **GoalsStore** (`goals/store.ts`) — goals
 - **InferenceEngine** (`inference/engine.ts`) — runs 5 statistical rules (timezone, language stability, engagement trend, response cadence, session pattern) with cooldowns.
 - **TriggerEvaluator** (`triggers/evaluator.ts`) — synchronous regex/signal rules in the message pipeline.
 - **OutcomeAnalyzer** (`outcomes/analyzer.ts`) — category-segmented engagement tracking with timing patterns.
@@ -186,7 +191,8 @@ Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline
 
 | File | Role |
 |------|------|
-| `src/gateway/lifecycle.ts` | Wires everything together — the dependency injection root |
+| `src/gateway/lifecycle.ts` | Wires everything together — the dependency injection root. Model-sync delegated to `src/config/model-sync.ts`. |
+| `src/config/model-sync.ts` | Syncs `iris.config.json` model list → `opencode.json` + agent frontmatter at startup. Emits `logger.warn` on config read/write errors or API failures during model sync. |
 | `.opencode/plugin/iris.ts` | THE plugin — all tools + hooks in one file |
 | `src/bridge/tool-server.ts` | Tool server entry point — mounts domain routers |
 | `src/bridge/routers/` | Domain routers — each file owns a slice of the tool-server API |
@@ -202,7 +208,11 @@ Tests live in `test/unit/` and `test/integration/`. Use vitest. Mocks are inline
 | `src/cli/registry.ts` | Config-driven tool-to-command mapper |
 | `src/onboarding/enricher.ts` | tinyld language + Unicode script + statistical profiling |
 | `src/heartbeat/engine.ts` | Multi-agent health orchestrator |
-| `src/intelligence/store.ts` | Intelligence store — 6 SQLite tables for all intelligence data |
+| `src/intelligence/store.ts` | Intelligence store facade — delegates to 4 domain stores below |
+| `src/intelligence/inference/store.ts` | InferenceStore — derived_signals, inference_log |
+| `src/intelligence/outcomes/store.ts` | OutcomesStore — proactive_outcomes |
+| `src/intelligence/arcs/store.ts` | ArcsStore — memory_arcs, arc_entries |
+| `src/intelligence/goals/store.ts` | GoalsStore — goals |
 | `src/intelligence/bus.ts` | Typed event bus connecting all intelligence subsystems |
 | `src/intelligence/prompt-assembler.ts` | Structured prompt builder (arcs, goals, outcomes, health) |
 | `AGENTS.md` | AI behavioral rules (injected into all agents) |

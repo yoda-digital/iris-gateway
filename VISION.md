@@ -121,10 +121,10 @@ Clean layers. Documented APIs. Resilient connections.
 ### v2.0 — Platform Evolution (due 2026-12-31)
 Platform-quality: metrics, SDK, multi-instance.
 
-- Prometheus metrics endpoint (issue #10)
-- Plugin SDK for external developers
-- Multi-instance support
-- Distributed architecture investigation
+- ✅ Plugin SDK for external developers — `IrisClient` published as `@yoda.digital/iris-gateway/sdk` (closes #100)
+- ✅ Multi-instance support — shared SQLite WAL + advisory leader election via `InstanceCoordinator` (closes #101)
+- ✅ Distributed architecture investigation — spike complete (closes #104)
+- ⏳ Prometheus metrics endpoint (issue #10) — remaining work
 
 ---
 

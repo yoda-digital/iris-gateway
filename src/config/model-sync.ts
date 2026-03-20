@@ -11,6 +11,9 @@ import type { IrisConfig } from "./types.js";
 import type { OpenCodeConfig } from "./types.js";
 import type { Logger } from "../logging/logger.js";
 
+/** Timeout for OpenRouter capability fetch — falls through to safe defaults if exceeded. */
+const OPENROUTER_FETCH_TIMEOUT_MS = 5_000;
+
 /**
  * Syncs iris.config.json model configuration into opencode.json and agent
  * frontmatter files. Returns `true` if opencode.json was modified.
@@ -82,10 +85,17 @@ export async function syncModelsToOpenCode(
         try {
           const apiKey = process.env["OPENROUTER_API_KEY"];
           if (apiKey) {
-            const resp = await fetch(
-              `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
-              { headers: { Authorization: `Bearer ${apiKey}` } },
-            );
+            const ac = new AbortController();
+            const timeoutId = setTimeout(() => ac.abort(), OPENROUTER_FETCH_TIMEOUT_MS);
+            let resp: Response;
+            try {
+              resp = await fetch(
+                `https://openrouter.ai/api/v1/models/${encodeURIComponent(orModelId)}`,
+                { headers: { Authorization: `Bearer ${apiKey}` }, signal: ac.signal },
+              );
+            } finally {
+              clearTimeout(timeoutId);
+            }
             if (resp.ok) {
               const data = (await resp.json()) as Record<string, unknown>;
               if (typeof data.context_length === "number") contextWindow = data.context_length;

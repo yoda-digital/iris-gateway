@@ -135,6 +135,77 @@ describe("syncModelsToOpenCode", () => {
     expect(content).toContain("model: openrouter/qwen/qwen3-coder:free");
   });
 
+  it("uses safe defaults when OpenRouter API fetch is aborted (timeout path)", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    // Simulate fetch that immediately rejects with AbortError (as if AbortController.abort() fired)
+    vi.stubGlobal("fetch", (_url: string, opts?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        if (opts?.signal) {
+          // If signal is already aborted, reject immediately
+          if (opts.signal.aborted) {
+            const err = new DOMException("The operation was aborted.", "AbortError");
+            reject(err);
+            return;
+          }
+          opts.signal.addEventListener("abort", () => {
+            const err = new DOMException("The operation was aborted.", "AbortError");
+            reject(err);
+          });
+        }
+        // Never resolve — hangs until abort fires
+      });
+    });
+
+    const config = makeConfig({
+      models: { primary: "openrouter/meta-llama/llama-3.3-70b-instruct:free" },
+      opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
+    });
+    const logger = makeLogger();
+
+    // Use fake timers so setTimeout(5000) fires immediately
+    vi.useFakeTimers();
+    const syncPromise = syncModelsToOpenCode(config, config.opencode, logger);
+    // Advance all timers to trigger the AbortController timeout
+    await vi.runAllTimersAsync();
+    const result = await syncPromise;
+
+    expect(result).toBe(true); // still writes with safe defaults
+    const written = JSON.parse(readFileSync(ocPath, "utf-8"));
+    const registeredModel = written.provider?.openrouter?.models?.["meta-llama/llama-3.3-70b-instruct:free"];
+    expect(registeredModel).toBeDefined();
+    expect(registeredModel.limit.context).toBe(131072);
+    expect(registeredModel.limit.output).toBe(16384);
+    // Warn must be logged for the AbortError
+    expect((logger.warn as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }, 15_000);
+
+  it("uses safe defaults when OpenRouter API returns an error response", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(new Response(JSON.stringify({ error: "rate limited" }), { status: 429 })),
+    );
+
+    const config = makeConfig({
+      models: { primary: "openrouter/meta-llama/llama-3.3-70b-instruct:free" },
+      opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
+    });
+    const logger = makeLogger();
+    const result = await syncModelsToOpenCode(config, config.opencode, logger);
+
+    expect(result).toBe(true);
+    const written = JSON.parse(readFileSync(ocPath, "utf-8"));
+    const registeredModel = written.provider?.openrouter?.models?.["meta-llama/llama-3.3-70b-instruct:free"];
+    expect(registeredModel).toBeDefined();
+    expect(registeredModel.limit.context).toBe(131072);
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
   it("returns false when opencode.json is missing or unreadable", async () => {
     const emptyDir = mkdtempSync(join(tmpdir(), "iris-model-sync-empty-"));
     const config = makeConfig({

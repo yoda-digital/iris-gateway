@@ -94,14 +94,14 @@ describe("syncModelsToOpenCode", () => {
     // Ensure API key is absent so fallback defaults are used
     vi.stubEnv("OPENROUTER_API_KEY", "");
     const config = makeConfig({
-      models: { primary: "openrouter/anthropic/claude-sonnet-4-5" },
+      models: { primary: "openrouter/meta-llama/llama-3.3-70b-instruct:free" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
     const result = await syncModelsToOpenCode(config, config.opencode, logger);
     expect(result).toBe(true);
     const written = JSON.parse(readFileSync(ocPath, "utf-8"));
-    const registeredModel = written.provider?.openrouter?.models?.["anthropic/claude-sonnet-4-5"];
+    const registeredModel = written.provider?.openrouter?.models?.["meta-llama/llama-3.3-70b-instruct:free"];
     expect(registeredModel).toBeDefined();
     expect(registeredModel.tool_call).toBe(true);
     expect(registeredModel.limit.context).toBe(131072);

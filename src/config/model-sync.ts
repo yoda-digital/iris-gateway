@@ -118,7 +118,7 @@ export async function syncModelsToOpenCode(
         // configured manually — wrong flags cause silent hang waiting for a field that never arrives.
 
         ocJson.provider ??= {};
-        const provider = ocJson.provider as Record<string, any>;
+        const provider = ocJson.provider as Record<string, unknown>;
         provider.openrouter ??= { options: { baseURL: "https://openrouter.ai/api/v1" }, models: {} };
         const openrouterSection = provider.openrouter as Record<string, unknown>;
         if (!openrouterSection.models) openrouterSection.models = {};
@@ -148,9 +148,6 @@ export async function syncModelsToOpenCode(
     return false;
   }
 
-  // Skip frontmatter sync if opencode.json write failed — avoids partially-synced gateway state
-  if (changed && !writeSucceeded) return false;
-
   // 3. Sync primary model into agent frontmatter
   // agent model: overrides opencode.json — must be kept in sync
   if (models.primary) {
@@ -174,7 +171,7 @@ export async function syncModelsToOpenCode(
   }
 
   const finalModel = models.primary ?? (ocJson.model as string | undefined) ?? "unknown";
-  console.log(`\n  ✔ Model: ${finalModel}\n`);
+  logger.info({ model: finalModel }, `\n  ✔ Model: ${finalModel}\n`);
 
   return changed;
 }

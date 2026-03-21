@@ -511,23 +511,36 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
     expect(exitCode).toBe(0);
     // fetch was called (validator ran)
     expect(vi.mocked(global.fetch)).toHaveBeenCalled();
+    // Token env-var reference must be written to the config file
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
+    expect(config.channels.telegram.token).toBe("${env:TELEGRAM_BOT_TOKEN}");
   });
 
-  it("does not throw when fetch rejects — fetchWithTimeout null path handled gracefully", async () => {
+  it("saves slack tokens even when fetch rejects (validateSlackAppToken null-return path — saved anyway)", async () => {
+    // Simulate fetchWithTimeout returning null inside validateSlackAppToken (lines 60-75)
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("AbortError")));
 
     const clack = await getClack();
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
 
-    p.multiselect.mockResolvedValueOnce(["telegram"]);
-    p.text.mockResolvedValueOnce("bad:token");
+    p.multiselect.mockResolvedValueOnce(["slack"]);
+    p.text.mockResolvedValueOnce("xapp-1-invalid"); // appToken
+    p.text.mockResolvedValueOnce("xoxb-invalid");   // botToken
     p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
     const cmd = new InitCommand();
-    // Must not throw — fetchWithTimeout null path must be handled gracefully
-    await expect(cmd.execute()).resolves.not.toThrow();
+    const exitCode = await cmd.execute();
+
+    // Wizard proceeds and saves tokens despite fetch failure (saved anyway)
+    expect(exitCode).toBe(0);
+    // fetch was called (validateSlackAppToken ran)
+    expect(vi.mocked(global.fetch)).toHaveBeenCalled();
+    // Env-var references must be written to the config file
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
+    expect(config.channels.slack.appToken).toBe("${env:SLACK_APP_TOKEN}");
+    expect(config.channels.slack.botToken).toBe("${env:SLACK_BOT_TOKEN}");
   });
 
   it("saves discord token even when fetch rejects (null-return path — saved anyway)", async () => {

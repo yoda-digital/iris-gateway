@@ -123,6 +123,9 @@ export class InitCommand extends Command {
       const spin = p.spinner();
       spin.start("Validating Telegram token…");
       const ok = await validateTelegramToken(token as string);
+      // Design: token is saved even when validation fails (network may be down during setup,
+      // or the token may be valid but the API is temporarily unreachable). The user can correct
+      // the token later in iris.config.json / .env without re-running the wizard.
       spin.stop(ok ? "✓ Token valid" : "⚠ Could not validate — saved anyway");
 
       env["TELEGRAM_BOT_TOKEN"] = token as string;
@@ -149,6 +152,7 @@ export class InitCommand extends Command {
       const spin = p.spinner();
       spin.start("Validating Discord token…");
       const ok = await validateDiscordToken(token as string);
+      // Same design as Telegram: save regardless of validation outcome (network resilience).
       spin.stop(ok ? "✓ Token valid" : "⚠ Could not validate — saved anyway");
 
       env["DISCORD_BOT_TOKEN"] = token as string;
@@ -175,6 +179,7 @@ export class InitCommand extends Command {
       const spin = p.spinner();
       spin.start("Validating Slack App token…");
       const ok = await validateSlackAppToken(appToken as string);
+      // Same design as Telegram: save regardless of validation outcome (network resilience).
       spin.stop(ok ? "✓ App token valid" : "⚠ Could not validate — saved anyway");
 
       env["SLACK_APP_TOKEN"] = appToken as string;

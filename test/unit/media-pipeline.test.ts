@@ -294,3 +294,50 @@ describe("MediaServer", () => {
     expect(url).toBe(`http://127.0.0.1:${port}/media/abc-123`);
   });
 });
+
+/* ============================================================
+   fetch.ts — timeout and post-download size guard (issue #203)
+   ============================================================ */
+
+describe("fetchMediaFromUrl — timeout and post-download size guard", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.useRealTimers();
+  });
+
+  it("rejects when fetch is aborted (AbortError — simulates timeout)", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(
+      new DOMException("The operation was aborted.", "AbortError"),
+    ) as any;
+
+    await expect(
+      fetchMediaFromUrl("https://example.com/slow", { timeoutMs: 1 }),
+    ).rejects.toThrow("The operation was aborted.");
+  });
+
+  it("rejects when buffer exceeds maxSizeBytes with no Content-Length header", async () => {
+    const oversizedData = Buffer.alloc(2048, 0);
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({
+        "content-type": "image/jpeg",
+        // No content-length header — post-download guard must fire
+      }),
+      arrayBuffer: () =>
+        Promise.resolve(
+          oversizedData.buffer.slice(
+            oversizedData.byteOffset,
+            oversizedData.byteOffset + oversizedData.byteLength,
+          ),
+        ),
+    }) as any;
+
+    await expect(
+      fetchMediaFromUrl("https://example.com/no-content-length", {
+        maxSizeBytes: 1024,
+      }),
+    ).rejects.toThrow(/Media too large/);
+  });
+});

@@ -49,6 +49,8 @@ import type { PromptAssembler } from "../intelligence/prompt-assembler.js";
 import { join } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 import { syncModelsToOpenCode } from "../config/model-sync.js";
+import { waitForOpenCodeReady } from "./readiness.js";
+import { printStartupSummary } from "./startup-summary.js";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -131,30 +133,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   await bridge.start();
 
   // 4.5 Wait for OpenCode to be fully ready (providers, plugins)
-  const READY_TIMEOUT_MS = 60_000;
-  const READY_POLL_MS = 500;
-  const readyStart = Date.now();
-  let warmupDone = false;
-  while (Date.now() - readyStart < READY_TIMEOUT_MS) {
-    try {
-      const healthy = await bridge.checkHealth();
-      if (healthy) {
-        const gracePeriodMs = process.env.OPENCODE_WARMUP_GRACE_MS !== undefined
-          ? Number(process.env.OPENCODE_WARMUP_GRACE_MS)
-          : 1000;
-        await new Promise(resolve => setTimeout(resolve, gracePeriodMs));
-        warmupDone = true;
-        logger.info("OpenCode ready (health check passed)");
-        break;
-      }
-    } catch {
-      // Not ready yet
-    }
-    await new Promise((r) => setTimeout(r, READY_POLL_MS));
-  }
-  if (!warmupDone) {
-    logger.warn("OpenCode warmup timed out — providers may not be ready");
-  }
+  await waitForOpenCodeReady(bridge, logger);
 
   // 5. Security subsystem
   const { pairingStore, allowlistStore, rateLimiter, securityGate } = initSecurity(config, stateDir);
@@ -392,30 +371,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   });
 
   // Startup summary
-  try {
-    const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");
-    const ocConfig = JSON.parse(readFileSync(ocPath, "utf-8"));
-    const primaryModel = ocConfig.model ?? "unknown";
-    const smallModel = ocConfig.small_model ?? "none";
-    const channels = Object.keys(config.channels);
-    const securityMode = config.security?.defaultDmPolicy ?? "open";
-    const governanceRules = governanceEngine?.getRules?.()?.length ?? 0;
-
-    console.log("");
-    console.log("  ┌─────────────────────────────────────────┐");
-    console.log("  │             Gateway Ready                │");
-    console.log("  ├─────────────────────────────────────────┤");
-    console.log(`  │  Model:     ${primaryModel.padEnd(28)}│`);
-    console.log(`  │  Small:     ${smallModel.padEnd(28)}│`);
-    console.log(`  │  Channels:  ${channels.join(", ").padEnd(28)}│`);
-    console.log(`  │  Security:  ${securityMode.padEnd(28)}│`);
-    console.log(`  │  Rules:     ${String(governanceRules).padEnd(28)}│`);
-    console.log(`  │  OpenCode:  :${config.opencode.port}${"".padEnd(23)}│`);
-    console.log(`  │  Tools:     :19877${"".padEnd(22)}│`);
-    console.log(`  │  Health:    :19876${"".padEnd(22)}│`);
-    console.log("  └─────────────────────────────────────────┘");
-    console.log("");
-  } catch { /* Best-effort */ }
+  printStartupSummary(config, governanceEngine);
 
   logger.info("Iris gateway started");
   return {

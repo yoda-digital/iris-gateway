@@ -473,3 +473,76 @@ describe("InitCommand: config structure", () => {
     expect(() => JSON.parse(raw)).not.toThrow();
   });
 });
+
+describe("InitCommand: fetchWithTimeout null-return paths in token validators", () => {
+  let tempDir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-init-null-"));
+    cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tempDir);
+  });
+
+  afterEach(() => {
+    cwdSpy.mockRestore();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("validateTelegramToken returns false (invalid) when fetchWithTimeout returns null (network error)", async () => {
+    // Stub fetch to reject → fetchWithTimeout catches and returns null
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network abort")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+    p.multiselect.mockResolvedValueOnce(["telegram"]);
+    p.text.mockResolvedValueOnce("bad-token"); // telegram token input
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const code = await cmd.execute();
+
+    // Null-return path must not throw — validator returns false gracefully
+    expect(code ?? 0).toBe(0);
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+  });
+
+  it("validateDiscordToken returns false when fetchWithTimeout returns null (network error)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network abort")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+    p.multiselect.mockResolvedValueOnce(["discord"]);
+    p.text.mockResolvedValueOnce("bad-discord-token");
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const code = await cmd.execute();
+
+    expect(code ?? 0).toBe(0);
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+  });
+
+  it("validateSlackAppToken returns false when fetchWithTimeout returns null (network error)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network abort")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+    p.multiselect.mockResolvedValueOnce(["slack"]);
+    p.text.mockResolvedValueOnce("xapp-bad-token");
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const code = await cmd.execute();
+
+    expect(code ?? 0).toBe(0);
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+  });
+});

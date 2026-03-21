@@ -15,6 +15,9 @@ export async function waitForOpenCodeReady(bridge: OpenCodeBridge, logger: Logge
     try {
       const healthy = await bridge.checkHealth();
       if (healthy) {
+        // Intentional: `!== undefined` check (not `||`) means OPENCODE_WARMUP_GRACE_MS=0
+        // genuinely skips the grace period. The old `|| 1000` coercion treated 0 as
+        // falsy and fell back to 1000ms, which was surprising.
         const gracePeriodMs =
           process.env.OPENCODE_WARMUP_GRACE_MS !== undefined
             ? Number(process.env.OPENCODE_WARMUP_GRACE_MS)

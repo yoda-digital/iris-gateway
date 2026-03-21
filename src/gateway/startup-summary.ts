@@ -14,7 +14,7 @@ export function printStartupSummary(config: IrisConfig, governanceEngine: Govern
     const smallModel = ocConfig.small_model ?? "none";
     const channels = Object.keys(config.channels);
     const securityMode = config.security?.defaultDmPolicy ?? "open";
-    const governanceRules = governanceEngine?.getRules?.()?.length ?? 0;
+    const governanceRules = governanceEngine.getRules().length;
 
     console.log("");
     console.log("  ┌─────────────────────────────────────────┐");

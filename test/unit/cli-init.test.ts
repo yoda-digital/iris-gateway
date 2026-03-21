@@ -561,5 +561,8 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
     // Wizard continues and saves despite fetch failure
     expect(exitCode).toBe(0);
     expect(vi.mocked(global.fetch)).toHaveBeenCalled();
+    // Env-var reference must be written to the config file
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
+    expect(config.channels.discord.token).toBe("${env:DISCORD_BOT_TOKEN}");
   });
 });

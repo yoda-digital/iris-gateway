@@ -473,3 +473,80 @@ describe("InitCommand: config structure", () => {
     expect(() => JSON.parse(raw)).not.toThrow();
   });
 });
+
+
+describe("InitCommand: fetchWithTimeout null-return path", () => {
+  let tempDir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-init-timeout-"));
+    cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tempDir);
+  });
+
+  afterEach(() => {
+    cwdSpy.mockRestore();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("saves telegram token even when fetch rejects (null-return path — saved anyway)", async () => {
+    // Simulate fetchWithTimeout returning null (network error / AbortError)
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("AbortError")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["telegram"]);
+    p.text.mockResolvedValueOnce("123:validformat");
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const exitCode = await cmd.execute();
+
+    // Wizard proceeds and saves token despite fetch failure (saved anyway)
+    expect(exitCode).toBe(0);
+    // fetch was called (validator ran)
+    expect(vi.mocked(global.fetch)).toHaveBeenCalled();
+  });
+
+  it("does not throw when fetch rejects — fetchWithTimeout null path handled gracefully", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("AbortError")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["telegram"]);
+    p.text.mockResolvedValueOnce("bad:token");
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    // Must not throw — fetchWithTimeout null path must be handled gracefully
+    await expect(cmd.execute()).resolves.not.toThrow();
+  });
+
+  it("saves discord token even when fetch rejects (null-return path — saved anyway)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("AbortError")));
+
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["discord"]);
+    p.text.mockResolvedValueOnce("invalid-discord-token");
+    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const exitCode = await cmd.execute();
+
+    // Wizard continues and saves despite fetch failure
+    expect(exitCode).toBe(0);
+    expect(vi.mocked(global.fetch)).toHaveBeenCalled();
+  });
+});

@@ -1,3 +1,9 @@
+## [1.13.11](https://github.com/yoda-digital/iris-gateway/compare/v1.13.10...v1.13.11) (2026-03-21)
+
+### Bug Fixes
+
+* [#203](https://github.com/yoda-digital/iris-gateway/issues/203) — add coverage for fetchMediaFromUrl timeout and post-download size guard ([#206](https://github.com/yoda-digital/iris-gateway/issues/206)) ([c981c5f](https://github.com/yoda-digital/iris-gateway/commit/c981c5f5f67e7e4deeeb1174ea5337dc1f17058a))
+
 ## [1.13.10](https://github.com/yoda-digital/iris-gateway/compare/v1.13.9...v1.13.10) (2026-03-20)
 
 ### Bug Fixes

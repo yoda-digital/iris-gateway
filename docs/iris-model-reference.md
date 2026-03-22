@@ -5,7 +5,7 @@
 | Agent | Model ID | Role | Speed | Tool Calling |
 |-------|----------|------|-------|-------------|
 | `chat` (primary) | `openai/gpt-oss-120b:free` | Main conversation | ★★★★★ | ★★★★☆ |
-| `moderator` | `openrouter/aurora-alpha` | Content safety | ★★★★★ | ★★★☆☆ |
+| `moderator` | `openrouter/arcee-ai/trinity-mini:free` | Content safety | ★★★★★ | ★★★☆☆ |
 | `reasoner` | `qwen/qwen3-coder:free` | Complex multi-step | ★★☆☆☆ | ★★★★★ |
 | `compactor` | `deepseek/deepseek-r1-0528:free` | Fact extraction | ★★★☆☆ | ★★☆☆☆ |
 | `small_model` | `arcee-ai/trinity-mini:free` | Titles, summaries | ★★★★★ | ★★★☆☆ |
@@ -39,7 +39,7 @@ If the primary model is unavailable (rate limited, provider down), switch to:
 | Agent | Primary | Fallback 1 | Fallback 2 |
 |-------|---------|-----------|-----------|
 | chat | gpt-oss-120b | glm-4.5-air | llama-3.3-70b |
-| moderator | aurora-alpha | trinity-mini | gpt-oss-120b |
+| moderator | trinity-mini | arcee-spotlight | gpt-oss-120b |
 | reasoner | qwen3-coder | trinity-large-preview | gpt-oss-120b |
 | compactor | deepseek-r1-0528 | qwen3-coder | glm-4.5-air |
 
@@ -53,7 +53,7 @@ To switch: edit the `model:` line in the agent's `.md` file and restart Iris.
 |-------|-----------|------------|-----------|------------------|
 | gpt-oss-120b | Excellent | Good | Degrades | Native JSON |
 | glm-4.5-air | Excellent | Excellent | Good (thinking mode) | Good |
-| aurora-alpha | Good | Untested | Untested | Unknown |
+| arcee-spotlight | Good | Good | Acceptable | Good |
 | qwen3-coder | Excellent | Excellent | Excellent | Native |
 | deepseek-r1-0528 | Limited | Poor | Poor | Via CoT |
 | trinity-large | Good | Good | Good | Good |
@@ -65,7 +65,7 @@ To switch: edit the `model:` line in the agent's `.md` file and restart Iris.
 | Model | Active params | Architecture | Expected TTFT | Throughput |
 |-------|-------------|-------------|--------------|-----------|
 | gpt-oss-120b | 5.1B | MoE 117B | <500ms | ~200 tok/s |
-| aurora-alpha | Unknown | Cloaked | <300ms | Fast |
+| arcee-spotlight | ~7B | Dense | <300ms | Fast |
 | trinity-mini | 3B | MoE 26B | <200ms | Very fast |
 | glm-4.5-air | Compact MoE | MoE | <500ms | ~120 tok/s |
 | trinity-large | 13B | MoE 400B | <800ms | Moderate |
@@ -84,7 +84,7 @@ To switch: edit the `model:` line in the agent's `.md` file and restart Iris.
 | gpt-oss-120b | 131K | Standard conversations |
 | glm-4.5-air | 131K | Standard with thinking |
 | trinity-large | 131K | Agent harness workflows |
-| aurora-alpha | 128K | Speed-critical |
+| arcee-spotlight | 131K | Speed-critical tasks |
 | llama-3.3-70b | 128K | Multilingual fallback |
 
 ### Multilingual (Romanian / Russian / English)

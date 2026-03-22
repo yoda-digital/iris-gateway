@@ -80,25 +80,34 @@ CMD ["node", "dist/index.js", "gateway", "run"]
 
 ### Docker Compose
 
-Create a `docker-compose.yml`:
+The `docker-compose.yml` in the repo root is the authoritative reference — use it directly:
+
+```bash
+cp iris.config.example.json iris.config.json
+# Edit iris.config.json — set your bot token and model
+echo "TELEGRAM_BOT_TOKEN=xxx" > .env
+docker-compose up -d
+```
+
+For reference, the compose file maps all three gateway ports and persists state in a named volume:
 
 ```yaml
-version: "3.8"
-
 services:
   iris:
     build: .
     container_name: iris-gateway
     restart: unless-stopped
     ports:
-      - "19876:19876"
+      - "19876:19876"   # health + REST API
+      - "19877:19877"   # tool server
+      - "19878:19878"   # media server
     env_file:
       - .env
     volumes:
-      - iris-state:/root/.iris
+      - iris-state:/home/iris/.iris
       - ./iris.config.json:/app/iris.config.json:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:19876/health"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:19876/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -346,7 +355,7 @@ Response:
 ```json
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "1.13.16",
   "uptime": 86400000,
   "uptimeHuman": "1d 0h",
   "channels": [

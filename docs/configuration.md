@@ -74,12 +74,13 @@ The wizard prompts you for the essentials and writes a ready-to-run config. You 
 
 ### Free model presets
 
-The wizard offers four free OpenRouter models out of the box:
+The wizard offers five free OpenRouter models out of the box:
 
 | Preset | Model ID | Notes |
 |--------|----------|-------|
 | Arcee Spotlight | `openrouter/arcee-ai/arcee-spotlight:free` | Strong general-purpose, fast |
 | Arcee Trinity Large | `openrouter/arcee-ai/trinity-large-preview:free` | Best reasoning in the free tier |
+| Arcee Trinity Mini | `openrouter/arcee-ai/trinity-mini:free` | Compact, efficient, fast responses |
 | Llama 3.3 70B | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | Meta's flagship open model |
 | Mistral 7B | `openrouter/mistralai/mistral-7b-instruct:free` | Ultra-fast, minimal latency |
 | Custom | _(manual entry)_ | Any OpenRouter model ID |

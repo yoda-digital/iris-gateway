@@ -234,9 +234,11 @@ The release pipeline (`.github/workflows/release.yml`) runs after CI passes on `
 
 Iris uses **ONLY free OpenRouter models**. No exceptions.
 
+- ✅ `openrouter/arcee-ai/arcee-spotlight:free`
 - ✅ `openrouter/arcee-ai/trinity-large-preview:free`
 - ✅ `openrouter/arcee-ai/trinity-mini:free`
 - ✅ `openrouter/meta-llama/llama-3.3-70b-instruct:free`
+- ✅ `openrouter/mistralai/mistral-7b-instruct:free`
 - ❌ `anthropic/claude-*` — NEVER. Requires paid API key.
 - ❌ `openai/gpt-4o` — NEVER. Requires paid API key.
 

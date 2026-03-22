@@ -509,9 +509,8 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
 
     // Wizard proceeds and saves token despite fetch failure (saved anyway)
     expect(exitCode).toBe(0);
-    // fetch was called (validator ran)
     expect(vi.mocked(global.fetch)).toHaveBeenCalled();
-    // Token env-var reference must be written to the config file
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
     const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
     expect(config.channels.telegram.token).toBe("${env:TELEGRAM_BOT_TOKEN}");
   });
@@ -535,9 +534,8 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
 
     // Wizard proceeds and saves tokens despite fetch failure (saved anyway)
     expect(exitCode).toBe(0);
-    // fetch was called (validateSlackAppToken ran)
     expect(vi.mocked(global.fetch)).toHaveBeenCalled();
-    // Env-var references must be written to the config file
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
     const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
     expect(config.channels.slack.appToken).toBe("${env:SLACK_APP_TOKEN}");
     expect(config.channels.slack.botToken).toBe("${env:SLACK_BOT_TOKEN}");
@@ -561,7 +559,7 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
     // Wizard continues and saves despite fetch failure
     expect(exitCode).toBe(0);
     expect(vi.mocked(global.fetch)).toHaveBeenCalled();
-    // Env-var reference must be written to the config file
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
     const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
     expect(config.channels.discord.token).toBe("${env:DISCORD_BOT_TOKEN}");
   });

@@ -11,6 +11,10 @@ on:
     types: [submitted]
   pull_request:
     types: [labeled]
+    # NOTE: This trigger remains for manual label-adds by humans. When github-actions[bot]
+    # adds needs-changes-loop via GITHUB_TOKEN, GitHub does NOT fire this event (security
+    # restriction to prevent infinite loops). For bot-added labels, workflow_dispatch below
+    # is the reliable trigger.
   # workflow_dispatch allows claude-code-review.yml to trigger this workflow directly
   # using GITHUB_TOKEN — bypassing the GitHub limitation that prevents pull_request
   # labeled events from re-triggering workflows when the label was added by GITHUB_TOKEN.
@@ -33,7 +37,7 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
       (github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '')
+      (github.event_name == 'workflow_dispatch' && github.actor == 'github-actions[bot]' && github.event.inputs.pr_number != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,6 +51,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          # For workflow_dispatch (needs-changes-loop fix trigger), checkout the PR branch
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || '' }}
 
       - name: Configure git credentials
         run: |

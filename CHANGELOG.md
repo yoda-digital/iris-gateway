@@ -1,3 +1,9 @@
+## [1.13.16](https://github.com/yoda-digital/iris-gateway/compare/v1.13.15...v1.13.16) (2026-03-22)
+
+### Bug Fixes
+
+* [#218](https://github.com/yoda-digital/iris-gateway/issues/218) — add coverage for Discord adapter init and message handling ([305d57c](https://github.com/yoda-digital/iris-gateway/commit/305d57c8ae4de231ee6d0467ebb04175d03e594a))
+
 ## [1.13.15](https://github.com/yoda-digital/iris-gateway/compare/v1.13.14...v1.13.15) (2026-03-22)
 
 ### Bug Fixes

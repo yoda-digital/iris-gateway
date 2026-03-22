@@ -1,3 +1,9 @@
+## [1.13.12](https://github.com/yoda-digital/iris-gateway/compare/v1.13.11...v1.13.12) (2026-03-22)
+
+### Bug Fixes
+
+* [#213](https://github.com/yoda-digital/iris-gateway/issues/213) — add tests for gateway/adapters.ts channel registration paths ([#214](https://github.com/yoda-digital/iris-gateway/issues/214)) ([40d52cd](https://github.com/yoda-digital/iris-gateway/commit/40d52cdce3bd296778d046b167326e2b52335a49))
+
 ## [1.13.11](https://github.com/yoda-digital/iris-gateway/compare/v1.13.10...v1.13.11) (2026-03-21)
 
 ### Bug Fixes

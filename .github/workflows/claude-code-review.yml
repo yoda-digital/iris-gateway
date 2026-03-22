@@ -12,6 +12,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -174,6 +175,32 @@ jobs:
             // Apply the verdict label
             await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: [labelInfo.name] });
             core.info(`Applied label: ${labelInfo.name}`);
+
+            // CRITICAL FIX: When verdict is NEEDS CHANGES, dispatch claude.yml via workflow_dispatch
+            // instead of relying on the pull_request labeled event, which GitHub does NOT fire
+            // when labels are added by GITHUB_TOKEN (to prevent infinite loops).
+            // workflow_dispatch bypasses this restriction and reliably triggers the fix workflow.
+            if (verdict === 'NEEDS CHANGES') {
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: 'claude.yml',
+                  ref: 'main',
+                  inputs: {
+                    pr_number: String(prNumber),
+                    branch: pr.head.ref,
+                  },
+                });
+                core.info(`Dispatched claude.yml workflow_dispatch for PR #${prNumber} (branch: ${pr.head.ref})`);
+              } catch (err) {
+                // If workflow_dispatch trigger doesn't exist yet (main branch hasn't merged the fix),
+                // fall back to label-only behavior. This is expected during the bootstrap phase
+                // (PR #219 review). Once merged, all future PRs will dispatch successfully.
+                core.warning(`workflow_dispatch failed (expected during bootstrap): ${err.message}`);
+              }
+            }
 
             // For NOT MERGEABLE, notify PR author (dedup: skip if already posted)
             if (verdict === 'NOT MERGEABLE') {

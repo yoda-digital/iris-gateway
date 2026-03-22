@@ -1,3 +1,9 @@
+## [1.13.15](https://github.com/yoda-digital/iris-gateway/compare/v1.13.14...v1.13.15) (2026-03-22)
+
+### Bug Fixes
+
+* **ci:** repair needs-changes-loop trigger — workflow_dispatch instead of label event ([#219](https://github.com/yoda-digital/iris-gateway/issues/219)) ([b54614f](https://github.com/yoda-digital/iris-gateway/commit/b54614f9c37d81bf3181bce6d25ca218b462a359))
+
 ## [1.13.14](https://github.com/yoda-digital/iris-gateway/compare/v1.13.13...v1.13.14) (2026-03-22)
 
 ### Bug Fixes

@@ -21,11 +21,18 @@ vi.mock("../../src/gateway/metrics.js", () => ({
 import { TriggerEvaluator } from "../../src/intelligence/triggers/evaluator.js";
 import type { TriggerRule } from "../../src/intelligence/triggers/rules.js";
 
+/**
+ * Note: TriggerEvaluator always prepends builtinTriggerRules before custom rules.
+ * We use a text value ("\x00noop") that is guaranteed not to match any built-in
+ * pattern, so built-in rules never fire and only our custom test rules run.
+ * If a new built-in rule is added that matches this text, tests here will break
+ * and should be updated with a different sentinel value.
+ */
 function makeMsg(): any {
   return {
     channelId: "tg",
     senderId: "u1",
-    text: "hello",
+    text: "\x00noop",
     chatId: "c1",
     chatType: "dm",
     id: "m1",
@@ -132,6 +139,29 @@ describe("TriggerEvaluator — action branch coverage", () => {
     expect(store.writeDerivedSignal).not.toHaveBeenCalled();
   });
 
+  it("update_signal: skips writeDerivedSignal when value is missing (signalType present)", () => {
+    const logger = makeLogger();
+    const bus = makeBus();
+    const store = makeIntelligenceStore();
+
+    const rule: TriggerRule = {
+      id: "signal-no-value",
+      enabled: true,
+      priority: 1,
+      evaluate: () => ({
+        action: "update_signal",
+        payload: { signalType: "mood" }, // signalType present, value absent
+        ruleId: "signal-no-value",
+      }),
+    };
+
+    const evaluator = new TriggerEvaluator(store as any, null, bus as any, logger as any, [rule]);
+    evaluator.evaluate(makeMsg(), []);
+
+    // Guard requires both signalType AND value — value missing means no write
+    expect(store.writeDerivedSignal).not.toHaveBeenCalled();
+  });
+
   it("update_signal: uses default confidence 0.7 when not provided", () => {
     const store = makeIntelligenceStore();
     const bus = makeBus();
@@ -179,6 +209,33 @@ describe("TriggerEvaluator — action branch coverage", () => {
       "Trigger rule evaluation failed",
     );
     expect(bus.emit).not.toHaveBeenCalled();
+  });
+
+  it("enabled: false — rule is skipped entirely, no bus.emit, no store calls", () => {
+    const logger = makeLogger();
+    const bus = makeBus();
+    const store = makeIntelligenceStore();
+    const intentStore = makeIntentStore();
+
+    const rule: TriggerRule = {
+      id: "disabled-rule",
+      enabled: false, // must be skipped
+      priority: 1,
+      evaluate: () => ({
+        action: "flag_for_prompt",
+        payload: { flag: "SHOULD_NOT_FIRE" },
+        ruleId: "disabled-rule",
+      }),
+    };
+
+    const evaluator = new TriggerEvaluator(store as any, intentStore as any, bus as any, logger as any, [rule]);
+    const results = evaluator.evaluate(makeMsg(), []);
+
+    expect(results).toHaveLength(0);
+    expect(bus.emit).not.toHaveBeenCalled();
+    expect(store.writeDerivedSignal).not.toHaveBeenCalled();
+    expect(intentStore.addIntent).not.toHaveBeenCalled();
+    expect(logger.info).not.toHaveBeenCalled();
   });
 
   it("create_intent: calls intentStore.addIntent when intentStore is provided", () => {

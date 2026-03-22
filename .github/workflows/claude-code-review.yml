@@ -182,17 +182,24 @@ jobs:
             // workflow_dispatch bypasses this restriction and reliably triggers the fix workflow.
             if (verdict === 'NEEDS CHANGES') {
               const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-              await github.rest.actions.createWorkflowDispatch({
-                owner,
-                repo,
-                workflow_id: 'claude.yml',
-                ref: 'main',
-                inputs: {
-                  pr_number: String(prNumber),
-                  branch: pr.head.ref,
-                },
-              });
-              core.info(`Dispatched claude.yml workflow_dispatch for PR #${prNumber} (branch: ${pr.head.ref})`);
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: 'claude.yml',
+                  ref: 'main',
+                  inputs: {
+                    pr_number: String(prNumber),
+                    branch: pr.head.ref,
+                  },
+                });
+                core.info(`Dispatched claude.yml workflow_dispatch for PR #${prNumber} (branch: ${pr.head.ref})`);
+              } catch (err) {
+                // If workflow_dispatch trigger doesn't exist yet (main branch hasn't merged the fix),
+                // fall back to label-only behavior. This is expected during the bootstrap phase
+                // (PR #219 review). Once merged, all future PRs will dispatch successfully.
+                core.warning(`workflow_dispatch failed (expected during bootstrap): ${err.message}`);
+              }
             }
 
             // For NOT MERGEABLE, notify PR author (dedup: skip if already posted)

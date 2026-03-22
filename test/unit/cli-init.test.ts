@@ -505,9 +505,12 @@ describe("InitCommand: fetchWithTimeout null-return paths in token validators", 
     const cmd = new InitCommand();
     const code = await cmd.execute();
 
-    // Null-return path must not throw — validator returns false gracefully
-    expect(code ?? 0).toBe(0);
+    // Null-return path must not throw — validator returns false gracefully, token saved anyway
+    expect(code).toBe(0);
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf8"));
+    expect(config.channels.telegram.token).toBe("${env:TELEGRAM_BOT_TOKEN}");
   });
 
   it("validateDiscordToken returns false when fetchWithTimeout returns null (network error)", async () => {
@@ -524,8 +527,11 @@ describe("InitCommand: fetchWithTimeout null-return paths in token validators", 
     const cmd = new InitCommand();
     const code = await cmd.execute();
 
-    expect(code ?? 0).toBe(0);
+    expect(code).toBe(0);
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf8"));
+    expect(config.channels.discord.token).toBe("${env:DISCORD_BOT_TOKEN}");
   });
 
   it("validateSlackAppToken returns false when fetchWithTimeout returns null (network error)", async () => {
@@ -535,6 +541,7 @@ describe("InitCommand: fetchWithTimeout null-return paths in token validators", 
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
     p.multiselect.mockResolvedValueOnce(["slack"]);
     p.text.mockResolvedValueOnce("xapp-bad-token");
+    p.text.mockResolvedValueOnce("xoxb-bad-bot-token"); // bot token (second p.text call for Slack)
     p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
     p.confirm.mockResolvedValueOnce(false);
 
@@ -542,7 +549,11 @@ describe("InitCommand: fetchWithTimeout null-return paths in token validators", 
     const cmd = new InitCommand();
     const code = await cmd.execute();
 
-    expect(code ?? 0).toBe(0);
+    expect(code).toBe(0);
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalled();
+    expect(existsSync(join(tempDir, "iris.config.json"))).toBe(true);
+    const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf8"));
+    expect(config.channels.slack.appToken).toBe("${env:SLACK_APP_TOKEN}");
+    expect(config.channels.slack.botToken).toBe("${env:SLACK_BOT_TOKEN}");
   });
 });

@@ -1,3 +1,9 @@
+## [1.13.13](https://github.com/yoda-digital/iris-gateway/compare/v1.13.12...v1.13.13) (2026-03-22)
+
+### Bug Fixes
+
+* [#200](https://github.com/yoda-digital/iris-gateway/issues/200) — split lifecycle.ts into readiness + startup-summary modules ([#202](https://github.com/yoda-digital/iris-gateway/issues/202)) ([e8645a5](https://github.com/yoda-digital/iris-gateway/commit/e8645a5fbcf35f6e2ef1a4c4617777acd7a296f7))
+
 ## [1.13.12](https://github.com/yoda-digital/iris-gateway/compare/v1.13.11...v1.13.12) (2026-03-22)
 
 ### Bug Fixes

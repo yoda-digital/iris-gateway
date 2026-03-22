@@ -1,3 +1,10 @@
+## [1.13.14](https://github.com/yoda-digital/iris-gateway/compare/v1.13.13...v1.13.14) (2026-03-22)
+
+### Bug Fixes
+
+* [#199](https://github.com/yoda-digital/iris-gateway/issues/199) — add coverage for fetchWithTimeout null-return path in token validators ([#201](https://github.com/yoda-digital/iris-gateway/issues/201)) ([685021b](https://github.com/yoda-digital/iris-gateway/commit/685021b69e45b86eaa4b28ac849577d5c7c9ee79))
+* [#209](https://github.com/yoda-digital/iris-gateway/issues/209) — add execute() lifecycle tests for cron/service.ts (66%→99% coverage) ([#210](https://github.com/yoda-digital/iris-gateway/issues/210)) ([169d953](https://github.com/yoda-digital/iris-gateway/commit/169d953cc9460cf470ae2f1f7043b95de69f6a94))
+
 ## [1.13.13](https://github.com/yoda-digital/iris-gateway/compare/v1.13.12...v1.13.13) (2026-03-22)
 
 ### Bug Fixes

@@ -101,14 +101,14 @@ No circular dependencies. No importing from a higher layer. If you need somethin
 
 ## Milestone Roadmap
 
-### v1.1 — Stability & Test Integrity (in progress — 89% complete, due 2026-04-29)
-Test suite: 1626 passing, 2 skipped. Coverage: 90.63% statements / 88.76% branches / 87.8% functions. 43 of 48 tracked issues closed.
+### v1.1 — Stability & Test Integrity (in progress — 93% complete, due 2026-04-29)
+Test suite: 1626 passing, 2 skipped. Coverage: 90.63% statements / 88.76% branches / 87.8% functions. 45 of 48 tracked issues closed.
 
 - ✅ Fixed 6 pre-existing test failures (issue #1)
 - ✅ Split tool-server.ts into domain routers (issue #2)
 - ✅ Decomposed iris.ts plugin (issue #3)
 - ✅ Model selection in config only (issue #4)
-- ⏳ Remaining: test coverage for cli-router, security-wiring, message-router, OutcomesStore (#204, #207, #208, #211, #217)
+- ⏳ Remaining: test coverage for security-wiring, message-router, OutcomesStore (#207, #208, #211)
 
 ### v1.2 — Architecture Hardening (due 2026-06-30)
 Clean layers. Documented APIs. Resilient connections.

@@ -9,7 +9,7 @@ Run a personal AI with memory, goals, and proactive nudges on your own server, a
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Coverage](https://img.shields.io/badge/coverage-%3E75%25-brightgreen)](docs/configuration.md)
 
-- 💸 **Free models only** — four pre-vetted OpenRouter free-tier presets in the init wizard. No paid API keys required to run.
+- 💸 **Free models only** — five pre-vetted OpenRouter free-tier presets in the init wizard. No paid API keys required to run.
 - 🧠 **Intelligence layer** — derives language, timezone, engagement patterns, and arc state from every conversation without you touching config
 - 📱 **All your channels, one brain** — Telegram, WhatsApp, Discord, Slack, WebChat share a single SQLite vault
 - 🎯 **Goal and arc tracking** — remembers what you're working on, sets next-action deadlines, follows up when relevant
@@ -73,7 +73,7 @@ $ iris init
 ◆  Writing iris.config.json... done.
 ```
 
-Free model options: Arcee Spotlight, Arcee Trinity Large, Llama 3.3 70B, Mistral 7B — or enter any custom model string.
+Free model options: Arcee Spotlight, Arcee Trinity Large, Arcee Trinity Mini, Llama 3.3 70B, Mistral 7B — or enter any custom model string.
 
 ### Docker (even faster)
 

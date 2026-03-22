@@ -101,13 +101,14 @@ No circular dependencies. No importing from a higher layer. If you need somethin
 
 ## Milestone Roadmap
 
-### v1.1 — Stability & Test Integrity ✅ (completed v1.8.x–v1.12.x)
-The test suite is green (1259/1259 passing, 82% coverage). All tracked violations resolved.
+### v1.1 — Stability & Test Integrity (in progress — 89% complete)
+The test suite is green (1626/1626 passing, 90.6% stmt / 88.8% branch / 87.8% function coverage).
 
 - ✅ Fixed 6 pre-existing test failures (issue #1)
 - ✅ Split tool-server.ts into domain routers (issue #2)
 - ✅ Decomposed iris.ts plugin (issue #3)
 - ✅ Model selection in config only (issue #4)
+- ⏳ 5 issues remaining (coverage gaps: bridge/cli.ts, security-wiring.ts, message-router.ts, OutcomesStore — see milestone v1.1 on GitHub)
 
 ### v1.2 — Architecture Hardening (due 2026-06-30)
 Clean layers. Documented APIs. Resilient connections.

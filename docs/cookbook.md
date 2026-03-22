@@ -6,7 +6,7 @@ Real-world patterns for policy, governance, vault memory, hooks, agents, and mul
 
 ### How policy works
 
-The master policy is the structural ceiling — it defines what CAN exist in the system. It's configured in `iris.yaml` (or `iris.json`) and is immutable at runtime. Three enforcement layers work together:
+The master policy is the structural ceiling — it defines what CAN exist in the system. It's configured in `iris.config.json` and is immutable at runtime. Three enforcement layers work together:
 
 ```
 Master Policy (ceiling)     — what tools/modes/permissions CAN exist
@@ -335,7 +335,7 @@ Denies all file and bash operations. The AI cannot read/write files or run shell
 
 The `agent_create` tool produces fully spec-compliant OpenCode agents with Iris architecture awareness. If no custom prompt is provided, the generator injects:
 
-- Full tool catalog (19 Iris tools with descriptions)
+- Full tool catalog (all registered Iris tools with descriptions)
 - Vault usage instructions (search, remember, forget patterns)
 - Governance awareness (hooks, directives, safety)
 - Available skills list (auto-discovered from `.opencode/skills/`)
@@ -1289,7 +1289,7 @@ proactive_scan({ thresholdMs: 604800000 })  // 7 days
 
 ### Overview
 
-Seven deterministic subsystems — zero LLM cost, all pure Node.js + SQLite. Initialized automatically in `lifecycle.ts`. Connected via a typed, synchronous event bus (`IntelligenceBus`) that delivers events in <5ms.
+Twelve deterministic subsystems — zero LLM cost, all pure Node.js + SQLite. Initialized automatically in `lifecycle.ts`. Connected via a typed, synchronous event bus (`IntelligenceBus`) that delivers events in <5ms.
 
 ### Signal Inference Engine
 

@@ -208,6 +208,11 @@ export class InitCommand extends Command {
           hint: "OpenRouter — no API key required",
         },
         {
+          value: "openrouter/arcee-ai/trinity-mini:free",
+          label: "Arcee Trinity Mini (free)",
+          hint: "OpenRouter — fast, lightweight, no API key required",
+        },
+        {
           value: "openrouter/meta-llama/llama-3.3-70b-instruct:free",
           label: "Llama 3.3 70B Instruct (free)",
           hint: "OpenRouter — no API key required",

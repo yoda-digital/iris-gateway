@@ -11,6 +11,19 @@ on:
     types: [submitted]
   pull_request:
     types: [labeled]
+  # workflow_dispatch allows claude-code-review.yml to trigger this workflow directly
+  # using GITHUB_TOKEN — bypassing the GitHub limitation that prevents pull_request
+  # labeled events from re-triggering workflows when the label was added by GITHUB_TOKEN.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to fix (needs-changes-loop trigger)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch name for the PR'
+        required: true
+        type: string
 
 jobs:
   claude:
@@ -19,7 +32,8 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
-      (github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop')
+      (github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,4 +72,4 @@ jobs:
           additional_permissions: |
             actions: read
           prompt: |
-            ${{ github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop' && format('A "needs-changes-loop" label was added to PR #{0}. Read the latest Claude review comment on this PR, implement ALL requested fixes directly using bash/edit tools, commit with a descriptive message, and push to the branch. Use git push origin HEAD. After pushing, post a summary comment of what was fixed.', github.event.pull_request.number) || '' }}
+            ${{ (github.event_name == 'pull_request' && github.event.label.name == 'needs-changes-loop') && format('A "needs-changes-loop" label was added to PR #{0}. Read the latest Claude review comment on this PR, implement ALL requested fixes directly using bash/edit tools, commit with a descriptive message, and push to the branch. Use git push origin HEAD. After pushing, post a summary comment of what was fixed.', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch') && format('A "needs-changes-loop" label was added to PR #{0}. Read the latest Claude review comment on this PR, implement ALL requested fixes directly using bash/edit tools, commit with a descriptive message, and push to the branch. Use git push origin HEAD:{1}. After pushing, post a summary comment of what was fixed.', github.event.inputs.pr_number, github.event.inputs.branch) || '' }}

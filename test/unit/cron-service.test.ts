@@ -204,9 +204,9 @@ describe("CronService — execute() lifecycle (fake timers)", () => {
     await service.addJob(jobEverySecond);
     await vi.advanceTimersByTimeAsync(2000);
     await Promise.resolve(); await Promise.resolve();
-    // execute() catches internally — no crash, logger.error not called from execute()
+    // execute() catches internally — outer .catch() not reached, logger.error not called
     expect(bridge.sendMessage).toHaveBeenCalled();
-    expect(logger.fatal).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("execute() catches non-Error throw via String(err) branch", async () => {
@@ -215,13 +215,21 @@ describe("CronService — execute() lifecycle (fake timers)", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await Promise.resolve(); await Promise.resolve();
     expect(bridge.sendMessage).toHaveBeenCalled();
-    expect(logger.fatal).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it("schedule() replaces existing cron when same job name is re-added", async () => {
     await service.addJob({ ...jobEverySecond });
     await service.addJob({ ...jobEverySecond, schedule: "*/2 * * * * *" });
-    expect(logger.debug).toHaveBeenCalledWith(
+    // Both schedule() calls must have run, confirming re-scheduling happened
+    expect(logger.debug).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ job: "exec-job" }),
+      "Scheduled cron job",
+    );
+    expect(logger.debug).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({ job: "exec-job" }),
       "Scheduled cron job",
     );

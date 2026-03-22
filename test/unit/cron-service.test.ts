@@ -202,20 +202,35 @@ describe("CronService — execute() lifecycle (fake timers)", () => {
   it("execute() catches error from sendMessage (Error instance)", async () => {
     bridge.sendMessage.mockRejectedValue(new Error("bridge failure"));
     await service.addJob(jobEverySecond);
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(1000);
     await Promise.resolve(); await Promise.resolve();
-    // execute() catches internally — outer .catch() not reached, logger.error not called
+    // execute() catches internally via runLogger — "Cron job failed" is logged, not "Unhandled"
     expect(bridge.sendMessage).toHaveBeenCalled();
-    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ job: "exec-job", error: "bridge failure" }),
+      "Cron job failed",
+    );
+    expect(logger.error).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "Unhandled cron execution error",
+    );
   });
 
   it("execute() catches non-Error throw via String(err) branch", async () => {
     bridge.sendMessage.mockRejectedValue("plain string error");
     await service.addJob(jobEverySecond);
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(1000);
     await Promise.resolve(); await Promise.resolve();
     expect(bridge.sendMessage).toHaveBeenCalled();
-    expect(logger.error).not.toHaveBeenCalled();
+    // String error is coerced via String(err) — logged as "Cron job failed", not "Unhandled"
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ job: "exec-job", error: "plain string error" }),
+      "Cron job failed",
+    );
+    expect(logger.error).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "Unhandled cron execution error",
+    );
   });
 
   it("schedule() replaces existing cron when same job name is re-added", async () => {

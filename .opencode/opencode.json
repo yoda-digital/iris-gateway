@@ -34,12 +34,12 @@
             "output": 8192
           }
         },
-        "aurora-alpha": {
-          "name": "Aurora Alpha (Speed/Moderator)",
+        "arcee-ai/arcee-spotlight:free": {
+          "name": "Arcee Spotlight (Speed/Moderator)",
           "reasoning": false,
           "tool_call": true,
           "limit": {
-            "context": 128000,
+            "context": 131072,
             "output": 8192
           }
         },

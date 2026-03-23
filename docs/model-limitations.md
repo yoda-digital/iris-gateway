@@ -12,16 +12,15 @@ This appendix documents observed limitations of each free OpenRouter model when 
 - When context exceeds ~80K tokens, tool call accuracy degrades. The session compaction hook should fire before this threshold.
 - Free tier rate limits are undocumented. Under heavy load (50+ concurrent users), expect 429 responses. The auto-reply engine absorbs peak traffic.
 
-## aurora-alpha (Moderator)
+## arcee-ai/trinity-mini:free (Moderator / Fast Tasks)
 
-**Strengths**: Extremely fast responses. Free. Good at binary classification tasks.
+**Strengths**: Fast responses (sub-200ms TTFT). Free. Good tool calling for simple 1-2 step tasks. 131K context.
 
 **Limitations**:
-- Cloaked model — identity and training data unknown. Do not use for sensitive decisions beyond content moderation.
-- Released 2026-02-09, very new — production track record is zero. Monitor closely.
+- Tool call chains degrade beyond 5 steps — not suitable for complex multi-tool workflows.
+- Structured output quality is "basic" — prefer for binary classification, titles, summaries, not complex JSON generation.
 - All prompts and completions are logged by the provider. Do not pass raw user PII through moderation — strip to sender ID + message text only.
-- No guaranteed SLA or availability commitment. Have trinity-mini as instant fallback.
-- Tool calling is supported per OpenRouter metadata but real-world reliability with Iris's complex tool schemas is untested.
+- Released late 2025 — production track record is short. Monitor for reliability drift.
 
 ## qwen3-coder:free (Reasoner)
 
@@ -79,7 +78,7 @@ This appendix documents observed limitations of each free OpenRouter model when 
 
 **Limitations**:
 - Dense 70B = all parameters active every pass = slowest model in the lineup (~40 tok/s).
-- 128K context is the smallest among the options (tied with aurora-alpha).
+- 128K context is the smallest among the recommended options.
 - No reasoning mode toggle — always one mode. For tasks that need deep reasoning, use deepseek-r1.
 - Free tier availability fluctuates. Meta has historically maintained free access but with rate limits.
 
@@ -94,4 +93,4 @@ This appendix documents observed limitations of each free OpenRouter model when 
 ### Iris-specific integration notes
 - The `experimental.chat.system.transform` hook injects vault context, profile data, memories, governance directives, and skill suggestions into the system prompt. This can reach 10-20K tokens before the user even speaks. Models with smaller effective context windows may struggle.
 - Tool schemas for Iris's 30+ tools are registered via the plugin manifest. Some models handle large tool arrays better than others. If a model struggles, reduce the tool set in its agent frontmatter.
-- Streaming config (`breakOn`, `idleMs`, `minChars`) interacts with model speed. Faster models (aurora-alpha, trinity-mini) may need lower `idleMs` to avoid stuttering. Slower models (qwen3-coder) need higher values.
+- Streaming config (`breakOn`, `idleMs`, `minChars`) interacts with model speed. Faster models (trinity-mini, arcee-spotlight) may need lower `idleMs` to avoid stuttering. Slower models (qwen3-coder) need higher values.

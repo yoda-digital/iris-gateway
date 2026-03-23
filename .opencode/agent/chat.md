@@ -1,7 +1,7 @@
 ---
 description: Multi-channel messaging AI assistant with persistent memory
 mode: primary
-model: openrouter/hunter-alpha
+model: openrouter/openai/gpt-oss-120b:free
 tools:
   send_message: true
   send_media: true

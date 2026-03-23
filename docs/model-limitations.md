@@ -1,6 +1,6 @@
 # Appendix: Free Model Known Limitations
 
-This appendix documents observed limitations of each free OpenRouter model when used with Iris Gateway's 30+ tool ecosystem. Updated February 2026.
+This appendix documents observed limitations of each free OpenRouter model when used with Iris Gateway's 30+ tool ecosystem. Updated March 2026.
 
 ## gpt-oss-120b:free (Primary Chat)
 
@@ -12,16 +12,27 @@ This appendix documents observed limitations of each free OpenRouter model when 
 - When context exceeds ~80K tokens, tool call accuracy degrades. The session compaction hook should fire before this threshold.
 - Free tier rate limits are undocumented. Under heavy load (50+ concurrent users), expect 429 responses. The auto-reply engine absorbs peak traffic.
 
-## aurora-alpha (Moderator)
+## arcee-ai/trinity-mini:free (Small Tasks / Proactive)
 
-**Strengths**: Extremely fast responses. Free. Good at binary classification tasks.
+**Strengths**: Ultra-fast (sub-200ms TTFT). 3B active parameters — ideal for lightweight tasks like generating titles, summaries, proactive notifications, and single-shot tool calls. Used as `small_model` for heartbeat diagnostics and enrichment profile updates.
 
 **Limitations**:
-- Cloaked model — identity and training data unknown. Do not use for sensitive decisions beyond content moderation.
-- Released 2026-02-09, very new — production track record is zero. Monitor closely.
-- All prompts and completions are logged by the provider. Do not pass raw user PII through moderation — strip to sender ID + message text only.
-- No guaranteed SLA or availability commitment. Have trinity-mini as instant fallback.
-- Tool calling is supported per OpenRouter metadata but real-world reliability with Iris's complex tool schemas is untested.
+- 3B active parameters — limited reasoning depth. Do not use for complex analysis or multi-step reasoning.
+- Tool call chains degrade beyond 3-5 steps; may produce malformed arguments for tools with many parameters.
+- Structured output quality is "basic" — avoid complex JSON generation; prefer for classification, summaries, short text.
+- Real performance degrades before the theoretical 131K context limit — keep system prompts lean.
+- All prompts and completions are logged by the provider. Do not pass raw user PII — strip to sender ID + message text only.
+
+## arcee-ai/arcee-spotlight:free (Moderator / Speed-Critical)
+
+**Strengths**: Fast (sub-300ms TTFT). Purpose-built for content safety tasks and binary classification. Good tool calling for simple schemas. 131K context. Used for moderation decisions and speed-critical workflows.
+
+**Limitations**:
+- Unknown architecture ("Arcee-optimized" model — Arcee doesn't fully disclose architecture). No reasoning capability for nuanced decisions.
+- Tool calling may be inconsistent with Iris's complex tool schemas; test before production use.
+- Binary classification only — not suitable for ranking, filtering, or multi-class problems.
+- All prompts and completions are logged by the provider. Do not pass raw user PII through moderation.
+- Released as speed-optimized in Feb 2026 — still building production track record.
 
 ## qwen3-coder:free (Reasoner)
 
@@ -53,15 +64,6 @@ This appendix documents observed limitations of each free OpenRouter model when 
 - Weaker on non-English languages compared to gpt-oss-120b or llama-3.3.
 - Free endpoint is the same as the current default in the existing config. If you were already experiencing issues with this model, the new config moves it to alt-primary fallback role.
 
-## trinity-mini:free (Proactive/Light)
-
-**Strengths**: Ultra-lightweight (3B active). Fast. Good enough for simple tool calls like `proactive_quota`, `heartbeat_status`, and `enrich_profile`.
-
-**Limitations**:
-- 3B active parameters means limited reasoning. Do not use for complex multi-tool chains.
-- May struggle with long system prompts (131K context is theoretical — real performance degrades earlier).
-- Function calling works for simple schemas but may produce malformed arguments for tools with many parameters.
-- Best for single-shot tool calls only.
 
 ## glm-4.5-air:free (Cron/Fallback)
 
@@ -79,7 +81,7 @@ This appendix documents observed limitations of each free OpenRouter model when 
 
 **Limitations**:
 - Dense 70B = all parameters active every pass = slowest model in the lineup (~40 tok/s).
-- 128K context is the smallest among the options (tied with aurora-alpha).
+- 128K context is the smallest among the recommended options.
 - No reasoning mode toggle — always one mode. For tasks that need deep reasoning, use deepseek-r1.
 - Free tier availability fluctuates. Meta has historically maintained free access but with rate limits.
 
@@ -94,4 +96,4 @@ This appendix documents observed limitations of each free OpenRouter model when 
 ### Iris-specific integration notes
 - The `experimental.chat.system.transform` hook injects vault context, profile data, memories, governance directives, and skill suggestions into the system prompt. This can reach 10-20K tokens before the user even speaks. Models with smaller effective context windows may struggle.
 - Tool schemas for Iris's 30+ tools are registered via the plugin manifest. Some models handle large tool arrays better than others. If a model struggles, reduce the tool set in its agent frontmatter.
-- Streaming config (`breakOn`, `idleMs`, `minChars`) interacts with model speed. Faster models (aurora-alpha, trinity-mini) may need lower `idleMs` to avoid stuttering. Slower models (qwen3-coder) need higher values.
+- Streaming config (`breakOn`, `idleMs`, `minChars`) interacts with model speed. Faster models (trinity-mini, arcee-spotlight) may need lower `idleMs` to avoid stuttering. Slower models (qwen3-coder) need higher values.

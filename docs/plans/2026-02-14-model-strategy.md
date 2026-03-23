@@ -4,7 +4,7 @@
 **Status**: ~~Implementation ready~~ SUPERSEDED (aurora-alpha removed from OpenRouter 2026-03-22)
 **Constraint**: $0 AI cost — free OpenRouter models only
 
-> **Note (2026-03-22)**: This plan referenced `aurora-alpha` which is no longer available on OpenRouter. The moderator role now uses `arcee-ai/trinity-mini:free` as the primary model. See current model assignments in `docs/iris-model-reference.md`.
+> **Note (2026-03-22)**: This plan referenced `aurora-alpha` which is no longer available on OpenRouter. The capabilities config now uses `arcee-ai/arcee-spotlight:free` for the speed/moderator slot. See current model assignments in `docs/iris-model-reference.md`.
 
 ## Executive Summary
 

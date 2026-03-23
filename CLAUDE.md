@@ -234,13 +234,22 @@ The release pipeline (`.github/workflows/release.yml`) runs after CI passes on `
 
 Iris uses **ONLY free OpenRouter models**. No exceptions.
 
-- ✅ `openrouter/arcee-ai/arcee-spotlight:free`
-- ✅ `openrouter/arcee-ai/trinity-large-preview:free`
-- ✅ `openrouter/arcee-ai/trinity-mini:free`
-- ✅ `openrouter/meta-llama/llama-3.3-70b-instruct:free`
-- ✅ `openrouter/mistralai/mistral-7b-instruct:free`
+**Approved for primary/agent assignments:**
+- ✅ `openrouter/openai/gpt-oss-120b:free` — primary chat, reasoning
+- ✅ `openrouter/qwen/qwen3-coder:free` — reasoner, complex tool chains
+- ✅ `openrouter/deepseek/deepseek-r1-0528:free` — compactor, fact extraction
+- ✅ `openrouter/arcee-ai/arcee-spotlight:free` — moderator, speed-critical
+- ✅ `openrouter/arcee-ai/trinity-large-preview:free` — alt-primary
+- ✅ `openrouter/arcee-ai/trinity-mini:free` — proactive, small tasks
+- ✅ `openrouter/meta-llama/llama-3.3-70b-instruct:free` — fallback
+- ✅ `openrouter/mistralai/mistral-7b-instruct:free` — ultra-fast fallback
+- ✅ `openrouter/z-ai/glm-4.5-air:free` — cron/fallback, multilingual
+- ✅ `openrouter/stepfun/step-3.5-flash:free` — long context, reasoning
+
+**Banned (never use):**
 - ❌ `anthropic/claude-*` — NEVER. Requires paid API key.
 - ❌ `openai/gpt-4o` — NEVER. Requires paid API key.
+- ❌ `aurora-alpha` — NO LONGER available on OpenRouter.
 
 When updating model references, default presets, or wizard options: **always use free OpenRouter models only**.
 

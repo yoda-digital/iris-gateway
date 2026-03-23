@@ -1,7 +1,7 @@
 ---
 description: Content moderation subagent — fast safety checks
 mode: subagent
-model: openrouter/hunter-alpha
+model: openrouter/arcee-ai/arcee-spotlight:free
 tools:
   channel_action: true
   governance_status: true

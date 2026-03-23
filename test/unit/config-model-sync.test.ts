@@ -65,7 +65,7 @@ describe("syncModelsToOpenCode", () => {
 
   it("syncs primary and small models into opencode.json", async () => {
     const config = makeConfig({
-      models: { primary: "openrouter/qwen/qwen3-coder:free", small: "openrouter/hunter-alpha" },
+      models: { primary: "openrouter/qwen/qwen3-coder:free", small: "openrouter/arcee-ai/trinity-mini:free" },
       opencode: { port: 4096, hostname: "127.0.0.1", autoSpawn: false, projectDir: tmpDir },
     });
     const logger = makeLogger();
@@ -73,7 +73,7 @@ describe("syncModelsToOpenCode", () => {
     expect(result).toBe(true);
     const written = JSON.parse(readFileSync(ocPath, "utf-8"));
     expect(written.model).toBe("openrouter/qwen/qwen3-coder:free");
-    expect(written.small_model).toBe("openrouter/hunter-alpha");
+    expect(written.small_model).toBe("openrouter/arcee-ai/trinity-mini:free");
   });
 
   it("returns false when models already match opencode.json", async () => {

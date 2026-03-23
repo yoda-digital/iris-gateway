@@ -378,7 +378,7 @@ agent_create({
   name: "code-reviewer",
   description: "Reviews code snippets for quality and security issues",
   mode: "subagent",
-  model: "openrouter/anthropic/claude-sonnet-4",
+  model: "openrouter/qwen/qwen3-coder:free",
   temperature: 0.3,
   top_p: 0.9,
   steps: 10,

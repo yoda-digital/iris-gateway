@@ -22,12 +22,12 @@ if (!API_KEY) {
 
 // ── Models to test ──
 const MODELS = {
-  "openai/gpt-oss-120b:free":        { role: "primary-chat",   expectTools: true  },
-  "z-ai/glm-4.5-air:free":           { role: "cron-fallback",  expectTools: true  },
-  "openrouter/aurora-alpha":          { role: "moderator",      expectTools: true  },
-  "qwen/qwen3-coder:free":           { role: "reasoner",       expectTools: true  },
-  "deepseek/deepseek-r1-0528:free":  { role: "compactor",      expectTools: false },
-  "arcee-ai/trinity-large-preview:free": { role: "alt-primary", expectTools: true  },
+  "openai/gpt-oss-120b:free":           { role: "primary-chat",   expectTools: true  },
+  "z-ai/glm-4.5-air:free":             { role: "cron-fallback",  expectTools: true  },
+  "arcee-ai/arcee-spotlight:free":     { role: "moderator",      expectTools: true  },
+  "qwen/qwen3-coder:free":             { role: "reasoner",       expectTools: true  },
+  "deepseek/deepseek-r1-0528:free":    { role: "compactor",      expectTools: false },
+  "arcee-ai/trinity-large-preview:free": { role: "alt-primary",    expectTools: true  },
   "arcee-ai/trinity-mini:free":      { role: "proactive",      expectTools: true  },
   "meta-llama/llama-3.3-70b-instruct:free": { role: "fallback", expectTools: true },
 };

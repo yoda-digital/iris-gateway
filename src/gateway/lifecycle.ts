@@ -107,7 +107,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   await syncModelsToOpenCode(config, config.opencode, logger);
 
   // 4a. Validate opencode.json model keys for legacy format (runs unconditionally, regardless of config.models).
-  // Auto-registration writes keys as "model-name" (e.g. "hunter-alpha"), NOT "openrouter/model-name".
+  // Auto-registration writes keys as "model-name" (e.g. "arcee-ai/arcee-spotlight:free"), NOT "openrouter/model-name".
   // A key containing "openrouter/" indicates a stale entry written before auto-registration was introduced.
   {
     const ocPath = join(config.opencode.projectDir ?? process.cwd(), ".opencode", "opencode.json");

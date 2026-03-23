@@ -5,7 +5,7 @@
 | Agent | Model ID | Role | Speed | Tool Calling |
 |-------|----------|------|-------|-------------|
 | `chat` (primary) | `openai/gpt-oss-120b:free` | Main conversation | ★★★★★ | ★★★★☆ |
-| `moderator` | `openrouter/arcee-ai/trinity-mini:free` | Content safety | ★★★★★ | ★★★☆☆ |
+| `moderator` | `openrouter/arcee-ai/arcee-spotlight:free` | Content safety | ★★★★★ | ★★★☆☆ |
 | `reasoner` | `qwen/qwen3-coder:free` | Complex multi-step | ★★☆☆☆ | ★★★★★ |
 | `compactor` | `deepseek/deepseek-r1-0528:free` | Fact extraction | ★★★☆☆ | ★★☆☆☆ |
 | `small_model` | `arcee-ai/trinity-mini:free` | Titles, summaries | ★★★★★ | ★★★☆☆ |
@@ -39,7 +39,7 @@ If the primary model is unavailable (rate limited, provider down), switch to:
 | Agent | Primary | Fallback 1 | Fallback 2 |
 |-------|---------|-----------|-----------|
 | chat | gpt-oss-120b | glm-4.5-air | llama-3.3-70b |
-| moderator | trinity-mini | arcee-spotlight | gpt-oss-120b |
+| moderator | arcee-spotlight | trinity-mini | gpt-oss-120b |
 | reasoner | qwen3-coder | trinity-large-preview | gpt-oss-120b |
 | compactor | deepseek-r1-0528 | qwen3-coder | glm-4.5-air |
 

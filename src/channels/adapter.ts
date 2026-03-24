@@ -1,5 +1,7 @@
 import type { TypedEventEmitter } from "../utils/typed-emitter.js";
 import type { ChannelAccountConfig } from "../config/types.js";
+import type { InboundMessage } from "../types/message.js";
+export type { InboundMessage, InboundMedia } from "../types/message.js";
 
 export interface ChannelCapabilities {
   readonly text: boolean;
@@ -16,29 +18,7 @@ export interface ChannelCapabilities {
   readonly maxTextLength: number;
 }
 
-export interface InboundMessage {
-  readonly id: string;
-  readonly channelId: string;
-  readonly senderId: string;
-  readonly senderName: string;
-  readonly chatId: string;
-  readonly chatType: "dm" | "group";
-  readonly text?: string;
-  readonly media?: InboundMedia[];
-  readonly replyToId?: string;
-  readonly timestamp: number;
-  readonly raw: unknown;
-}
 
-export interface InboundMedia {
-  readonly type: "image" | "video" | "audio" | "document";
-  readonly mimeType: string;
-  readonly url?: string;
-  readonly buffer?: Buffer;
-  readonly filename?: string;
-  readonly size?: number;
-  readonly caption?: string;
-}
 
 export interface SendTextParams {
   readonly to: string;

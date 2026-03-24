@@ -1,5 +1,5 @@
 import * as chrono from "chrono-node";
-import type { InboundMessage } from "../../channels/adapter.js";
+import type { InboundMessage } from "../../types/message.js";
 import type { DerivedSignal, TriggerResult } from "../types.js";
 
 export interface TriggerRule {

@@ -3,7 +3,7 @@ import type { IntelligenceStore } from "../store.js";
 import type { IntelligenceBus } from "../bus.js";
 import type { DerivedSignal, TriggerResult } from "../types.js";
 import type { IntentStore } from "../../proactive/store.js";
-import type { InboundMessage } from "../../channels/adapter.js";
+import type { InboundMessage } from "../../types/message.js";
 import type { Logger } from "../../logging/logger.js";
 import { builtinTriggerRules, type TriggerRule } from "./rules.js";
 

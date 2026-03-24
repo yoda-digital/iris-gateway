@@ -17,8 +17,6 @@ vi.mock("../../src/gateway/metrics.js", () => ({
     outcomesLogged: { inc: vi.fn() },
     arcsDetected: { inc: vi.fn() },
     intentsTriggered: { inc: vi.fn() },
-    inferenceRuns: { inc: vi.fn() },
-    goalsCreated: { inc: vi.fn() },
   },
 }));
 
@@ -35,7 +33,6 @@ describe("IntelligenceStore — Inference delegation", () => {
       signalType: "engagement",
       value: "high",
       confidence: 0.9,
-      sourceRuleId: "rule-1",
     });
     expect(sig.id).toBeTruthy();
     expect(sig.signalType).toBe("engagement");

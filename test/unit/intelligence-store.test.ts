@@ -71,7 +71,7 @@ describe("IntelligenceStore — Inference delegation", () => {
   it("logInference + getLastInferenceRun", () => {
     const store = new IntelligenceStore(makeDb());
     const ts = Date.now();
-    store.logInference({ ruleId: "rule-x", senderId: "u1", executedAt: ts, result: "ok" });
+    store.logInference({ ruleId: "rule-x", senderId: "u1", executedAt: ts, result: "produced", details: null });
     const last = store.getLastInferenceRun("rule-x", "u1");
     expect(last).toBe(ts);
   });
@@ -152,7 +152,7 @@ describe("IntelligenceStore — Arcs delegation", () => {
 
   it("addArcEntry + getArcEntries", () => {
     const store = new IntelligenceStore(makeDb());
-    const arc = store.createArc({ senderId: "u1", channelId: "telegram", title: "Test", seedEntryId: "m1" });
+    const arc = store.createArc({ senderId: "u1", title: "Test" });
     const entry = store.addArcEntry({ arcId: arc.id, content: "some arc content" });
     expect(entry.arcId).toBe(arc.id);
 
@@ -162,22 +162,22 @@ describe("IntelligenceStore — Arcs delegation", () => {
 
   it("getActiveArcs returns arcs for sender", () => {
     const store = new IntelligenceStore(makeDb());
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "Arc A", seedEntryId: "m1" });
+    store.createArc({ senderId: "u1", title: "Arc A" });
     const active = store.getActiveArcs("u1");
     expect(active.length).toBeGreaterThanOrEqual(1);
   });
 
   it("getArcsBySender returns all arcs for sender", () => {
     const store = new IntelligenceStore(makeDb());
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "Arc A", seedEntryId: "m1" });
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "Arc B", seedEntryId: "m2" });
+    store.createArc({ senderId: "u1", title: "Arc A" });
+    store.createArc({ senderId: "u1", title: "Arc B" });
     const all = store.getArcsBySender("u1");
     expect(all.length).toBe(2);
   });
 
   it("updateArcTitle changes the title", () => {
     const store = new IntelligenceStore(makeDb());
-    const arc = store.createArc({ senderId: "u1", channelId: "telegram", title: "Old", seedEntryId: "m1" });
+    const arc = store.createArc({ senderId: "u1", title: "Old" });
     store.updateArcTitle(arc.id, "New Title");
     const fetched = store.getArc(arc.id);
     expect(fetched!.title).toBe("New Title");
@@ -185,7 +185,7 @@ describe("IntelligenceStore — Arcs delegation", () => {
 
   it("updateArcStatus changes the status", () => {
     const store = new IntelligenceStore(makeDb());
-    const arc = store.createArc({ senderId: "u1", channelId: "telegram", title: "Arc", seedEntryId: "m1" });
+    const arc = store.createArc({ senderId: "u1", title: "Arc" });
     store.updateArcStatus(arc.id, "resolved");
     const fetched = store.getArc(arc.id);
     expect(fetched!.status).toBe("resolved");
@@ -193,21 +193,21 @@ describe("IntelligenceStore — Arcs delegation", () => {
 
   it("getStaleArcs returns empty on fresh arcs", () => {
     const store = new IntelligenceStore(makeDb());
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "Fresh", seedEntryId: "m1" });
+    store.createArc({ senderId: "u1", title: "Fresh" });
     const stale = store.getStaleArcs(30);
     expect(stale).toEqual([]);
   });
 
   it("findArcByKeywords returns matching arc (2+ keyword overlap required)", () => {
     const store = new IntelligenceStore(makeDb());
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "vacation beach plans", seedEntryId: "m1" });
+    store.createArc({ senderId: "u1", title: "vacation beach plans" });
     const found = store.findArcByKeywords("u1", ["vacation", "beach"]);
     expect(found).not.toBeNull();
   });
 
   it("findArcByKeywords returns null when only 1 keyword matches", () => {
     const store = new IntelligenceStore(makeDb());
-    store.createArc({ senderId: "u1", channelId: "telegram", title: "vacation plans", seedEntryId: "m1" });
+    store.createArc({ senderId: "u1", title: "vacation plans" });
     const found = store.findArcByKeywords("u1", ["vacation", "nonexistent-xyz"]);
     expect(found).toBeNull();
   });

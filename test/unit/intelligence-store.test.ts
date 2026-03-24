@@ -52,8 +52,8 @@ describe("IntelligenceStore — Inference delegation", () => {
 
   it("getDerivedSignals returns list filtered by senderId", () => {
     const store = new IntelligenceStore(makeDb());
-    store.writeDerivedSignal({ senderId: "u1", signalType: "mood", value: "happy", confidence: 0.8, sourceRuleId: "r1" });
-    store.writeDerivedSignal({ senderId: "u2", signalType: "mood", value: "sad", confidence: 0.5, sourceRuleId: "r1" });
+    store.writeDerivedSignal({ senderId: "u1", signalType: "mood", value: "happy", confidence: 0.8 });
+    store.writeDerivedSignal({ senderId: "u2", signalType: "mood", value: "sad", confidence: 0.5 });
     const results = store.getDerivedSignals("u1");
     expect(results).toHaveLength(1);
     expect(results[0].senderId).toBe("u1");
@@ -61,8 +61,8 @@ describe("IntelligenceStore — Inference delegation", () => {
 
   it("getDerivedSignals filters by signalType", () => {
     const store = new IntelligenceStore(makeDb());
-    store.writeDerivedSignal({ senderId: "u1", signalType: "mood", value: "ok", confidence: 0.5, sourceRuleId: "r1" });
-    store.writeDerivedSignal({ senderId: "u1", signalType: "intent", value: "buy", confidence: 0.7, sourceRuleId: "r2" });
+    store.writeDerivedSignal({ senderId: "u1", signalType: "mood", value: "ok", confidence: 0.5 });
+    store.writeDerivedSignal({ senderId: "u1", signalType: "intent", value: "buy", confidence: 0.7 });
     const mood = store.getDerivedSignals("u1", "mood");
     expect(mood).toHaveLength(1);
     expect(mood[0].signalType).toBe("mood");
@@ -133,9 +133,7 @@ describe("IntelligenceStore — Arcs delegation", () => {
     const store = new IntelligenceStore(makeDb());
     const arc = store.createArc({
       senderId: "u1",
-      channelId: "telegram",
       title: "Weekend plans",
-      seedEntryId: "msg-1",
     });
     expect(arc.id).toBeTruthy();
     expect(arc.title).toBe("Weekend plans");

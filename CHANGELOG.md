@@ -1,3 +1,9 @@
+## [1.13.17](https://github.com/yoda-digital/iris-gateway/compare/v1.13.16...v1.13.17) (2026-03-24)
+
+### Refactoring
+
+* **intelligence:** move InboundMessage to src/types/message.ts — fix dep direction violation ([#222](https://github.com/yoda-digital/iris-gateway/issues/222)) ([#229](https://github.com/yoda-digital/iris-gateway/issues/229)) ([9294456](https://github.com/yoda-digital/iris-gateway/commit/92944562b453198f8d3f0d7389b79ab84c7a5f97))
+
 ## [1.13.16](https://github.com/yoda-digital/iris-gateway/compare/v1.13.15...v1.13.16) (2026-03-22)
 
 ### Bug Fixes

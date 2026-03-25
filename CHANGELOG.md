@@ -1,3 +1,9 @@
+## [1.13.18](https://github.com/yoda-digital/iris-gateway/compare/v1.13.17...v1.13.18) (2026-03-25)
+
+### Bug Fixes
+
+* remove trailing comma in opencode.json (JSON syntax error) ([#230](https://github.com/yoda-digital/iris-gateway/issues/230)) ([dad1711](https://github.com/yoda-digital/iris-gateway/commit/dad1711c1b0f052575243e8029ca3a98ec390281))
+
 ## [1.13.17](https://github.com/yoda-digital/iris-gateway/compare/v1.13.16...v1.13.17) (2026-03-24)
 
 ### Refactoring

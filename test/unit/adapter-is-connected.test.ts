@@ -6,6 +6,7 @@ vi.mock("grammy", () => {
   class Bot {
     api = {
       getMe: vi.fn().mockResolvedValue({ id: 42 }),
+      getUpdates: vi.fn().mockResolvedValue([]), // preflight check — no conflict
     };
     on = vi.fn();
     catch = vi.fn();

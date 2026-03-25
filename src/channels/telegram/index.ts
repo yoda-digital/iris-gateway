@@ -27,6 +27,39 @@ const CAPABILITIES: ChannelCapabilities = {
   maxTextLength: 4096,
 };
 
+/**
+ * Performs a preflight check to detect concurrent iris-gateway instances.
+ *
+ * Calls getUpdates with timeout=0 (non-blocking) before starting the polling
+ * loop. If another instance is already polling, Telegram returns a 409 Conflict.
+ * We catch this and throw a structured error so the process can exit early with
+ * a clear message, instead of logging GrammyErrors indefinitely.
+ *
+ * Timeout=0 means: return immediately with any pending updates (or empty array).
+ * It does NOT block for 30 seconds like the normal polling loop.
+ */
+async function assertNoConcurrentPoller(bot: Bot): Promise<void> {
+  try {
+    await bot.api.getUpdates({ limit: 1, timeout: 0 });
+  } catch (err: unknown) {
+    const isGrammyError =
+      err !== null &&
+      typeof err === "object" &&
+      "error_code" in err &&
+      (err as { error_code: unknown }).error_code === 409;
+
+    if (isGrammyError) {
+      throw new Error(
+        "Telegram conflict detected (409): another iris-gateway instance is already polling this bot. " +
+        "Stop the other instance before starting a new one. " +
+        "Run: pkill -f 'iris-gateway' or 'node.*dist/index.js'"
+      );
+    }
+    // Any other error (network, auth): re-throw as-is
+    throw err;
+  }
+}
+
 export class TelegramAdapter implements ChannelAdapter {
   readonly id = "telegram";
   readonly label = "Telegram";
@@ -67,6 +100,10 @@ export class TelegramAdapter implements ChannelAdapter {
     // Get bot info before starting to know our own ID
     const botInfo = await this.bot.api.getMe();
     this.botUserId = String(botInfo.id);
+
+    // Preflight: detect concurrent instances before entering the polling loop.
+    // Throws with a human-readable message if another poller is active (409 conflict).
+    await assertNoConcurrentPoller(this.bot);
 
     // bot.start() never resolves (runs polling loop forever), so fire-and-forget
     this.bot.start({ drop_pending_updates: true }).catch((err) => {

@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, GrammyError } from "grammy";
 import type {
   ChannelAdapter,
   ChannelCapabilities,
@@ -42,13 +42,7 @@ async function assertNoConcurrentPoller(bot: Bot): Promise<void> {
   try {
     await bot.api.getUpdates({ limit: 1, timeout: 0 });
   } catch (err: unknown) {
-    const isGrammyError =
-      err !== null &&
-      typeof err === "object" &&
-      "error_code" in err &&
-      (err as { error_code: unknown }).error_code === 409;
-
-    if (isGrammyError) {
+    if (err instanceof GrammyError && err.error_code === 409) {
       throw new Error(
         "Telegram conflict detected (409): another iris-gateway instance is already polling this bot. " +
         "Stop the other instance before starting a new one. " +

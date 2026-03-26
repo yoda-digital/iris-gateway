@@ -49,7 +49,7 @@ export interface ChannelAdapter {
   readonly events: TypedEventEmitter<ChannelEvents>;
   readonly isConnected: boolean;
 
-  start(config: ChannelAccountConfig, signal: AbortSignal): Promise<void>;
+  start(config: ChannelAccountConfig, signal: AbortSignal, opts?: Record<string, unknown>): Promise<void>;
   stop(): Promise<void>;
 
   sendText(params: SendTextParams): Promise<{ messageId: string }>;

@@ -32,26 +32,6 @@ function makeBotMock(overrides: {
   };
 }
 
-// grammY error classes
-class GrammyError extends Error {
-  error_code: number;
-  description: string;
-  constructor(message: string, error_code: number, description: string) {
-    super(message);
-    this.name = "GrammyError";
-    this.error_code = error_code;
-    this.description = description;
-  }
-}
-
-function grammy409() {
-  return new GrammyError(
-    "Conflict: terminated by other getUpdates request",
-    409,
-    "Conflict: terminated by other getUpdates request"
-  );
-}
-
 vi.mock("grammy", () => ({
   Bot: vi.fn(),
   GrammyError: class GrammyError extends Error {
@@ -66,9 +46,25 @@ vi.mock("grammy", () => ({
   },
 }));
 
-// Import after mock registration
-import { Bot } from "grammy";
+// Import after mock registration — use the mocked GrammyError so instanceof works
+import { Bot, GrammyError } from "grammy";
 const MockBot = vi.mocked(Bot);
+
+function grammy409() {
+  return new GrammyError(
+    "Conflict: terminated by other getUpdates request",
+    409,
+    "Conflict: terminated by other getUpdates request"
+  );
+}
+
+function grammy409Webhook() {
+  return new GrammyError(
+    "Conflict: can't use getUpdates method while Webhook is active",
+    409,
+    "Conflict: can't use getUpdates method while Webhook is active"
+  );
+}
 
 describe("TelegramAdapter — concurrent instance detection", () => {
   beforeEach(() => {
@@ -90,19 +86,43 @@ describe("TelegramAdapter — concurrent instance detection", () => {
     expect(mockBot.start).toHaveBeenCalledOnce();
   });
 
-  it("throws on 409 conflict before entering polling loop", async () => {
+  it("starts successfully when Telegram returns pending updates in preflight", async () => {
+    const mockBot = makeBotMock({ getUpdatesResult: [{ update_id: 1 }] });
+    MockBot.mockImplementation(() => mockBot as unknown as InstanceType<typeof Bot>);
+
+    const adapter = new TelegramAdapter();
+    const signal = AbortSignal.timeout(5000);
+
+    await expect(adapter.start({ token: "fake-token" }, signal)).resolves.not.toThrow();
+    expect(mockBot.api.getUpdates).toHaveBeenCalledWith({ limit: 1, timeout: 0 });
+    expect(mockBot.start).toHaveBeenCalledOnce();
+  });
+
+  it("throws on 409 conflict before entering polling loop, with pkill hint", async () => {
     const mockBot = makeBotMock({ getUpdatesError: grammy409() });
     MockBot.mockImplementation(() => mockBot as unknown as InstanceType<typeof Bot>);
 
     const adapter = new TelegramAdapter();
     const signal = AbortSignal.timeout(5000);
 
-    // The error thrown depends on GrammyError class matching between mock and runtime.
-    // In CI/production, assertNoConcurrentPoller wraps it. In test env with mocked grammy,
-    // instanceof may fail, so we verify behavior: (1) error is thrown, (2) polling not started.
-    await expect(adapter.start({ token: "fake-token" }, signal)).rejects.toThrow();
+    const err = await adapter.start({ token: "fake-token" }, signal).catch((e) => e as Error);
+    expect(err.message).toMatch(/conflict detected/i);
+    expect(err.message).toMatch(/pkill/);
 
-    // Critical behavior: must NOT enter the polling loop after detecting conflict
+    // Critical: must NOT enter the polling loop after detecting conflict
+    expect(mockBot.start).not.toHaveBeenCalled();
+  });
+
+  it("throws a webhook-specific message when 409 is due to active webhook", async () => {
+    const mockBot = makeBotMock({ getUpdatesError: grammy409Webhook() });
+    MockBot.mockImplementation(() => mockBot as unknown as InstanceType<typeof Bot>);
+
+    const adapter = new TelegramAdapter();
+    const signal = AbortSignal.timeout(5000);
+
+    const err = await adapter.start({ token: "fake-token" }, signal).catch((e) => e as Error);
+    expect(err.message).toMatch(/webhook/i);
+    expect(err.message).not.toMatch(/pkill/);
     expect(mockBot.start).not.toHaveBeenCalled();
   });
 
@@ -114,13 +134,26 @@ describe("TelegramAdapter — concurrent instance detection", () => {
     const adapter = new TelegramAdapter();
     const signal = AbortSignal.timeout(5000);
 
-    await expect(
-      adapter.start({ token: "bad-token" }, signal)
-    ).rejects.toThrow("Unauthorized");
+    const err = await adapter.start({ token: "bad-token" }, signal).catch((e) => e as Error);
+    expect(err.message).toBe("Unauthorized");
+    expect(err.message).not.toMatch(/conflict detected/i);
+  });
 
-    // Should not obscure auth errors with the conflict message
-    const message = await adapter.start({ token: "bad-token" }, signal).catch(e => e.message);
-    expect(message).not.toMatch(/conflict detected/i);
+  it("skips conflict check when skipConflictCheck option is set (for outbound-only callers)", async () => {
+    // Simulates iris send telegram while main gateway is already polling
+    const mockBot = makeBotMock({ getUpdatesError: grammy409() });
+    MockBot.mockImplementation(() => mockBot as unknown as InstanceType<typeof Bot>);
+
+    const adapter = new TelegramAdapter();
+    const signal = AbortSignal.timeout(5000);
+
+    await expect(
+      adapter.start({ token: "fake-token" }, signal, { skipConflictCheck: true })
+    ).resolves.not.toThrow();
+
+    // getUpdates should NOT have been called
+    expect(mockBot.api.getUpdates).not.toHaveBeenCalled();
+    expect(mockBot.start).toHaveBeenCalledOnce();
   });
 
   it("does not start adapter state (_isConnected) when conflict is detected", async () => {

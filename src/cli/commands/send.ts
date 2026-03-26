@@ -60,7 +60,7 @@ export class SendCommand extends Command {
     const adapter = factory();
 
     try {
-      await adapter.start(channelConfig, abortController.signal);
+      await adapter.start(channelConfig, abortController.signal, { skipConflictCheck: true });
       const result = await adapter.sendText({
         to: this.target,
         text: this.message,

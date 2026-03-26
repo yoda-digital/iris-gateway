@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/yoda-digital/iris-gateway/compare/v1.13.18...v1.14.0) (2026-03-26)
+
+### Features
+
+* **telegram:** detect concurrent instances and fail fast on 409 conflict ([#231](https://github.com/yoda-digital/iris-gateway/issues/231)) ([#232](https://github.com/yoda-digital/iris-gateway/issues/232)) ([bc9f318](https://github.com/yoda-digital/iris-gateway/commit/bc9f318eca72e806f906564e1f26a5cb940e1982))
+
 ## [1.13.18](https://github.com/yoda-digital/iris-gateway/compare/v1.13.17...v1.13.18) (2026-03-25)
 
 ### Bug Fixes

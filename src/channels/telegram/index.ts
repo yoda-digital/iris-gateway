@@ -46,7 +46,7 @@ async function assertNoConcurrentPoller(bot: Bot): Promise<void> {
       // Distinguish between two 409 scenarios:
       // 1. Another getUpdates poller is running → description contains "terminated by other"
       // 2. A webhook is set → description contains "Webhook is active"
-      const description = (err as GrammyError).description ?? "";
+      const description = err.description ?? "";
       if (description.toLowerCase().includes("webhook")) {
         throw new Error(
           "Telegram conflict (409): a webhook is currently active for this bot. " +

@@ -1,3 +1,9 @@
+## [1.15.1](https://github.com/yoda-digital/iris-gateway/compare/v1.15.0...v1.15.1) (2026-03-27)
+
+### Bug Fixes
+
+* [#236](https://github.com/yoda-digital/iris-gateway/issues/236) — clarify isConnected semantics and add isPolling alias for TelegramAdapter ([#248](https://github.com/yoda-digital/iris-gateway/issues/248)) ([463a97d](https://github.com/yoda-digital/iris-gateway/commit/463a97d063bdc731e7f63af44e77898f74929272))
+
 ## [1.15.0](https://github.com/yoda-digital/iris-gateway/compare/v1.14.1...v1.15.0) (2026-03-27)
 
 ### Features

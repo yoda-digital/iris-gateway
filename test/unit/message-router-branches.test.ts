@@ -411,7 +411,7 @@ describe("MessageRouter — event handler paths", () => {
     // This exercises the cleanup branches without needing to hang the bridge.
     const { tempDir, router } = makeEnv();
     try {
-      const pr = (router as any).pendingResponses as Map<string, any>;
+      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
       pr.set("test-session", { channelId: "mock", chatId: "c1", createdAt: Date.now() });
 
       const eh = router.getEventHandler();
@@ -458,13 +458,13 @@ describe("MessageRouter — pruneStale cleanup", () => {
     // Access private pendingResponses via type assertion to verify pruning.
     const { tempDir, router } = makeEnv();
     try {
-      const pr = (router as any).pendingResponses as Map<string, any>;
+      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
       const staleTs = Date.now() - 6 * 60 * 1000; // 6 min ago > 5 min TTL
       pr.set("stale-session", { channelId: "mock", chatId: "c1", createdAt: staleTs });
       pr.set("fresh-session", { channelId: "mock", chatId: "c2", createdAt: Date.now() });
 
       // Call the private method directly
-      (router as any).pruneStale();
+      (router as any).turnGrouper["pruneStale"]();
 
       expect(pr.has("stale-session")).toBe(false);
       expect(pr.has("fresh-session")).toBe(true);

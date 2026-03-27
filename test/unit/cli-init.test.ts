@@ -46,7 +46,7 @@ async function setupHappyPathMocks(telegramToken = "123:abc", model = "openroute
 
   p.multiselect.mockResolvedValueOnce(["telegram"]);
   p.text.mockResolvedValueOnce(telegramToken); // telegram token
-  p.select.mockResolvedValueOnce(model);       // model selector
+  p.text.mockResolvedValueOnce(model);         // model identifier (text input — no hardcoded options)
   p.confirm.mockResolvedValueOnce(false);      // skip opencode install
 }
 
@@ -113,7 +113,7 @@ describe("InitCommand: happy path", () => {
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
 
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free"); // model (text input)
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
@@ -208,7 +208,7 @@ describe("InitCommand: EACCES error handling", () => {
     p.spinner.mockReturnValue({ start: vi.fn(), stop: spinnerStop });
 
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(true); // want to install opencode
 
     const cp = await getChildProcess();
@@ -231,7 +231,7 @@ describe("InitCommand: EACCES error handling", () => {
     p.spinner.mockReturnValue({ start: vi.fn(), stop: spinnerStop });
 
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(true);
 
     const cp = await getChildProcess();
@@ -253,7 +253,7 @@ describe("InitCommand: EACCES error handling", () => {
     p.spinner.mockReturnValue({ start: vi.fn(), stop: vi.fn() });
 
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(true);
 
     const cp = await getChildProcess();
@@ -316,8 +316,8 @@ describe("InitCommand: model preset defaults", () => {
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
 
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("__custom__");
-    p.text.mockResolvedValueOnce("openrouter/my-org/my-model:free"); // custom model input
+    // No __custom__ option anymore — user types model directly via p.text
+    p.text.mockResolvedValueOnce("openrouter/my-org/my-model:free"); // model identifier
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
@@ -378,7 +378,7 @@ describe("InitCommand: invalid input rejection (cancel handling)", () => {
     const clack = await getClack();
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce(CANCEL_SENTINEL);
+    p.text.mockResolvedValueOnce(CANCEL_SENTINEL); // model input cancelled
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
     const cmd = new InitCommand();
@@ -387,12 +387,11 @@ describe("InitCommand: invalid input rejection (cancel handling)", () => {
     expect(exitCode).toBe(1);
   });
 
-  it("returns exit code 1 when custom model input is cancelled", async () => {
+  it("returns exit code 1 when model text input is cancelled (no __custom__ option needed)", async () => {
     const clack = await getClack();
     const p = clack as Record<string, ReturnType<typeof vi.fn>>;
     p.multiselect.mockResolvedValueOnce(["whatsapp"]);
-    p.select.mockResolvedValueOnce("__custom__");
-    p.text.mockResolvedValueOnce(CANCEL_SENTINEL);
+    p.text.mockResolvedValueOnce(CANCEL_SENTINEL); // model prompt cancelled
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
     const cmd = new InitCommand();
@@ -500,7 +499,7 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
 
     p.multiselect.mockResolvedValueOnce(["telegram"]);
     p.text.mockResolvedValueOnce("123:validformat");
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
@@ -525,7 +524,7 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
     p.multiselect.mockResolvedValueOnce(["slack"]);
     p.text.mockResolvedValueOnce("xapp-1-invalid"); // appToken
     p.text.mockResolvedValueOnce("xoxb-invalid");   // botToken
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");
@@ -549,7 +548,7 @@ describe("InitCommand: fetchWithTimeout null-return path", () => {
 
     p.multiselect.mockResolvedValueOnce(["discord"]);
     p.text.mockResolvedValueOnce("invalid-discord-token");
-    p.select.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free") // model (text input);
     p.confirm.mockResolvedValueOnce(false);
 
     const { InitCommand } = await import("../../src/cli/commands/init.js");

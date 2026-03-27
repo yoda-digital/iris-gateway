@@ -15,6 +15,7 @@ export function bootstrapIntelligence(
   intentStore: IntentStore | null,
   heartbeatStore: HeartbeatStore | null,
   logger: Logger,
+  // Optional startup hint only; lifecycle currently omits this because language is determined per-message.
   userLanguage?: string,
 ): IntelligenceComponents {
   const titleGenerator: TitleGeneratorFn = async (keywords, content) => {

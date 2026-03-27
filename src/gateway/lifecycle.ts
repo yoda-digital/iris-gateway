@@ -45,6 +45,7 @@ import type { ArcDetector } from "../intelligence/arcs/detector.js";
 import type { ArcLifecycle } from "../intelligence/arcs/lifecycle.js";
 import type { GoalLifecycle } from "../intelligence/goals/lifecycle.js";
 import type { CrossChannelResolver } from "../intelligence/cross-channel/resolver.js";
+import type { TrendDetector } from "../intelligence/health/trend-detector.js";
 import type { HealthGate } from "../intelligence/health/gate.js";
 import type { PromptAssembler } from "../intelligence/prompt-assembler.js";
 import { join } from "node:path";
@@ -86,6 +87,7 @@ export interface GatewayContext {
   arcLifecycle: ArcLifecycle | null;
   goalLifecycle: GoalLifecycle | null;
   crossChannelResolver: CrossChannelResolver | null;
+  trendDetector: TrendDetector | null;
   healthGate: HealthGate | null;
   promptAssembler: PromptAssembler | null;
 }
@@ -179,7 +181,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   const intel = bootstrapIntelligence(bridge, vaultDb, signalStore, intentStore, heartbeatStore, logger);
   const { intelligenceBus, intelligenceStore, inferenceEngine, triggerEvaluator,
     outcomeAnalyzer, arcDetector, arcLifecycle, goalLifecycle,
-    crossChannelResolver, healthGate, promptAssembler } = intel;
+    crossChannelResolver, trendDetector, healthGate, promptAssembler } = intel;
 
   // 5.77 CLI tools
   let cliExecutor: CliExecutor | null = null;
@@ -340,6 +342,6 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     signalStore, profileEnricher, heartbeatEngine, activityTracker,
     intelligenceBus, intelligenceStore, inferenceEngine, triggerEvaluator,
     outcomeAnalyzer, arcDetector, arcLifecycle, goalLifecycle,
-    crossChannelResolver, healthGate, promptAssembler,
+    crossChannelResolver, trendDetector, healthGate, promptAssembler,
   };
 }

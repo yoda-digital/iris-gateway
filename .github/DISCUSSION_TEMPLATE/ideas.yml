@@ -1,0 +1,53 @@
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for iris-gateway? Drop it here. We read every suggestion.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Telegram channel
+        - WhatsApp channel
+        - Discord channel
+        - Slack channel
+        - Core gateway / routing
+        - CLI / developer experience
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: "I run into X when trying to Y..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would the solution look like?
+      placeholder: "It'd be great if iris-gateway could..."
+    validations:
+      required: true
+  - type: dropdown
+    id: importance
+    attributes:
+      label: How much does this matter to you?
+      options:
+        - Nice to have
+        - Would use it regularly
+        - Blocking my adoption
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      placeholder: "I've tried X but it doesn't work because..."
+    validations:
+      required: false

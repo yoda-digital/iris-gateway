@@ -1,0 +1,13 @@
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share thoughts, show what you built, or start a conversation about iris-gateway.
+  - type: textarea
+    id: content
+    attributes:
+      label: What's on your mind?
+      placeholder: "I've been using iris-gateway for..."
+    validations:
+      required: true

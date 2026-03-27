@@ -1,0 +1,43 @@
+title: "[Q] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask anything about iris-gateway. We typically respond within a few hours.
+  - type: dropdown
+    id: topic
+    attributes:
+      label: What's this about?
+      options:
+        - Setup / installation
+        - Configuration
+        - Channel integration (Telegram, WhatsApp, etc.)
+        - AI model setup (OpenRouter, Anthropic)
+        - Deployment / production
+        - API / SDK usage
+        - Bug or unexpected behavior
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      placeholder: "How do I..."
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
+      placeholder: "I'm running iris-gateway v1.14.1 on Node 22, Ubuntu 24.04..."
+    validations:
+      required: false
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before posting
+      options:
+        - label: I checked the README and existing discussions
+          required: true

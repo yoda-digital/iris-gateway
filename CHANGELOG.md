@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/yoda-digital/iris-gateway/compare/v1.14.1...v1.15.0) (2026-03-27)
+
+### Features
+
+* add GitHub Discussion category form templates ([7d89c82](https://github.com/yoda-digital/iris-gateway/commit/7d89c82958ee168577949df79b024c0cc569d0ce))
+
 ## [1.14.1](https://github.com/yoda-digital/iris-gateway/compare/v1.14.0...v1.14.1) (2026-03-27)
 
 ### Bug Fixes

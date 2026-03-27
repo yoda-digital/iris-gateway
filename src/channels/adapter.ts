@@ -47,6 +47,12 @@ export interface ChannelAdapter {
   readonly label: string;
   readonly capabilities: ChannelCapabilities;
   readonly events: TypedEventEmitter<ChannelEvents>;
+  /**
+   * Returns true if the adapter's polling/connection loop has been started
+   * (i.e., `start()` was called successfully). This reflects *intent*, not
+   * confirmed reachability. For a real connectivity check, use `checkHealth()`
+   * if available, or inspect the "connected" event.
+   */
   readonly isConnected: boolean;
 
   start(config: ChannelAccountConfig, signal: AbortSignal, opts?: Record<string, unknown>): Promise<void>;

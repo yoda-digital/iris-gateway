@@ -55,6 +55,10 @@ export class ChannelChecker implements HealthChecker {
       };
     }
 
+    // isConnected reflects polling-loop start, not confirmed Telegram reachability.
+    // This is the strongest synchronous signal available — grammY long-polling has
+    // no async ready callback. The assertNoConcurrentPoller() preflight (called in
+    // start()) validates the token and absence of 409 conflicts before this flag is set.
     const connected = adapters.filter((a) => a.isConnected).length;
     const total = adapters.length;
 

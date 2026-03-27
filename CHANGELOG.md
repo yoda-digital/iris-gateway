@@ -1,3 +1,9 @@
+## [1.14.1](https://github.com/yoda-digital/iris-gateway/compare/v1.14.0...v1.14.1) (2026-03-27)
+
+### Bug Fixes
+
+* [#234](https://github.com/yoda-digital/iris-gateway/issues/234) — split message-router.ts (380→268 lines) into TurnGrouper + router-metrics ([#237](https://github.com/yoda-digital/iris-gateway/issues/237)) ([37316b0](https://github.com/yoda-digital/iris-gateway/commit/37316b003881eadaf16dc567435666b01ebc8c38))
+
 ## [1.14.0](https://github.com/yoda-digital/iris-gateway/compare/v1.13.18...v1.14.0) (2026-03-26)
 
 ### Features

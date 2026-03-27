@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question? Use Discussions
+    url: https://github.com/yoda-digital/iris-gateway/discussions/categories/q-a
+    about: Ask questions in the Q&A section — we respond the same day.
+  - name: Feature idea? Use Discussions
+    url: https://github.com/yoda-digital/iris-gateway/discussions/categories/ideas
+    about: Share feature ideas where the community can discuss and vote.

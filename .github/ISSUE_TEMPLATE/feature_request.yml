@@ -1,0 +1,54 @@
+name: Feature Request
+description: Suggest something iris-gateway should do
+title: "[Feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of iris-gateway?
+      options:
+        - Channel (Telegram, WhatsApp, Discord, Slack)
+        - AI / Model integration
+        - Tools (built-in or custom)
+        - Memory / Vault
+        - Intelligence layer (language, timezone, arcs)
+        - Plugin system
+        - CLI / Developer experience
+        - Health monitoring
+        - SDK / API
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: "When I try to X, I can't because..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Your proposed solution
+      placeholder: "It'd be useful if iris-gateway could..."
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Who benefits?
+      options:
+        - Everyone using iris-gateway
+        - People using a specific channel
+        - Plugin developers
+        - Self-hosting power users
+        - Just me (niche use case)
+    validations:
+      required: true
+  - type: checkboxes
+    id: willingness
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to submit a PR for this

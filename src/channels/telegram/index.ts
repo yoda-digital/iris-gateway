@@ -72,7 +72,14 @@ export class TelegramAdapter implements ChannelAdapter {
   readonly events = new TypedEventEmitter<ChannelEvents>();
 
   private _isConnected = false;
+  /**
+   * True once bot.start() has been fired. Reflects *intent* to connect, not
+   * confirmed reachability (grammY long-polling gives no ready callback).
+   * Renamed alias: isPolling — prefer isConnected for interface compat.
+   */
   get isConnected(): boolean { return this._isConnected; }
+  /** Alias that communicates the true semantics: polling loop was started. */
+  get isPolling(): boolean { return this._isConnected; }
 
   private bot: Bot | null = null;
   private botUserId: string | null = null;
@@ -117,10 +124,12 @@ export class TelegramAdapter implements ChannelAdapter {
     this.bot.start({ drop_pending_updates: true }).catch((err) => {
       this.events.emit("error", err instanceof Error ? err : new Error(String(err)));
     });
-    // NOTE: _isConnected reflects intent to connect, not confirmed connection.
+    // NOTE: _isConnected reflects intent to connect, not confirmed reachability.
     // grammY provides no ready/connected callback in long-polling mode — bot.start()
-    // runs the polling loop forever and never resolves. We set _isConnected = true
-    // optimistically after firing bot.start(), so callers can query the state.
+    // runs the polling loop forever and never resolves. We set this flag after
+    // assertNoConcurrentPoller() confirmed the bot token is valid and no 409 conflict
+    // exists. This is the strongest signal available without blocking the start path.
+    // ChannelAdapter.isConnected documents this semantic explicitly.
     this._isConnected = true;
     this.events.emit("connected");
   }

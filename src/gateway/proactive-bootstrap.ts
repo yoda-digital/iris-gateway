@@ -12,7 +12,6 @@ import type { InstanceCoordinator } from "../instance/coordinator.js";
 
 export interface ProactiveComponents {
   intentStore: IntentStore | null;
-  pulseEngine: PulseEngine | null;
 }
 
 export function bootstrapProactive(

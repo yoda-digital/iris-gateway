@@ -17,22 +17,20 @@ import { PluginLoader } from "../plugins/loader.js";
 import { TemplateEngine } from "../auto-reply/engine.js";
 import type { AutoReplyTemplate } from "../auto-reply/types.js";
 import { UsageTracker } from "../usage/tracker.js";
-import { IntentStore } from "../proactive/store.js";
-import { PulseEngine } from "../proactive/engine.js";
+import type { IntentStore } from "../proactive/store.js";
+import type { PulseEngine } from "../proactive/engine.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
 import { CanvasServer } from "../canvas/server.js";
 import { HealthServer } from "./health.js";
 import { SignalStore } from "../onboarding/signals.js";
 import { ProfileEnricher } from "../onboarding/enricher.js";
-import { HeartbeatStore } from "../heartbeat/store.js";
-import { HeartbeatEngine } from "../heartbeat/engine.js";
-import { ActivityTracker } from "../heartbeat/activity.js";
-import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
+import type { HeartbeatStore } from "../heartbeat/store.js";
+import type { HeartbeatEngine } from "../heartbeat/engine.js";
+import type { ActivityTracker } from "../heartbeat/activity.js";
 import { CliExecutor } from "../cli/executor.js";
 import { InstanceCoordinator } from "../instance/coordinator.js";
 import { CliToolRegistry } from "../cli/registry.js";
 import { initSecurity } from "./security-wiring.js";
-import { initIntelligence } from "./intelligence-wiring.js";
 import { startChannelAdapters } from "./adapters.js";
 import { bootstrapIntelligence } from "./intelligence-bootstrap.js";
 import { bootstrapHeartbeat, startHeartbeatEngine } from "./heartbeat-bootstrap.js";
@@ -43,7 +41,7 @@ import type { IntelligenceStore } from "../intelligence/store.js";
 import type { InferenceEngine } from "../intelligence/inference/engine.js";
 import type { TriggerEvaluator } from "../intelligence/triggers/evaluator.js";
 import type { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
-import type { ArcDetector, TitleGeneratorFn } from "../intelligence/arcs/detector.js";
+import type { ArcDetector } from "../intelligence/arcs/detector.js";
 import type { ArcLifecycle } from "../intelligence/arcs/lifecycle.js";
 import type { GoalLifecycle } from "../intelligence/goals/lifecycle.js";
 import type { CrossChannelResolver } from "../intelligence/cross-channel/resolver.js";
@@ -170,45 +168,18 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   if (policyEngine.enabled) logger.info("Master policy engine enabled");
 
   // 5.7 Proactive system
-  let intentStore: IntentStore | null = null;
+  const { intentStore } = bootstrapProactive(config, logger, vaultDb);
   let pulseEngine: PulseEngine | null = null;
-  if (config.proactive?.enabled) {
-    intentStore = new IntentStore(vaultDb);
-    logger.info("Proactive intent store initialized");
-  }
 
   // 5.75 Heartbeat
-  let heartbeatStore: HeartbeatStore | null = null;
+  const { heartbeatStore, activityTracker } = bootstrapHeartbeat(config, logger, vaultDb, vaultStore);
   let heartbeatEngine: HeartbeatEngine | null = null;
-  let activityTracker: ActivityTracker | null = null;
-  if (config.heartbeat?.enabled) {
-    heartbeatStore = new HeartbeatStore(vaultDb);
-    activityTracker = new ActivityTracker(vaultDb, vaultStore);
-    logger.info("Heartbeat store initialized");
-  }
 
   // 5.76 Intelligence layer
-  const titleGenerator: TitleGeneratorFn = async (keywords, content) => {
-    const session = await bridge.createSession("__arc_title_gen__");
-    try {
-      const prompt = [
-        "Generate a short, human-readable title (3-6 words) for a memory arc.",
-        "The title should be in the same language as the content.",
-        `Keywords: ${keywords.slice(0, 6).join(", ")}`,
-        `Content: ${content.substring(0, 300)}`,
-        "Reply with ONLY the title — no quotes, no punctuation, no explanation.",
-      ].join("\n");
-      const title = await bridge.sendMessage(session.id, prompt);
-      return title.trim().replace(/^["']+|["']+$/g, "");
-    } finally {
-      bridge.deleteSession(session.id).catch(() => {});
-    }
-  };
-  const intel = initIntelligence(vaultDb, signalStore, intentStore, heartbeatStore, logger, titleGenerator);
+  const intel = bootstrapIntelligence(bridge, vaultDb, signalStore, intentStore, heartbeatStore, logger);
   const { intelligenceBus, intelligenceStore, inferenceEngine, triggerEvaluator,
     outcomeAnalyzer, arcDetector, arcLifecycle, goalLifecycle,
     crossChannelResolver, healthGate, promptAssembler } = intel;
-  const trendDetector = intel.trendDetector;
 
   // 5.77 CLI tools
   let cliExecutor: CliExecutor | null = null;
@@ -336,25 +307,10 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   }
 
   // 12.6 Proactive pulse engine
-  if (config.proactive?.enabled && intentStore) {
-    pulseEngine = new PulseEngine({ store: intentStore, bridge, router, sessionMap, vaultStore, registry, logger, config: config.proactive, coordinator });
-    pulseEngine.start();
-    logger.info("Proactive pulse engine started");
-  }
+  pulseEngine = startPulseEngine(config, logger, intentStore, bridge, router, sessionMap, vaultStore, registry, coordinator);
 
   // 12.7 Heartbeat engine
-  if (config.heartbeat?.enabled && heartbeatStore) {
-    heartbeatEngine = new HeartbeatEngine({
-      store: heartbeatStore,
-      checkers: [new BridgeChecker(bridge), new ChannelChecker(registry), new VaultChecker(vaultDb), new SessionChecker(sessionMap), new MemoryChecker()],
-      logger,
-      config: config.heartbeat,
-      getInFlightCount: () => bridge.getInFlightCount(),
-    });
-    heartbeatEngine.start();
-    toolServer.setHeartbeatEngine(heartbeatEngine);
-    logger.info("Heartbeat engine started");
-  }
+  heartbeatEngine = startHeartbeatEngine(config, logger, heartbeatStore, toolServer, bridge, registry, vaultDb, sessionMap);
 
   // 12.8 Onboarding consolidation timer
   if (config.onboarding?.enabled && profileEnricher && signalStore) {

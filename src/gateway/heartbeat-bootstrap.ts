@@ -5,6 +5,7 @@ import { HeartbeatEngine } from "../heartbeat/engine.js";
 import { ActivityTracker } from "../heartbeat/activity.js";
 import { BridgeChecker, ChannelChecker, VaultChecker, SessionChecker, MemoryChecker } from "../heartbeat/checkers.js";
 import type { OpenCodeBridge } from "../bridge/opencode-client.js";
+import type { ToolServer } from "../bridge/tool-server.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { VaultDB } from "../vault/db.js";
 import type { VaultStore } from "../vault/store.js";
@@ -12,7 +13,6 @@ import type { SessionMap } from "../bridge/session-map.js";
 
 export interface HeartbeatComponents {
   heartbeatStore: HeartbeatStore | null;
-  heartbeatEngine: HeartbeatEngine | null;
   activityTracker: ActivityTracker | null;
 }
 
@@ -38,6 +38,7 @@ export function startHeartbeatEngine(
   config: IrisConfig,
   logger: Logger,
   heartbeatStore: HeartbeatStore | null,
+  toolServer: ToolServer,
   bridge: OpenCodeBridge,
   registry: ChannelRegistry,
   vaultDb: VaultDB,
@@ -62,6 +63,7 @@ export function startHeartbeatEngine(
   });
 
   engine.start();
+  toolServer.setHeartbeatEngine(engine);
   logger.info("Heartbeat engine started");
 
   return engine;

@@ -214,10 +214,11 @@ export class InitCommand extends Command {
       if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
       env["OPENAI_API_KEY"] = apiKey as string;
     } else if (finalModel.startsWith("anthropic/")) {
-      p.note(
-        "Anthropic models require a paid API key and are not supported by this project's default policy. Set ANTHROPIC_API_KEY manually only if you intentionally override this.",
-        "Anthropic not supported by default"
+      p.log.warn(
+        "Anthropic models require a paid API key and are not supported by this project's default policy. Use an OpenRouter free model instead, or set ANTHROPIC_API_KEY manually after setup.",
       );
+      p.cancel("Setup cancelled: unsupported model provider.");
+      return 1;
     }
 
     // ── 4. OpenCode CLI ───────────────────────────────────────────────────────

@@ -1,3 +1,9 @@
+## [1.15.6](https://github.com/yoda-digital/iris-gateway/compare/v1.15.5...v1.15.6) (2026-03-28)
+
+### Bug Fixes
+
+* [#286](https://github.com/yoda-digital/iris-gateway/issues/286) — update counter help text for clarity ([#287](https://github.com/yoda-digital/iris-gateway/issues/287)) ([117c52c](https://github.com/yoda-digital/iris-gateway/commit/117c52c9dcc88ebece1e2ad9f022b1b9a4815f5d))
+
 ## [1.15.5](https://github.com/yoda-digital/iris-gateway/compare/v1.15.4...v1.15.5) (2026-03-28)
 
 ### Bug Fixes

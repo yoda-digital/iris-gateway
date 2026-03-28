@@ -1,3 +1,9 @@
+## [1.15.3](https://github.com/yoda-digital/iris-gateway/compare/v1.15.2...v1.15.3) (2026-03-28)
+
+### Bug Fixes
+
+* [#235](https://github.com/yoda-digital/iris-gateway/issues/235) — pre-emptive decomposition of policy.ts, skills-handlers.ts, proactive/engine.ts ([#259](https://github.com/yoda-digital/iris-gateway/issues/259)) ([ab3a977](https://github.com/yoda-digital/iris-gateway/commit/ab3a977577ad5559273f2e45861590b4037a2d72))
+
 ## [1.15.2](https://github.com/yoda-digital/iris-gateway/compare/v1.15.1...v1.15.2) (2026-03-28)
 
 ### Bug Fixes

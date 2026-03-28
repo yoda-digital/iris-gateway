@@ -23,7 +23,7 @@ class MetricsRegistry {
 
   readonly messagesSent = new Counter({
     name: "iris_messages_sent_total",
-    help: "Total number of messages sent",
+    help: "Total messages sent per channel",
     labelNames: ["channel"],
     registers: [this.registry],
   });

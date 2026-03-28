@@ -5,3 +5,4 @@ dist/
 coverage/
 .iris/
 iris.config.json
+package-lock.json

@@ -214,12 +214,10 @@ export class InitCommand extends Command {
       if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
       env["OPENAI_API_KEY"] = apiKey as string;
     } else if (finalModel.startsWith("anthropic/")) {
-      const apiKey = await p.text({
-        message: "Enter your Anthropic API key:",
-        validate: (v) => (v.trim() === "" ? "Key cannot be empty" : undefined),
-      });
-      if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
-      env["ANTHROPIC_API_KEY"] = apiKey as string;
+      p.note(
+        "Anthropic models require a paid API key and are not supported by this project's default policy. Set ANTHROPIC_API_KEY manually only if you intentionally override this.",
+        "Anthropic not supported by default"
+      );
     }
 
     // ── 4. OpenCode CLI ───────────────────────────────────────────────────────

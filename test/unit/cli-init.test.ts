@@ -18,7 +18,6 @@ vi.mock("@clack/prompts", () => {
     spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
     isCancel: vi.fn((v: unknown) => v === null),
     multiselect: vi.fn(),
-    select: vi.fn(),
     text: vi.fn(),
     confirm: vi.fn(),
   };
@@ -326,6 +325,70 @@ describe("InitCommand: model preset defaults", () => {
 
     const config = JSON.parse(readFileSync(join(tempDir, "iris.config.json"), "utf-8"));
     expect(config.models.primary).toBe("openrouter/my-org/my-model:free");
+  });
+});
+
+describe("InitCommand: model prefix handling", () => {
+  let tempDir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-init-prefix-"));
+    cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tempDir);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+  });
+
+  afterEach(() => {
+    cwdSpy.mockRestore();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("prompts for OpenAI API key when model starts with openai/", async () => {
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["whatsapp"]);
+    p.text.mockResolvedValueOnce("openai/gpt-4.1-mini"); // model
+    p.text.mockResolvedValueOnce("sk-test-openai"); // api key
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const exitCode = await cmd.execute();
+
+    expect(exitCode).toBe(0);
+    expect(existsSync(join(tempDir, ".env"))).toBe(true);
+    const envContent = readFileSync(join(tempDir, ".env"), "utf-8");
+    expect(envContent).toContain("OPENAI_API_KEY=sk-test-openai");
+  });
+
+  it("warns for anthropic/ models and does not write ANTHROPIC_API_KEY", async () => {
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["whatsapp"]);
+    p.text.mockResolvedValueOnce("anthropic/claude-opus-4"); // model
+    p.confirm.mockResolvedValueOnce(false);
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const exitCode = await cmd.execute();
+
+    expect(exitCode).toBe(0);
+    expect(p.note).toHaveBeenCalledWith(
+      expect.stringContaining("not supported by this project's default policy"),
+      "Anthropic not supported by default"
+    );
+    const envPath = join(tempDir, ".env");
+    if (existsSync(envPath)) {
+      const envContent = readFileSync(envPath, "utf-8");
+      expect(envContent).not.toContain("ANTHROPIC_API_KEY");
+    }
   });
 });
 

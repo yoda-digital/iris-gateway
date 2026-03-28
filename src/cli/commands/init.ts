@@ -194,50 +194,17 @@ export class InitCommand extends Command {
 
     // ── 3. AI model ───────────────────────────────────────────────────────────
 
-    const modelResult = await p.select<string>({
-      message: "Which AI model do you want to use?",
-      options: [
-        {
-          value: "openrouter/arcee-ai/arcee-spotlight:free",
-          label: "Arcee Spotlight (free)",
-          hint: "OpenRouter — no API key required",
-        },
-        {
-          value: "openrouter/arcee-ai/trinity-large-preview:free",
-          label: "Arcee Trinity Large (free)",
-          hint: "OpenRouter — no API key required",
-        },
-        {
-          value: "openrouter/arcee-ai/trinity-mini:free",
-          label: "Arcee Trinity Mini (free)",
-          hint: "OpenRouter — no API key required",
-        },
-        {
-          value: "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-          label: "Llama 3.3 70B Instruct (free)",
-          hint: "OpenRouter — no API key required",
-        },
-        {
-          value: "openrouter/mistralai/mistral-7b-instruct:free",
-          label: "Mistral 7B Instruct (free)",
-          hint: "OpenRouter — no API key required",
-        },
-        { value: "__custom__", label: "Custom", hint: "enter model identifier manually" },
-      ],
+    // No hardcoded model IDs — VISION.md §3: "No model identifier appears in source code. Ever."
+    // Users enter the model identifier directly; defaults are documented in iris.config.example.json.
+    const modelResult = await p.text({
+      message: "Enter AI model identifier (see iris.config.example.json for options):",
+      placeholder: "provider/org/model-name:tier",
+      validate: (v) => (v.trim() === "" ? "Model identifier cannot be empty" : undefined),
     });
 
     if (p.isCancel(modelResult)) { p.cancel("Setup cancelled."); return 1; }
 
-    let finalModel = modelResult as string;
-    if (finalModel === "__custom__") {
-      const customModel = await p.text({
-        message: "Enter model identifier:",
-        placeholder: "e.g. openrouter/meta-llama/llama-3-8b-instruct:free",
-        validate: (v) => (v.trim() === "" ? "Cannot be empty" : undefined),
-      });
-      if (p.isCancel(customModel)) { p.cancel("Setup cancelled."); return 1; }
-      finalModel = customModel as string;
-    }
+    let finalModel = (modelResult as string).trim();
 
     if (finalModel.startsWith("openai/")) {
       const apiKey = await p.text({
@@ -247,12 +214,11 @@ export class InitCommand extends Command {
       if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
       env["OPENAI_API_KEY"] = apiKey as string;
     } else if (finalModel.startsWith("anthropic/")) {
-      const apiKey = await p.text({
-        message: "Enter your Anthropic API key:",
-        validate: (v) => (v.trim() === "" ? "Key cannot be empty" : undefined),
-      });
-      if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
-      env["ANTHROPIC_API_KEY"] = apiKey as string;
+      p.log.warn(
+        "Anthropic models require a paid API key and are not supported by this project's default policy. Use an OpenRouter free model instead, or set ANTHROPIC_API_KEY manually after setup.",
+      );
+      p.cancel("Setup cancelled: unsupported model provider.");
+      return 1;
     }
 
     // ── 4. OpenCode CLI ───────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ class MetricsRegistry {
   // Message counters
   readonly messagesReceived = new Counter({
     name: "iris_messages_received_total",
-    help: "Total number of messages received",
+    help: "Totl numbr of mesages recieved",
     labelNames: ["channel"],
     registers: [this.registry],
   });

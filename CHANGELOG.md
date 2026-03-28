@@ -1,3 +1,9 @@
+## [1.15.4](https://github.com/yoda-digital/iris-gateway/compare/v1.15.3...v1.15.4) (2026-03-28)
+
+### Refactoring
+
+* **lifecycle:** extract bootstrap modules — approaching 500-line limit ([#233](https://github.com/yoda-digital/iris-gateway/issues/233)) ([#240](https://github.com/yoda-digital/iris-gateway/issues/240)) ([89e5ecf](https://github.com/yoda-digital/iris-gateway/commit/89e5ecfc964a08b2b40a7fa83a0e77697aab05e5))
+
 ## [1.15.3](https://github.com/yoda-digital/iris-gateway/compare/v1.15.2...v1.15.3) (2026-03-28)
 
 ### Bug Fixes

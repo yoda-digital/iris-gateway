@@ -152,7 +152,7 @@ export class PulseEngine {
         chatId: intent.chatId,
         senderId: intent.senderId,
         chatType: "dm",
-        prompt: buildIntentPrompt(intent, this.vaultStore, this.config, quota.engagementRate, quota.sentToday, quota.limit),
+        prompt: buildIntentPrompt(intent, this.vaultStore, quota.engagementRate, quota.sentToday, quota.limit),
         sourceId: intent.id,
         sourceType: "intent",
       });
@@ -187,7 +187,7 @@ export class PulseEngine {
         chatId: trigger.chatId,
         senderId: trigger.senderId,
         chatType: "dm",
-        prompt: buildTriggerPrompt(trigger, this.vaultStore, this.config, quota.engagementRate, quota.sentToday, quota.limit),
+        prompt: buildTriggerPrompt(trigger, this.vaultStore, quota.engagementRate, quota.sentToday, quota.limit),
         sourceId: trigger.id,
         sourceType: "trigger",
       });

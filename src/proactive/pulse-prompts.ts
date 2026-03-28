@@ -13,7 +13,6 @@ import type { VaultStore } from "../vault/store.js";
 export function buildIntentPrompt(
   intent: ProactiveIntent,
   vaultStore: VaultStore,
-  config: ProactiveConfig,
   engagementRate: number,
   sentToday: number,
   limit: number,
@@ -46,7 +45,6 @@ If you want to try later, respond with: [DEFER Xh] (replace X with hours)`;
 export function buildTriggerPrompt(
   trigger: ProactiveTrigger,
   vaultStore: VaultStore,
-  config: ProactiveConfig,
   engagementRate: number,
   sentToday: number,
   limit: number,

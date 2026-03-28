@@ -1,3 +1,11 @@
+/**
+ * engine.ts — PulseEngine: scheduling and proactive execution loop.
+ *
+ * @decomposition-plan (issue #235 — VISION.md §1 pre-emption at 341 lines)
+ * Prompt builders and quiet-hours logic extracted to pulse-prompts.ts:
+ *   - pulse-prompts.ts → buildIntentPrompt, buildTriggerPrompt, isQuietHours
+ *   - engine.ts        → PulseEngine class — scheduling + execution (this file, ~200 lines)
+ */
 import type { IntentStore } from "./store.js";
 import type { ProactiveConfig, ProactiveIntent, ProactiveTrigger } from "./types.js";
 import type { OpenCodeBridge } from "../bridge/opencode-client.js";
@@ -7,6 +15,7 @@ import type { VaultStore } from "../vault/store.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { Logger } from "../logging/logger.js";
 import type { InstanceCoordinator } from "../instance/coordinator.js";
+import { buildIntentPrompt, buildTriggerPrompt, isQuietHours } from "./pulse-prompts.js";
 
 interface PulseEngineDeps {
   store: IntentStore;
@@ -103,15 +112,10 @@ export class PulseEngine {
     if (this.coordinator && !this.coordinator.leader) return;
     if (!this.config.dormancy.enabled) return;
 
-    const dormant = this.store.listDormantUsers(
-      this.config.dormancy.thresholdMs,
-      10,
-    );
+    const dormant = this.store.listDormantUsers(this.config.dormancy.thresholdMs, 10);
 
     for (const user of dormant) {
-      const daysInactive = Math.floor(
-        (Date.now() - user.lastSeen) / 86_400_000,
-      );
+      const daysInactive = Math.floor((Date.now() - user.lastSeen) / 86_400_000);
       this.store.addTrigger({
         type: "dormant_user",
         channelId: user.channelId,
@@ -120,10 +124,7 @@ export class PulseEngine {
         context: `User "${user.name ?? "unknown"}" inactive for ${daysInactive} days.`,
         executeAt: Date.now() + 3_600_000,
       });
-      this.logger.info(
-        { senderId: user.senderId, daysInactive },
-        "Dormant user trigger created",
-      );
+      this.logger.info({ senderId: user.senderId, daysInactive }, "Dormant user trigger created");
     }
   }
 
@@ -135,11 +136,7 @@ export class PulseEngine {
         return;
       }
 
-      const quota = this.store.getQuotaStatus(
-        intent.senderId,
-        intent.channelId,
-        this.config.softQuotas.perUserPerDay,
-      );
+      const quota = this.store.getQuotaStatus(intent.senderId, intent.channelId, this.config.softQuotas.perUserPerDay);
       if (!quota.allowed) {
         this.logger.debug({ id: intent.id, sentToday: quota.sentToday }, "Skipped: quota exceeded");
         return;
@@ -150,15 +147,12 @@ export class PulseEngine {
         return;
       }
 
-      // Intents are created during active conversations — don't gate by quiet hours.
-      // Quiet hours only apply to system-initiated triggers (dormancy, etc.).
-
       const result = await this.executeProactive({
         channelId: intent.channelId,
         chatId: intent.chatId,
         senderId: intent.senderId,
         chatType: "dm",
-        prompt: this.buildIntentPrompt(intent, quota.engagementRate, quota.sentToday, quota.limit),
+        prompt: buildIntentPrompt(intent, this.vaultStore, this.config, quota.engagementRate, quota.sentToday, quota.limit),
         sourceId: intent.id,
         sourceType: "intent",
       });
@@ -172,11 +166,7 @@ export class PulseEngine {
 
   private async executeTrigger(trigger: ProactiveTrigger): Promise<void> {
     try {
-      const quota = this.store.getQuotaStatus(
-        trigger.senderId,
-        trigger.channelId,
-        this.config.softQuotas.perUserPerDay,
-      );
+      const quota = this.store.getQuotaStatus(trigger.senderId, trigger.channelId, this.config.softQuotas.perUserPerDay);
       if (!quota.allowed) {
         this.logger.debug({ id: trigger.id }, "Trigger skipped: quota exceeded");
         return;
@@ -187,7 +177,7 @@ export class PulseEngine {
         return;
       }
 
-      if (this.isQuietHours(trigger.senderId, trigger.channelId)) {
+      if (isQuietHours(trigger.senderId, trigger.channelId, this.vaultStore, this.config)) {
         this.logger.debug({ id: trigger.id }, "Trigger skipped: quiet hours");
         return;
       }
@@ -197,7 +187,7 @@ export class PulseEngine {
         chatId: trigger.chatId,
         senderId: trigger.senderId,
         chatType: "dm",
-        prompt: this.buildTriggerPrompt(trigger, quota.engagementRate, quota.sentToday, quota.limit),
+        prompt: buildTriggerPrompt(trigger, this.vaultStore, this.config, quota.engagementRate, quota.sentToday, quota.limit),
         sourceId: trigger.id,
         sourceType: "trigger",
       });
@@ -226,10 +216,7 @@ export class PulseEngine {
       this.bridge,
     );
 
-    const response = await this.bridge.sendAndWait(
-      entry.openCodeSessionId,
-      params.prompt,
-    );
+    const response = await this.bridge.sendAndWait(entry.openCodeSessionId, params.prompt);
 
     if (!response || response.trim() === SKIP_MARKER) {
       this.logger.info({ sourceId: params.sourceId }, "AI chose to skip");
@@ -258,84 +245,5 @@ export class PulseEngine {
     );
 
     return "sent";
-  }
-
-  private buildIntentPrompt(
-    intent: ProactiveIntent,
-    engagementRate: number,
-    sentToday: number,
-    limit: number,
-  ): string {
-    const elapsed = Date.now() - intent.createdAt;
-    const hoursAgo = Math.floor(elapsed / 3_600_000);
-    const timeAgo = hoursAgo >= 24
-      ? `${Math.floor(hoursAgo / 24)} days ago`
-      : `${hoursAgo} hours ago`;
-
-    const profile = this.vaultStore.getProfile(intent.senderId, intent.channelId);
-    const profileBlock = profile
-      ? `User: ${profile.name ?? "unknown"} | ${profile.timezone ?? "no timezone"} | ${profile.language ?? ""}`
-      : "User: unknown";
-
-    return `[PROACTIVE FOLLOW-UP]
-You registered an intent ${timeAgo}: "${intent.what}"
-${intent.why ? `Reason: "${intent.why}"` : ""}
-
-${profileBlock}
-Your quota: ${limit - sentToday}/${limit} proactive messages remaining today
-Your engagement rate: ${Math.round(engagementRate * 100)}% of proactive messages get replies
-
-Decide: Should you follow up now? If yes, compose a natural, helpful message.
-Use any tools you need (send_message, vault_remember, canvas_update, etc.).
-If not worth it, respond with just: [SKIP]
-If you want to try later, respond with: [DEFER Xh] (replace X with hours)`;
-  }
-
-  private buildTriggerPrompt(
-    trigger: ProactiveTrigger,
-    engagementRate: number,
-    sentToday: number,
-    limit: number,
-  ): string {
-    const profile = this.vaultStore.getProfile(trigger.senderId, trigger.channelId);
-    const profileBlock = profile
-      ? `User: ${profile.name ?? "unknown"} | ${profile.timezone ?? "no timezone"} | ${profile.language ?? ""}`
-      : "User: unknown";
-
-    return `[PROACTIVE OUTREACH — ${trigger.type.replace(/_/g, " ").toUpperCase()}]
-${trigger.context}
-
-${profileBlock}
-Your quota: ${limit - sentToday}/${limit} proactive messages remaining today
-Your engagement rate: ${Math.round(engagementRate * 100)}% of proactive messages get replies
-
-Decide: Should you reach out? If yes, compose a natural, warm message.
-If not appropriate, respond with just: [SKIP]
-If you want to try later, respond with: [DEFER Xh]`;
-  }
-
-  private isQuietHours(senderId: string, channelId: string): boolean {
-    const profile = this.vaultStore.getProfile(senderId, channelId);
-    const tz = profile?.timezone;
-
-    let hour: number;
-    if (tz) {
-      try {
-        hour = parseInt(
-          new Date().toLocaleString("en-US", { timeZone: tz, hour: "numeric", hour12: false }),
-          10,
-        );
-      } catch {
-        hour = new Date().getHours();
-      }
-    } else {
-      hour = new Date().getHours();
-    }
-
-    const { start, end } = this.config.quietHours;
-    if (start > end) {
-      return hour >= start || hour < end;
-    }
-    return hour >= start && hour < end;
   }
 }

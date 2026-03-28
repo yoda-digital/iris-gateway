@@ -1,3 +1,10 @@
+## [1.15.5](https://github.com/yoda-digital/iris-gateway/compare/v1.15.4...v1.15.5) (2026-03-28)
+
+### Bug Fixes
+
+* [#239](https://github.com/yoda-digital/iris-gateway/issues/239) — remove hardcoded model IDs from CLI init wizard (VISION.md §3) ([#243](https://github.com/yoda-digital/iris-gateway/issues/243)) ([4464710](https://github.com/yoda-digital/iris-gateway/commit/446471010c777570ba2904376862363cc5655a15))
+* [#262](https://github.com/yoda-digital/iris-gateway/issues/262) — add unit tests for pulse-prompts.ts (buildIntentPrompt, buildTriggerPrompt, isQuietHours) ([#263](https://github.com/yoda-digital/iris-gateway/issues/263)) ([9e9a5c0](https://github.com/yoda-digital/iris-gateway/commit/9e9a5c009fb7d9face87afad251b9c30b922e3f9))
+
 ## [1.15.4](https://github.com/yoda-digital/iris-gateway/compare/v1.15.3...v1.15.4) (2026-03-28)
 
 ### Refactoring

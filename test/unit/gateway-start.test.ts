@@ -78,14 +78,6 @@ vi.mock("../../src/usage/tracker.js", () => ({
   UsageTracker: vi.fn(),
 }));
 
-vi.mock("../../src/proactive/store.js", () => ({
-  IntentStore: vi.fn(),
-}));
-
-vi.mock("../../src/proactive/engine.js", () => ({
-  PulseEngine: vi.fn(),
-}));
-
 vi.mock("../../src/canvas/server.js", () => ({
   CanvasServer: vi.fn(),
 }));
@@ -102,26 +94,6 @@ vi.mock("../../src/onboarding/enricher.js", () => ({
   ProfileEnricher: vi.fn(),
 }));
 
-vi.mock("../../src/heartbeat/store.js", () => ({
-  HeartbeatStore: vi.fn(),
-}));
-
-vi.mock("../../src/heartbeat/engine.js", () => ({
-  HeartbeatEngine: vi.fn(),
-}));
-
-vi.mock("../../src/heartbeat/activity.js", () => ({
-  ActivityTracker: vi.fn(),
-}));
-
-vi.mock("../../src/heartbeat/checkers.js", () => ({
-  BridgeChecker: vi.fn(),
-  ChannelChecker: vi.fn(),
-  VaultChecker: vi.fn(),
-  SessionChecker: vi.fn(),
-  MemoryChecker: vi.fn(),
-}));
-
 vi.mock("../../src/cli/executor.js", () => ({
   CliExecutor: vi.fn(),
 }));
@@ -134,8 +106,16 @@ vi.mock("../../src/gateway/security-wiring.js", () => ({
   initSecurity: vi.fn(),
 }));
 
-vi.mock("../../src/gateway/intelligence-wiring.js", () => ({
-  initIntelligence: vi.fn(),
+vi.mock("../../src/gateway/intelligence-bootstrap.js", () => ({
+  bootstrapIntelligence: vi.fn(),
+}));
+vi.mock("../../src/gateway/proactive-bootstrap.js", () => ({
+  bootstrapProactive: vi.fn(),
+  startPulseEngine: vi.fn(),
+}));
+vi.mock("../../src/gateway/heartbeat-bootstrap.js", () => ({
+  bootstrapHeartbeat: vi.fn(),
+  startHeartbeatEngine: vi.fn(),
 }));
 
 vi.mock("../../src/gateway/adapters.js", () => ({
@@ -171,14 +151,11 @@ import { PluginLoader } from "../../src/plugins/loader.js";
 import { UsageTracker } from "../../src/usage/tracker.js";
 import { HealthServer } from "../../src/gateway/health.js";
 import { initSecurity } from "../../src/gateway/security-wiring.js";
-import { initIntelligence } from "../../src/gateway/intelligence-wiring.js";
+import { bootstrapIntelligence } from "../../src/gateway/intelligence-bootstrap.js";
+import { bootstrapProactive, startPulseEngine } from "../../src/gateway/proactive-bootstrap.js";
+import { bootstrapHeartbeat, startHeartbeatEngine } from "../../src/gateway/heartbeat-bootstrap.js";
 import { startChannelAdapters } from "../../src/gateway/adapters.js";
 import { registerShutdownHandlers } from "../../src/gateway/shutdown.js";
-import { IntentStore } from "../../src/proactive/store.js";
-import { PulseEngine } from "../../src/proactive/engine.js";
-import { HeartbeatStore } from "../../src/heartbeat/store.js";
-import { HeartbeatEngine } from "../../src/heartbeat/engine.js";
-import { ActivityTracker } from "../../src/heartbeat/activity.js";
 import { SignalStore } from "../../src/onboarding/signals.js";
 import { ProfileEnricher } from "../../src/onboarding/enricher.js";
 
@@ -309,16 +286,29 @@ beforeEach(() => {
     loadAll: vi.fn().mockResolvedValue(pluginRegistry),
   }) as any);
   vi.mocked(UsageTracker).mockImplementation(() => ({}) as any);
-  vi.mocked(IntentStore).mockImplementation(() => ({}) as any);
-  vi.mocked(PulseEngine).mockImplementation(() => ({ start: vi.fn(), stop: vi.fn() }) as any);
-  vi.mocked(HeartbeatStore).mockImplementation(() => ({}) as any);
-  vi.mocked(HeartbeatEngine).mockImplementation(() => ({ start: vi.fn(), stop: vi.fn(), getStatus: vi.fn().mockReturnValue([]) }) as any);
-  vi.mocked(ActivityTracker).mockImplementation(() => ({}) as any);
   vi.mocked(SignalStore).mockImplementation(() => ({}) as any);
   vi.mocked(ProfileEnricher).mockImplementation(() => ({}) as any);
   vi.mocked(HealthServer).mockImplementation(() => makeHealthServer() as any);
   vi.mocked(initSecurity).mockReturnValue(makeSecurity() as any);
-  vi.mocked(initIntelligence).mockReturnValue(makeIntelligence() as any);
+  vi.mocked(bootstrapIntelligence).mockReturnValue(makeIntelligence() as any);
+  vi.mocked(bootstrapProactive).mockImplementation((config: any) => ({
+    intentStore: config.proactive?.enabled ? {} : null,
+  }));
+  vi.mocked(startPulseEngine).mockImplementation((config: any, _logger: any, intentStore: any) => (
+    config.proactive?.enabled && intentStore
+      ? { start: vi.fn(), stop: vi.fn() }
+      : null
+  ));
+  vi.mocked(bootstrapHeartbeat).mockImplementation((config: any) => ({
+    heartbeatStore: config.heartbeat?.enabled ? {} : null,
+    activityTracker: config.heartbeat?.enabled ? {} : null,
+  }));
+  vi.mocked(startHeartbeatEngine).mockImplementation((config: any, _logger: any, heartbeatStore: any, toolServer: any) => {
+    if (!(config.heartbeat?.enabled && heartbeatStore)) return null;
+    const engine = { start: vi.fn(), stop: vi.fn(), getStatus: vi.fn().mockReturnValue([]) };
+    toolServer.setHeartbeatEngine(engine);
+    return engine;
+  });
   vi.mocked(startChannelAdapters).mockResolvedValue(undefined);
   vi.mocked(registerShutdownHandlers).mockImplementation(() => {});
 });
@@ -396,10 +386,8 @@ describe("startGateway", () => {
 
   it("initializes intentStore when proactive.enabled=true", async () => {
     vi.mocked(loadConfig).mockReturnValue(makeMinimalConfig({ proactive: { enabled: true, rules: [] } }));
-    const intentStore = {};
-    vi.mocked(IntentStore).mockImplementation(() => intentStore as any);
     const ctx = await startGateway();
-    expect(ctx.intentStore).toBe(intentStore);
+    expect(ctx.intentStore).not.toBeNull();
   });
 
   it("intentStore is null when proactive is disabled", async () => {
@@ -439,21 +427,13 @@ describe("startGateway", () => {
     };
     vi.mocked(loadConfig).mockReturnValue(makeMinimalConfig({ heartbeat: heartbeatConfig }));
 
-    const heartbeatStore = {};
-    const heartbeatEngine = { start: vi.fn(), stop: vi.fn(), getStatus: vi.fn().mockReturnValue([]) };
-    const activityTracker = {};
-    vi.mocked(HeartbeatStore).mockImplementation(() => heartbeatStore as any);
-    vi.mocked(HeartbeatEngine).mockImplementation(() => heartbeatEngine as any);
-    vi.mocked(ActivityTracker).mockImplementation(() => activityTracker as any);
-
     const toolServer = makeToolServer();
     vi.mocked(ToolServer).mockImplementation(() => toolServer as any);
 
     const ctx = await startGateway();
-    expect(ctx.heartbeatEngine).toBe(heartbeatEngine);
-    expect(ctx.activityTracker).toBe(activityTracker);
-    expect(heartbeatEngine.start).toHaveBeenCalled();
-    expect(toolServer.setHeartbeatEngine).toHaveBeenCalledWith(heartbeatEngine);
+    expect(ctx.heartbeatEngine).not.toBeNull();
+    expect(ctx.activityTracker).not.toBeNull();
+    expect(toolServer.setHeartbeatEngine).toHaveBeenCalledWith(ctx.heartbeatEngine);
   });
 
   it("heartbeatEngine is null when heartbeat is disabled", async () => {
@@ -470,13 +450,8 @@ describe("startGateway", () => {
         rules: [],
       },
     }));
-    const pulseEngine = { start: vi.fn(), stop: vi.fn() };
-    vi.mocked(PulseEngine).mockImplementation(() => pulseEngine as any);
-    vi.mocked(IntentStore).mockImplementation(() => ({}) as any);
-
     const ctx = await startGateway();
-    expect(ctx.pulseEngine).toBe(pulseEngine);
-    expect(pulseEngine.start).toHaveBeenCalled();
+    expect(ctx.pulseEngine).not.toBeNull();
   });
 
   it("plugin services are started during gateway init", async () => {
@@ -556,15 +531,15 @@ describe("startGateway", () => {
     expect(logger.info).toHaveBeenCalledWith("Iris gateway started");
   });
 
-  it("initIntelligence is called with correct arguments", async () => {
+  it("bootstrapIntelligence is called with correct arguments", async () => {
     await startGateway();
-    expect(initIntelligence).toHaveBeenCalledWith(
+    expect(bootstrapIntelligence).toHaveBeenCalledWith(
+      expect.anything(), // bridge
       expect.anything(), // vaultDb
       null,              // signalStore (onboarding disabled)
       null,              // intentStore (proactive disabled)
       null,              // heartbeatStore (heartbeat disabled)
       expect.anything(), // logger
-      expect.any(Function), // titleGenerator
     );
   });
 

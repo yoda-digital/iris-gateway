@@ -1,3 +1,9 @@
+## [1.15.2](https://github.com/yoda-digital/iris-gateway/compare/v1.15.1...v1.15.2) (2026-03-28)
+
+### Bug Fixes
+
+* [#260](https://github.com/yoda-digital/iris-gateway/issues/260) — add SessionChecker and MemoryChecker branch coverage ([#261](https://github.com/yoda-digital/iris-gateway/issues/261)) ([4186084](https://github.com/yoda-digital/iris-gateway/commit/4186084267cde2112b1a278f912fb902ebf4d65c))
+
 ## [1.15.1](https://github.com/yoda-digital/iris-gateway/compare/v1.15.0...v1.15.1) (2026-03-27)
 
 ### Bug Fixes

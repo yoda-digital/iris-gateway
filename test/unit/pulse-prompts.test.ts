@@ -16,10 +16,17 @@ function mockVaultStore(profile: { name?: string; timezone?: string; language?: 
 function makeIntent(overrides: Partial<ProactiveIntent> = {}): ProactiveIntent {
   return {
     id: "intent-1",
+    sessionId: "session-1",
     senderId: "user1",
     channelId: "telegram",
+    chatId: "chat1",
     what: "Check on the report",
-    why: "User mentioned deadline",
+    why: "User mentioned deadline" as string | null,
+    confidence: 0.8,
+    category: null,
+    executeAt: Date.now() + 3_600_000,
+    executedAt: null,
+    result: null,
     createdAt: Date.now() - 2 * 3_600_000, // 2 hours ago
     ...overrides,
   } as ProactiveIntent;
@@ -30,8 +37,12 @@ function makeTrigger(overrides: Partial<ProactiveTrigger> = {}): ProactiveTrigge
     id: "trigger-1",
     senderId: "user1",
     channelId: "telegram",
-    type: "follow_up",
+    chatId: "chat1",
+    type: "dormant_user",
     context: "User asked about project status",
+    executeAt: Date.now() + 3_600_000,
+    executedAt: null,
+    result: null,
     ...overrides,
   } as ProactiveTrigger;
 }
@@ -89,9 +100,9 @@ describe("buildIntentPrompt", () => {
     expect(result).toContain("User: unknown");
   });
 
-  it("omits Reason line when why is falsy", () => {
+  it("omits Reason line when why is null", () => {
     const store = mockVaultStore(null);
-    const intent = makeIntent({ why: undefined });
+    const intent = makeIntent({ why: null });
     const result = buildIntentPrompt(intent, store, 0.5, 0, 10);
     expect(result).not.toContain("Reason:");
   });
@@ -110,9 +121,9 @@ describe("buildTriggerPrompt", () => {
 
   it("formats trigger type in upper-case with spaces", () => {
     const store = mockVaultStore(null);
-    const trigger = makeTrigger({ type: "follow_up" });
+    const trigger = makeTrigger({ type: "dormant_user" });
     const result = buildTriggerPrompt(trigger, store, 0.5, 2, 10);
-    expect(result).toContain("FOLLOW UP");
+    expect(result).toContain("DORMANT USER");
   });
 
   it("includes quota and engagement rate", () => {
@@ -174,7 +185,7 @@ describe("isQuietHours", () => {
   });
 
   it("returns true for overnight range — hour < end", () => {
-    vi.setSystemTime(new Date("2026-03-28T03:00:00Z")); // 3 UTC → 5 local, < end=7
+    vi.setSystemTime(new Date("2026-03-28T03:00:00Z")); // 3 UTC < end=7 → quiet
     const store = mockVaultStore(null);
     expect(isQuietHours("u1", "c1", store, baseConfig)).toBe(true);
   });
@@ -182,6 +193,13 @@ describe("isQuietHours", () => {
   it("returns false for overnight range — hour outside both bounds", () => {
     vi.setSystemTime(new Date("2026-03-28T14:00:00Z")); // 14 UTC
     const store = mockVaultStore(null);
+    expect(isQuietHours("u1", "c1", store, baseConfig)).toBe(false);
+  });
+
+  it("uses profile timezone when valid IANA zone is provided", () => {
+    // UTC 10:00 = Europe/Chisinau 12:00 (UTC+2 in summer) — outside quiet hours (23-7)
+    vi.setSystemTime(new Date("2026-06-15T10:00:00Z"));
+    const store = mockVaultStore({ timezone: "Europe/Chisinau" });
     expect(isQuietHours("u1", "c1", store, baseConfig)).toBe(false);
   });
 

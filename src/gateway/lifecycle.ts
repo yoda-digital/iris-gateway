@@ -92,8 +92,7 @@ export interface GatewayContext {
   promptAssembler: PromptAssembler | null;
 }
 
-const SSE_RECONNECT_DELAY_MS = 3_000;
-const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+const SSE_RECONNECT_DELAY_MS = 5_000;
 
 export async function startGateway(configPath?: string): Promise<GatewayContext> {
   // 1. Load config
@@ -331,8 +330,12 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       });
       logger.info("OpenCode SSE subscription active");
     } catch (err) {
-      logger.warn({ err }, "SSE subscription dropped — reconnecting in 5s");
-      setTimeout(() => void wireSSE(), 5_000);
+      if (abortController.signal.aborted) return;
+      logger.warn({ err }, `SSE subscription dropped — reconnecting in ${SSE_RECONNECT_DELAY_MS}ms`);
+      setTimeout(() => {
+        if (abortController.signal.aborted) return;
+        void wireSSE();
+      }, SSE_RECONNECT_DELAY_MS);
     }
   };
   void wireSSE();

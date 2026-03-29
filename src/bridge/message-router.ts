@@ -214,6 +214,10 @@ export class MessageRouter {
       throw err;
     }
 
+    // Check whether SSE path already consumed this turn before sendAndWait returned.
+    // turnGrouper.get() returns undefined once SSE's handleResponse() deleted it.
+    const sseAlreadyDelivered = !this.turnGrouper.get(entry.openCodeSessionId);
+
     // Mark as delivered so SSE path doesn't double-deliver if it fires concurrently
     this.eventHandler.markDelivered(entry.openCodeSessionId);
 
@@ -225,7 +229,12 @@ export class MessageRouter {
     this.turnGrouper.delete(entry.openCodeSessionId);
 
     const elapsed = Date.now() - startTime;
-    if (response) {
+    if (sseAlreadyDelivered) {
+      // SSE path already delivered; polling is the fallback — skip to avoid duplicate
+      cb.onSuccess();
+      log.info(` 10 ▸ Response      ○ SSE already delivered (${elapsed}ms) — polling skipped`);
+      log.info(`──── DONE ──── ${elapsed}ms total (SSE-delivered) ────`);
+    } else if (response) {
       cb.onSuccess();
       const responsePreview = `"${response.substring(0, 80)}${response.length > 80 ? "…" : ""}"`;
       log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);

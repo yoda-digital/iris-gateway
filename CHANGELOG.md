@@ -1,3 +1,9 @@
+## [1.15.7](https://github.com/yoda-digital/iris-gateway/compare/v1.15.6...v1.15.7) (2026-03-29)
+
+### Bug Fixes
+
+* [#276](https://github.com/yoda-digital/iris-gateway/issues/276) — pin @opencode-ai/sdk to exactly 1.3.3 ([#288](https://github.com/yoda-digital/iris-gateway/issues/288)) ([be06509](https://github.com/yoda-digital/iris-gateway/commit/be065091af225e5acc384d19704078c298340acf))
+
 ## [1.15.6](https://github.com/yoda-digital/iris-gateway/compare/v1.15.5...v1.15.6) (2026-03-28)
 
 ### Bug Fixes

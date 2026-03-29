@@ -9,7 +9,7 @@ Run a personal AI with memory, goals, and proactive nudges on your own server, a
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 [![Coverage](https://img.shields.io/badge/coverage-%3E75%25-brightgreen)](docs/configuration.md)
 
-- 💸 **Free models only** — five pre-vetted OpenRouter free-tier presets in the init wizard. No paid API keys required to run.
+- 💸 **Free models** — five pre-vetted OpenRouter free-tier presets in the init wizard. No subscription or per-token charges. A one-time $10 credit deposit unlocks 1,000 req/day on free models (vs. 50 req/day without it — barely usable for a real assistant).
 - 🧠 **Intelligence layer** — derives language, timezone, engagement patterns, and arc state from every conversation without you touching config
 - 📱 **All your channels, one brain** — Telegram, WhatsApp, Discord, Slack, WebChat share a single SQLite vault
 - 🎯 **Goal and arc tracking** — remembers what you're working on, sets next-action deadlines, follows up when relevant
@@ -54,7 +54,7 @@ curl http://127.0.0.1:19876/health
 ```
 
 **Telegram bot token:** [@BotFather](https://t.me/botfather) → `/newbot`  
-**Free AI models:** Sign up at [openrouter.ai/keys](https://openrouter.ai/keys) — no credit card required for free tier  
+**Free AI models:** Sign up at [openrouter.ai/keys](https://openrouter.ai/keys). The API key itself is free with no credit card required — but see the [rate limit note](#openrouter-free-tier--rate-limits) below.  
 **Full config reference:** [docs/configuration.md](docs/configuration.md)
 
 ### Init Wizard
@@ -65,7 +65,7 @@ curl http://127.0.0.1:19876/health
 $ iris init
 
 ◆  Config output path: iris.config.json
-◆  Which AI model? › Arcee Trinity Large (free) — OpenRouter, no API key required
+◆  Which AI model? › Arcee Trinity Large (free) — OpenRouter free tier
 ◆  OpenCode CLI detected at /usr/local/bin/opencode ✓
 ◆  Enable Telegram? › Yes
 ◆  Telegram bot token: ████████████████████
@@ -81,6 +81,35 @@ Free model options: Arcee Spotlight, Arcee Trinity Large, Llama 3.3 70B, Mistral
 cp iris.config.example.json iris.config.json
 # Edit iris.config.json — set your bot token and model
 docker-compose up -d
+```
+
+---
+
+## OpenRouter Free Tier & Rate Limits
+
+Getting an API key at [openrouter.ai/keys](https://openrouter.ai/keys) is free and requires no credit card. However, there are two tiers of daily rate limits for free (`:free`) models:
+
+| Account status | Free model requests/day | Requests/min |
+|---|---|---|
+| No credits added | **50 req/day** | 20 req/min |
+| ≥ $10 credit deposited (one-time) | **1,000 req/day** | 20 req/min |
+
+**The practical reality:** 50 requests/day is too low for a personal AI assistant that handles messaging across multiple channels. For real daily use, add at least $10 in credits to your OpenRouter account once — this unlocks 1,000 free-model requests per day. The $10 is not consumed by free models; it stays in your balance for paid models if you ever use them.
+
+> **Does Iris cost anything to run?** No ongoing subscription, no per-token charges for free models. The one-time $10 deposit is what OpenRouter uses to verify accounts and prevent abuse. After that, your daily usage of free models costs nothing.
+
+**Steps:**
+1. Sign up at [openrouter.ai](https://openrouter.ai)
+2. Go to [Settings → Credits](https://openrouter.ai/settings/credits) and add $10
+3. Create an API key at [openrouter.ai/keys](https://openrouter.ai/keys)
+4. Use that key in `iris init` or your `iris.config.json`
+
+You can verify your current tier and remaining quota anytime:
+```bash
+curl -s https://openrouter.ai/api/v1/key \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data | {is_free_tier, usage_daily}'
+# is_free_tier: true  → you have NOT purchased $10 yet (50 req/day limit)
+# is_free_tier: false → $10+ deposited, 1,000 req/day unlocked
 ```
 
 ---

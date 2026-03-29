@@ -87,6 +87,8 @@ The wizard offers five free OpenRouter models out of the box:
 
 > **Policy:** The init wizard only offers free OpenRouter models as presets. Paid models (OpenAI, Anthropic) can be entered via the "Custom" option — you will be prompted for the corresponding API key. This is by design: Iris is built around zero-cost model access.
 
+> **OpenRouter rate limits:** Free (`:free`) models have two daily limits depending on your account. With no credits: 50 requests/day. With a one-time $10 credit deposit: 1,000 requests/day. The $10 is not consumed by free models — it serves as an anti-abuse verification and stays in your balance. For a real assistant handling daily messaging, the $10 deposit is effectively required. See [OpenRouter rate limits docs](https://openrouter.ai/docs/api/reference/limits) for details.
+
 ### Running headlessly
 
 For automated deploys (Docker, CI), skip the wizard entirely and provide a config file directly:

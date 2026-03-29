@@ -216,6 +216,8 @@ export class MessageRouter {
 
     // Check whether SSE path already consumed this turn before sendAndWait returned.
     // turnGrouper.get() returns undefined once SSE's handleResponse() deleted it.
+    // Note: a missing entry also covers the streaming-coalescer path (which calls
+    // turnGrouper.delete() when coalescer.end() fires) — both are correct no-ops here.
     const sseAlreadyDelivered = !this.turnGrouper.get(entry.openCodeSessionId);
 
     // Mark as delivered so SSE path doesn't double-deliver if it fires concurrently

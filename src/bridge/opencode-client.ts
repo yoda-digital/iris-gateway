@@ -244,7 +244,7 @@ export class OpenCodeBridge {
     return "";
   }
 
-  async subscribeEvents(onEvent: (event: OpenCodeEvent) => void): Promise<void> {
+  async subscribeEvents(onEvent: (event: OpenCodeEvent) => void, signal?: AbortSignal): Promise<void> {
     const result = await this.getClient().event.subscribe({
       onSseEvent: (streamEvent) => {
         if (streamEvent.data && typeof streamEvent.data === "object") {
@@ -256,6 +256,7 @@ export class OpenCodeBridge {
     if (stream) {
       for await (const _ of stream) {
         // Events are delivered via onSseEvent callback
+        if (signal?.aborted) break;
       }
     }
   }

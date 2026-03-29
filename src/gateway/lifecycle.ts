@@ -323,7 +323,20 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   // Emit gateway.ready hook
   await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
 
-  // 13. SSE subscription disabled (see original for reason)
+  // 13. Wire SSE subscription (primary event delivery path)
+  // The polling path in sendAndWait() acts as fallback during reconnect windows.
+  const wireSSE = async (): Promise<void> => {
+    try {
+      await bridge.subscribeEvents((event) => {
+        router.getEventHandler().handleEvent(event);
+      });
+      logger.info("OpenCode SSE subscription active");
+    } catch (err) {
+      logger.warn({ err }, "SSE subscription dropped — reconnecting in 5s");
+      setTimeout(() => void wireSSE(), 5_000);
+    }
+  };
+  void wireSSE();
 
   // 14. Graceful shutdown
   registerShutdownHandlers({

@@ -46,7 +46,7 @@ function isToolPart(part: unknown): part is { type: "tool"; tool: string; sessio
 
 export class EventHandler {
   readonly events = new TypedEventEmitter<EventHandlerEvents>();
-  private readonly accumulator = new Map<string, { textChunks: string[]; reasoningChunks: string[]; updatedAt: number }>();
+  private readonly accumulator = new Map<string, { textChunks: string[]; reasoningChunks: string[]; updatedAt: number; delivered: boolean }>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -77,7 +77,7 @@ export class EventHandler {
 
         if (isTextPart(part)) {
           const now = Date.now();
-          const entry = this.accumulator.get(part.sessionID) ?? { textChunks: [], reasoningChunks: [], updatedAt: now };
+          const entry = this.accumulator.get(part.sessionID) ?? { textChunks: [], reasoningChunks: [], updatedAt: now, delivered: false };
           if (delta) {
             entry.textChunks.push(delta);
             this.events.emit("partial", part.sessionID, delta);
@@ -91,7 +91,7 @@ export class EventHandler {
 
         if (isReasoningPart(part)) {
           const now = Date.now();
-          const entry = this.accumulator.get(part.sessionID) ?? { textChunks: [], reasoningChunks: [], updatedAt: now };
+          const entry = this.accumulator.get(part.sessionID) ?? { textChunks: [], reasoningChunks: [], updatedAt: now, delivered: false };
           if (delta) {
             entry.reasoningChunks.push(delta);
           } else {
@@ -113,6 +113,11 @@ export class EventHandler {
         if (!sessionId) break;
         const entry = this.accumulator.get(sessionId);
         if (entry) {
+          if (entry.delivered) {
+            // Polling path already delivered this response — SSE is a no-op
+            this.accumulator.delete(sessionId);
+            break;
+          }
           // Prefer text parts; fall back to reasoning if model only produced reasoning
           const text = entry.textChunks.length > 0
             ? entry.textChunks.join("")
@@ -120,6 +125,7 @@ export class EventHandler {
               ? entry.reasoningChunks.join("")
               : "";
           if (text) {
+            entry.delivered = true;
             this.events.emit("response", sessionId, text);
           }
           this.accumulator.delete(sessionId);
@@ -134,6 +140,17 @@ export class EventHandler {
         this.accumulator.delete(sessionId);
         break;
       }
+    }
+  }
+
+  /**
+   * Mark a session as already delivered by the polling path.
+   * Prevents SSE path from emitting a duplicate response.
+   */
+  markDelivered(sessionId: string): void {
+    const entry = this.accumulator.get(sessionId);
+    if (entry) {
+      entry.delivered = true;
     }
   }
 

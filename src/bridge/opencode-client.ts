@@ -116,10 +116,10 @@ export class OpenCodeBridge {
     };
   }
 
-  async sendMessage(sessionId: string, text: string): Promise<string> {
+  async sendMessage(sessionId: string, text: string, agent = "chat"): Promise<string> {
     const response = await this.getClient().session.prompt({
       path: { id: sessionId },
-      body: { agent: "chat", parts: [{ type: "text", text }] },
+      body: { agent, parts: [{ type: "text", text }] },
       throwOnError: true,
     });
     const parts = response.data.parts ?? [];
@@ -141,6 +141,7 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs = 120_000,
     pollMs = 2_000,
+    agent = "chat",
   ): Promise<string> {
     const allowed = await this.supervisor.waitForCircuit();
     if (!allowed) return "";
@@ -148,7 +149,7 @@ export class OpenCodeBridge {
     this.inFlightCount++;
     metrics.queueDepth.set(this.inFlightCount);
     try {
-      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs);
+      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs, agent);
       this.supervisor.circuitBreaker.onSuccess();
       return result;
     } catch (err) {
@@ -167,13 +168,14 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs: number,
     pollMs: number,
+    agent = "chat",
   ): Promise<string> {
     const before = await this.listMessages(sessionId);
     const knownCount = before.length;
 
     const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
     const body = JSON.stringify({
-      agent: "chat",
+      agent,
       parts: [{ type: "text", text }],
     });
     this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");

@@ -214,6 +214,9 @@ export class MessageRouter {
       throw err;
     }
 
+    // Mark as delivered so SSE path doesn't double-deliver if it fires concurrently
+    this.eventHandler.markDelivered(entry.openCodeSessionId);
+
     const coalescer = this.activeCoalescers.get(entry.openCodeSessionId);
     if (coalescer) {
       coalescer.dispose();

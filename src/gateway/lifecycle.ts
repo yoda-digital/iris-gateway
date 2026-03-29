@@ -92,7 +92,7 @@ export interface GatewayContext {
   promptAssembler: PromptAssembler | null;
 }
 
-const SSE_RECONNECT_DELAY_MS = 3_000;
+const SSE_RECONNECT_DELAY_MS = 5_000;
 const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
 
 export async function startGateway(configPath?: string): Promise<GatewayContext> {
@@ -323,7 +323,28 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   // Emit gateway.ready hook
   await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
 
-  // 13. SSE subscription disabled (see original for reason)
+  // 13. Wire SSE subscription (with exponential backoff auto-reconnect)
+  let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+  const wireSSE = async (): Promise<void> => {
+    if (abortController.signal.aborted) return;
+    try {
+      sseReconnectDelay = SSE_RECONNECT_DELAY_MS; // reset on successful connection
+      await bridge.subscribeEvents((event) => {
+        router.getEventHandler().handleEvent(event);
+      }, abortController.signal);
+      logger.info("OpenCode SSE subscription ended");
+    } catch (err) {
+      if (abortController.signal.aborted) return;
+      logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+      const delay = sseReconnectDelay;
+      sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+      setTimeout(() => {
+        if (abortController.signal.aborted) return;
+        void wireSSE();
+      }, delay);
+    }
+  };
+  void wireSSE();
 
   // 14. Graceful shutdown
   registerShutdownHandlers({

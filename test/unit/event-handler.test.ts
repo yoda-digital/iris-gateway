@@ -232,4 +232,96 @@ describe("EventHandler", () => {
     handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
     expect(onResponse).not.toHaveBeenCalled();
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // markDelivered() and delivered-guard tests (added by PR #289 fix iteration)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  it("markDelivered() sets delivered=true and prevents a subsequent session.idle from emitting", () => {
+    handler = new EventHandler();
+    const onResponse = vi.fn();
+    handler.events.on("response", onResponse);
+
+    handler.handleEvent(
+      makeEvent("message.part.updated", {
+        part: { type: "text", text: "Hello", sessionID: "s1" },
+        delta: "Hello",
+      }),
+    );
+
+    // Polling path wins — mark delivered before SSE fires
+    handler.markDelivered("s1");
+
+    // SSE session.idle fires after polling has already delivered
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+
+    // Should not double-emit
+    expect(onResponse).not.toHaveBeenCalled();
+  });
+
+  it("delivered guard: second session.idle for the same session is silently dropped", () => {
+    handler = new EventHandler();
+    const onResponse = vi.fn();
+    handler.events.on("response", onResponse);
+
+    handler.handleEvent(
+      makeEvent("message.part.updated", {
+        part: { type: "text", text: "Once", sessionID: "s1" },
+        delta: "Once",
+      }),
+    );
+
+    // First idle — SSE wins
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    expect(onResponse).toHaveBeenCalledWith("s1", "Once");
+
+    // Second idle for the same session — accumulator was deleted, must not re-emit
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+    expect(onResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("SSE wins: session.idle fires before markDelivered — response emitted once, no double delivery", () => {
+    handler = new EventHandler();
+    const onResponse = vi.fn();
+    handler.events.on("response", onResponse);
+
+    handler.handleEvent(
+      makeEvent("message.part.updated", {
+        part: { type: "text", text: "SSE first", sessionID: "s1" },
+        delta: "SSE first",
+      }),
+    );
+
+    // SSE path fires first
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+    expect(onResponse).toHaveBeenCalledOnce();
+    expect(onResponse).toHaveBeenCalledWith("s1", "SSE first");
+
+    // Polling path calls markDelivered afterwards — should be a no-op (entry already deleted)
+    handler.markDelivered("s1");
+
+    // No further emissions
+    expect(onResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it("polling wins: markDelivered called before session.idle — response never emitted via SSE", () => {
+    handler = new EventHandler();
+    const onResponse = vi.fn();
+    handler.events.on("response", onResponse);
+
+    handler.handleEvent(
+      makeEvent("message.part.updated", {
+        part: { type: "text", text: "Polling first", sessionID: "s1" },
+        delta: "Polling first",
+      }),
+    );
+
+    // Polling path wins — marks delivered before SSE idle fires
+    handler.markDelivered("s1");
+
+    // SSE session.idle arrives late — must be silently dropped
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+    expect(onResponse).not.toHaveBeenCalled();
+  });
 });

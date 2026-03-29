@@ -1,3 +1,9 @@
+## [1.15.8](https://github.com/yoda-digital/iris-gateway/compare/v1.15.7...v1.15.8) (2026-03-29)
+
+### Bug Fixes
+
+* [#273](https://github.com/yoda-digital/iris-gateway/issues/273) — wire SSE subscription in lifecycle.ts, prevent duplicate delivery ([#289](https://github.com/yoda-digital/iris-gateway/issues/289)) ([995becd](https://github.com/yoda-digital/iris-gateway/commit/995becd1392efe5b66532917cdf27bf04cb1446e))
+
 ## [1.15.7](https://github.com/yoda-digital/iris-gateway/compare/v1.15.6...v1.15.7) (2026-03-29)
 
 ### Bug Fixes

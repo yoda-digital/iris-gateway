@@ -6,6 +6,7 @@ import {
   type Event as OpenCodeEvent,
   type Part,
   type TextPart,
+  type Permission,
 } from "@opencode-ai/sdk";
 import type { OpenCodeConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
@@ -14,7 +15,7 @@ import { BridgeSupervisor, type SupervisorOptions } from "./supervisor.js";
 export { CircuitBreaker };
 export type { CircuitState } from "./circuit-breaker.js";
 
-export type { OpenCodeEvent, Part, TextPart, SupervisorOptions };
+export type { OpenCodeEvent, Part, TextPart, SupervisorOptions, Permission };
 
 export interface SessionInfo {
   readonly id: string;
@@ -27,6 +28,7 @@ export class OpenCodeBridge {
   private serverHandle: { url: string; close(): void } | null = null;
   private readonly projectDir: string;
   private inFlightCount = 0;
+  private liveToolCatalog: string[] = [];
   private readonly supervisor: BridgeSupervisor;
 
   constructor(
@@ -72,6 +74,21 @@ export class OpenCodeBridge {
       });
       this.logger.info("Connected to OpenCode server");
     }
+    await this.refreshToolCatalog();
+  }
+
+  async refreshToolCatalog(): Promise<void> {
+    try {
+      const response = await this.getClient().tool.ids({ throwOnError: true });
+      this.liveToolCatalog = response.data ?? [];
+      this.logger.info({ count: this.liveToolCatalog.length }, 'Tool catalog refreshed from OpenCode');
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to refresh tool catalog — using cached/static fallback');
+    }
+  }
+
+  getLiveToolCatalog(): string[] {
+    return this.liveToolCatalog;
   }
 
   async stop(): Promise<void> {
@@ -114,6 +131,19 @@ export class OpenCodeBridge {
       title: session.title ?? title ?? "Iris Chat",
       createdAt: session.time.created,
     };
+  }
+
+  async approvePermission(
+    sessionId: string,
+    permissionId: string,
+    response: "once" | "always" | "reject",
+  ): Promise<void> {
+    await this.getClient().postSessionIdPermissionsPermissionId({
+      path: { id: sessionId, permissionID: permissionId },
+      body: { response },
+      throwOnError: true,
+    });
+    this.logger.info({ sessionId, permissionId, response }, "Permission decision sent");
   }
 
   async sendMessage(sessionId: string, text: string, agent = "chat"): Promise<string> {

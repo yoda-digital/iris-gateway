@@ -5,7 +5,8 @@ import type { Logger } from "../logging/logger.js";
 import type { ChannelAccountConfig } from "../config/types.js";
 import { chunkText, PLATFORM_LIMITS } from "../utils/text-chunker.js";
 import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-gating.js";
-import type { OpenCodeBridge } from "./opencode-client.js";
+import type { OpenCodeBridge, Permission } from "./opencode-client.js";
+import type { PolicyEngine } from "../governance/policy.js";
 import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
@@ -30,6 +31,7 @@ export class MessageRouter {
     private readonly templateEngine?: TemplateEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly policyEngine?: PolicyEngine | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -65,6 +67,10 @@ export class MessageRouter {
           this.logger.error({ err, sessionId }, "Failed to send error response");
         });
       }
+    });
+
+    this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
+      void this.handlePermissionRequest(sessionId, permission);
     });
 
     this.outboundQueue = new MessageQueue(logger);
@@ -311,5 +317,74 @@ export class MessageRouter {
     this.sendResponse(pending.channelId, pending.chatId, text, pending.replyToId).catch((err) => {
       this.logger.error({ err, sessionId }, "Failed to send response");
     });
+  }
+
+  // ── Permission handling ──
+
+  private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
+    const log = this.logger.child({ sessionId, permissionId: permission.id, permissionType: permission.type });
+    log.info("Permission request received");
+
+    if (this.isAutoDenied(permission)) {
+      log.info("Auto-denying permission (policy or blocked type)");
+      await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
+        log.error({ err }, "Failed to auto-deny permission");
+      });
+      return;
+    }
+
+    if (this.isAutoApproved(permission)) {
+      log.info("Auto-approving permission (read-only / policy allowed)");
+      await this.bridge.approvePermission(sessionId, permission.id, "once").catch((err) => {
+        log.error({ err }, "Failed to auto-approve permission");
+      });
+      return;
+    }
+
+    // Unknown/sensitive: ask user via inline buttons
+    const pending = this.turnGrouper.get(sessionId);
+    if (!pending) {
+      log.warn("No pending context for permission request — auto-denying");
+      await this.bridge.approvePermission(sessionId, permission.id, "reject").catch(() => {});
+      return;
+    }
+
+    await this.requestUserApproval(permission, pending.channelId, pending.chatId).catch((err) => {
+      log.error({ err }, "Failed to send permission approval request to user");
+    });
+  }
+
+  private isAutoApproved(permission: Permission): boolean {
+    const readOnlyTypes = ["read", "list", "search", "stat"];
+    if (readOnlyTypes.some((t) => permission.type.includes(t))) return true;
+
+    if (this.policyEngine) {
+      // If policy explicitly allows this permission type, auto-approve
+      if (!this.policyEngine.isPermissionDenied(permission.type)) {
+        // Only auto-approve known safe types; unknown fall through to user
+        const safeTypes = ["read", "list", "search"];
+        return safeTypes.some((t) => permission.type.startsWith(t));
+      }
+    }
+    return false;
+  }
+
+  private isAutoDenied(permission: Permission): boolean {
+    const blockedTypes = ["doom_loop", "external_directory", "network_egress"];
+    if (blockedTypes.some((t) => permission.type.includes(t))) return true;
+
+    if (this.policyEngine) {
+      return this.policyEngine.isPermissionDenied(permission.type);
+    }
+    return false;
+  }
+
+  private async requestUserApproval(permission: Permission, channelId: string, chatId: string): Promise<void> {
+    const adapter = this.registry.get(channelId);
+    if (!adapter) return;
+
+    const text = `⚙️ Agent requests permission\n*${permission.title}*\nType: \`${permission.type}\`\n\nReply with the permission ID to allow or deny:\nAllow: \`/perm once ${permission.sessionID} ${permission.id}\`\nDeny: \`/perm reject ${permission.sessionID} ${permission.id}\``;
+
+    await adapter.sendText({ to: chatId, text });
   }
 }

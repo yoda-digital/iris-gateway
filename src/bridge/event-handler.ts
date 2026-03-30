@@ -1,4 +1,4 @@
-import type { OpenCodeEvent, Part } from "./opencode-client.js";
+import type { OpenCodeEvent, Part, Permission } from "./opencode-client.js";
 import { TypedEventEmitter } from "../utils/typed-emitter.js";
 
 export interface EventHandlerEvents {
@@ -6,6 +6,7 @@ export interface EventHandlerEvents {
   partial: (sessionId: string, delta: string) => void;
   error: (sessionId: string, error: unknown) => void;
   toolCall: (sessionId: string, toolName: string, input: unknown) => void;
+  permissionRequest: (sessionId: string, permission: Permission) => void;
 }
 
 const ACCUMULATOR_TTL_MS = 5 * 60_000; // 5 minutes
@@ -125,6 +126,13 @@ export class EventHandler {
           }
           this.accumulator.delete(sessionId);
         }
+        break;
+      }
+
+      case "permission.updated": {
+        const perm = props as unknown as Permission;
+        if (!perm?.sessionID || !perm?.id) break;
+        this.events.emit("permissionRequest", perm.sessionID, perm);
         break;
       }
 

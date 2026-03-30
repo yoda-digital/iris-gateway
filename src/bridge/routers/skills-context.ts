@@ -11,6 +11,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { CliToolRegistry } from "../../cli/registry.js";
 import type { PolicyEngine } from "../../governance/policy.js";
+import type { OpenCodeBridge } from "../opencode-client.js";
 
 export interface SkillsDeps {
   workingDir?: string;
@@ -51,9 +52,10 @@ export interface HandlerDirs {
   irisToolCatalog: string[];
 }
 
-export function buildHandlerDirs(deps: SkillsDeps): HandlerDirs {
+export function buildHandlerDirs(deps: SkillsDeps & { bridge?: OpenCodeBridge | null }): HandlerDirs {
   const _cwd = deps.workingDir ?? process.cwd();
-  const irisToolCatalog = [...IRIS_TOOL_CATALOG];
+  const liveCatalog = deps.bridge?.getLiveToolCatalog() ?? [];
+  const irisToolCatalog = liveCatalog.length > 0 ? [...liveCatalog] : [...IRIS_TOOL_CATALOG];
   if (deps.cliRegistry) {
     for (const toolName of deps.cliRegistry.listTools()) {
       const def = deps.cliRegistry.getToolDef(toolName);

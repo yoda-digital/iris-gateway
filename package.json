@@ -33,7 +33,7 @@
     "better-sqlite3": "^12.6.2",
     "chrono-node": "^2.9.0",
     "clipanion": "^4.0.0-rc.4",
-    "croner": "^9.0.0",
+    "croner": "^10.0.1",
     "discord.js": "^14.25.0",
     "grammy": "^1.40.0",
     "hono": "^4.0.0",

@@ -277,17 +277,17 @@ export class MessageRouter {
     const t = text.toLowerCase();
 
     // Coding execution — needs real tools
-    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/i.test(t)) {
+    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
       return "build";
     }
 
     // Architecture and planning
-    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/i.test(t)) {
+    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
       return "plan";
     }
 
     // Codebase investigation
-    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/i.test(t)) {
+    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
       return "explore";
     }
 

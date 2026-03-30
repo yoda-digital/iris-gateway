@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -29,58 +29,71 @@ function makeRouter(channelConfigs: Record<string, any> = {}) {
 }
 
 describe("selectAgent() — intent-based routing", () => {
-  it("routes 'fix this bug' to build", async () => {
-    const { router } = makeRouter();
-    // Access private method via any cast
+  const tempDirs: string[] = [];
+
+  function make(channelConfigs: Record<string, any> = {}) {
+    const { router, tempDir } = makeRouter(channelConfigs);
+    tempDirs.push(tempDir);
+    return router;
+  }
+
+  afterEach(() => {
+    for (const dir of tempDirs.splice(0)) {
+      try { rmSync(dir, { recursive: true }); } catch {}
+    }
+  });
+
+  it("routes 'fix this bug' to build", () => {
+    const router = make();
     const agent = (router as any).selectAgent("fix this bug in auth.ts", "telegram");
     expect(agent).toBe("build");
   });
 
   it("routes 'implement a new feature' to build", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("implement a new function in utils.ts", "telegram");
     expect(agent).toBe("build");
   });
 
   it("routes 'plan the architecture' to plan", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("plan the architecture for the new API", "telegram");
     expect(agent).toBe("plan");
   });
 
   it("routes 'design the system' to plan", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("design the database schema for users", "telegram");
     expect(agent).toBe("plan");
   });
 
   it("routes 'explore the codebase' to explore", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("explore the codebase and find all API routes", "telegram");
     expect(agent).toBe("explore");
   });
 
   it("routes 'where is the function' to explore", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("where is the sendMessage function", "telegram");
     expect(agent).toBe("explore");
   });
 
   it("routes general chat to chat", () => {
-    const { router } = makeRouter();
+    const router = make();
     const agent = (router as any).selectAgent("hello, how are you?", "telegram");
     expect(agent).toBe("chat");
   });
 
   it("returns defaultAgent from channel config when set", () => {
-    const { router } = makeRouter({ telegram: { defaultAgent: "build" } });
+    const router = make({ telegram: { defaultAgent: "build" } });
     // Even a casual message should return 'build' when channel overrides
     const agent = (router as any).selectAgent("hello", "telegram");
     expect(agent).toBe("build");
   });
 
   it("falls back to auto-routing for channels without defaultAgent config", () => {
-    const { router } = makeRouter({ telegram: { defaultAgent: "build" } });
+    const router = make({ telegram: { defaultAgent: "build" } });
     // Different channel without override
     const agent = (router as any).selectAgent("fix this bug in file.ts", "discord");
     expect(agent).toBe("build"); // from auto-routing

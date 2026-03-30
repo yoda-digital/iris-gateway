@@ -16,6 +16,14 @@ export type { CircuitState } from "./circuit-breaker.js";
 
 export type { OpenCodeEvent, Part, TextPart, SupervisorOptions };
 
+export interface PromptOptions {
+  agent?: string;
+  model?: { providerID: string; modelID: string };
+  system?: string;
+  tools?: Record<string, boolean>;
+  noReply?: boolean;
+}
+
 export interface SessionInfo {
   readonly id: string;
   readonly title: string;
@@ -116,10 +124,26 @@ export class OpenCodeBridge {
     };
   }
 
-  async sendMessage(sessionId: string, text: string): Promise<string> {
+  async sendMessage(sessionId: string, text: string, options: PromptOptions = {}): Promise<string> {
+    const body: Record<string, unknown> = {
+      agent: options.agent ?? "chat",
+      parts: [{ type: "text", text }],
+    };
+    if (options.model) {
+      body.model = options.model;
+    }
+    if (options.system) {
+      body.system = options.system;
+    }
+    if (options.tools) {
+      body.tools = options.tools;
+    }
+    if (options.noReply !== undefined) {
+      body.noReply = options.noReply;
+    }
     const response = await this.getClient().session.prompt({
       path: { id: sessionId },
-      body: { agent: "chat", parts: [{ type: "text", text }] },
+      body: body as { agent?: string; model?: { providerID: string; modelID: string }; system?: string; tools?: Record<string, boolean>; noReply?: boolean; parts: { type: "text"; text: string }[] },
       throwOnError: true,
     });
     const parts = response.data.parts ?? [];
@@ -141,6 +165,7 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs = 120_000,
     pollMs = 2_000,
+    options: PromptOptions = {},
   ): Promise<string> {
     const allowed = await this.supervisor.waitForCircuit();
     if (!allowed) return "";
@@ -148,7 +173,7 @@ export class OpenCodeBridge {
     this.inFlightCount++;
     metrics.queueDepth.set(this.inFlightCount);
     try {
-      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs);
+      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs, options);
       this.supervisor.circuitBreaker.onSuccess();
       return result;
     } catch (err) {
@@ -167,15 +192,29 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs: number,
     pollMs: number,
+    options: PromptOptions = {},
   ): Promise<string> {
     const before = await this.listMessages(sessionId);
     const knownCount = before.length;
 
     const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
-    const body = JSON.stringify({
-      agent: "chat",
+    const bodyObj: Record<string, unknown> = {
+      agent: options.agent ?? "chat",
       parts: [{ type: "text", text }],
-    });
+    };
+    if (options.model) {
+      bodyObj.model = options.model;
+    }
+    if (options.system) {
+      bodyObj.system = options.system;
+    }
+    if (options.tools) {
+      bodyObj.tools = options.tools;
+    }
+    if (options.noReply !== undefined) {
+      bodyObj.noReply = options.noReply;
+    }
+    const body = JSON.stringify(bodyObj);
     this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
     const res = await fetch(url, {
       method: "POST",

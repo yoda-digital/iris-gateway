@@ -471,4 +471,126 @@ describe("OpenCodeBridge", () => {
       expect(result).toBe("");
     });
   });
+
+  /* ── PromptOptions ───────────────────────────────────────────── */
+
+  describe("PromptOptions", () => {
+    let bridge: OpenCodeBridge;
+    let fetchSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      injectClient(bridge, makeMockClient());
+      fetchSpy = vi.fn().mockResolvedValue({ status: 200 });
+      vi.stubGlobal("fetch", fetchSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("uses default agent when no options provided", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, {});
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.agent).toBe("chat");
+      expect(callBody.model).toBeUndefined();
+      expect(callBody.system).toBeUndefined();
+      expect(callBody.tools).toBeUndefined();
+      expect(callBody.noReply).toBeUndefined();
+    });
+
+    it("includes model in prompt body when set", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { model: { providerID: "anthropic", modelID: "claude-3-5-sonnet" } };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.model).toEqual({ providerID: "anthropic", modelID: "claude-3-5-sonnet" });
+    });
+
+    it("includes system in prompt body when set", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { system: "You are a helpful assistant" };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.system).toBe("You are a helpful assistant");
+    });
+
+    it("includes tools in prompt body when set", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { tools: { bash: true, edit: false } };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.tools).toEqual({ bash: true, edit: false });
+    });
+
+    it("includes noReply in prompt body when set to true", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { noReply: true };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.noReply).toBe(true);
+    });
+
+    it("includes noReply in prompt body when set to false", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { noReply: false };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.noReply).toBe(false);
+    });
+
+    it("uses custom agent when provided", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = { agent: "code-reviewer" };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody.agent).toBe("code-reviewer");
+    });
+
+    it("includes all options when all are set", async () => {
+      fetchSpy.mockResolvedValue({ status: 200 });
+      const options = {
+        agent: "translator",
+        model: { providerID: "openai", modelID: "gpt-4" },
+        system: "Translate to French",
+        tools: { bash: false },
+        noReply: true,
+      };
+      const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
+      await vi.advanceTimersByTimeAsync(600);
+      await promise;
+
+      const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(callBody).toEqual({
+        agent: "translator",
+        model: { providerID: "openai", modelID: "gpt-4" },
+        system: "Translate to French",
+        tools: { bash: false },
+        noReply: true,
+        parts: [{ type: "text", text: "hi" }],
+      });
+    });
+  });
 });

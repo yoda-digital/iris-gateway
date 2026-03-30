@@ -205,8 +205,10 @@ export class MessageRouter {
 
     let response: string | null = null;
     try {
-      const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
-      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs);
+      const channelConfig = this.channelConfigs[msg.channelId];
+      const sendTimeoutMs = channelConfig?.sendAndWaitTimeoutMs;
+      const promptOptions = channelConfig?.model ? { model: channelConfig.model } : {};
+      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs, undefined, promptOptions);
     } catch (err) {
       cb.onFailure();
       recordError(msg.channelId, "bridge_error");

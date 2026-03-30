@@ -76,6 +76,7 @@ export interface ChannelAccountConfig {
   readonly maxTextLength?: number;
   readonly streaming?: StreamingConfig;
   readonly sendAndWaitTimeoutMs?: number;
+  readonly model?: { providerID: string; modelID: string };
 }
 
 export interface StreamingConfig {

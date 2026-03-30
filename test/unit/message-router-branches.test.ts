@@ -406,21 +406,43 @@ describe("MessageRouter — event handler paths", () => {
     }
   });
 
-  it("'error' event cleans up coalescer and pending response", () => {
+  it("'error' event cleans up coalescer and pending response", async () => {
     // Directly inject a pending response + coalescer, then fire the error event.
     // This exercises the cleanup branches without needing to hang the bridge.
-    const { tempDir, router } = makeEnv();
+    const { tempDir, router, adapter } = makeEnv();
     try {
       const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
-      pr.set("test-session", { channelId: "mock", chatId: "c1", createdAt: Date.now() });
+      pr.set("test-session", { channelId: "mock", chatId: "c1", replyToId: "r1", createdAt: Date.now() });
 
       const eh = router.getEventHandler();
-      expect(() => {
-        (eh.events as any).emit("error", "test-session", new Error("simulated error"));
-      }).not.toThrow();
+      (eh.events as any).emit("error", "test-session", new Error("simulated error"));
 
       // pendingResponses entry should be cleaned up
       expect(pr.has("test-session")).toBe(false);
+
+      // Allow microtasks (sendResponse is async) to flush
+      await new Promise((r) => setTimeout(r, 10));
+
+      // User should receive an error message via sendText
+      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c1");
+      expect(sendCall).toBeDefined();
+      const sentText = (sendCall?.args[0] as any)?.text as string;
+      expect(sentText).toMatch(/⚠️ Request failed/);
+      expect(sentText).toContain("simulated error");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
+  it("'error' event with no pending context does not throw", async () => {
+    const { tempDir, router } = makeEnv();
+    try {
+      const eh = router.getEventHandler();
+      expect(() => {
+        (eh.events as any).emit("error", "unknown-session", new Error("orphan error"));
+      }).not.toThrow();
+      await new Promise((r) => setTimeout(r, 10));
     } finally {
       router.dispose();
       cleanup(tempDir);

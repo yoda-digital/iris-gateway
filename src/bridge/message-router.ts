@@ -57,7 +57,14 @@ export class MessageRouter {
         coalescer.dispose();
         this.activeCoalescers.delete(sessionId);
       }
+      const pending = this.turnGrouper.get(sessionId);
       this.turnGrouper.delete(sessionId);
+      if (pending) {
+        const reason = (error as any)?.message ?? "An unexpected error occurred";
+        this.sendResponse(pending.channelId, pending.chatId, `⚠️ Request failed: ${reason}`, pending.replyToId).catch((err) => {
+          this.logger.error({ err, sessionId }, "Failed to send error response");
+        });
+      }
     });
 
     this.outboundQueue = new MessageQueue(logger);

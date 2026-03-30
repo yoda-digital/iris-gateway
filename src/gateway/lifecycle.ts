@@ -332,7 +332,11 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       await bridge.subscribeEvents((event) => {
         router.getEventHandler().handleEvent(event);
       }, abortController.signal);
-      logger.info("OpenCode SSE subscription ended");
+      // Stream ended without error (normal SSE close or server restart).
+      // Reconnect unless we were explicitly shut down.
+      if (abortController.signal.aborted) return;
+      logger.info("OpenCode SSE subscription ended — reconnecting");
+      void wireSSE();
     } catch (err) {
       if (abortController.signal.aborted) return;
       logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);

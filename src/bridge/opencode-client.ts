@@ -23,6 +23,13 @@ export interface SessionInfo {
   readonly createdAt: number;
 }
 
+export interface Permission {
+  readonly id: string;
+  readonly sessionID: string;
+  readonly type: string;
+  readonly title: string;
+}
+
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
@@ -408,6 +415,15 @@ export class OpenCodeBridge {
     await this.getClient().session.delete({
       path: { id: sessionId },
       throwOnError: true,
+    });
+  }
+
+  async approvePermission(sessionId: string, permissionId: string, verdict: "once" | "reject"): Promise<void> {
+    const url = `${this.getBaseUrl()}/session/${sessionId}/permission/${permissionId}/respond`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verdict }),
     });
   }
 }

@@ -64,10 +64,10 @@ function makeSecurityGate(): SecurityGate {
 
 function makeSessionMap(): SessionMap {
   return {
-    get: vi.fn().mockReturnValue(undefined),
-    getOrCreate: vi.fn().mockResolvedValue("sess-1"),
-    set: vi.fn(),
-    delete: vi.fn(),
+    resolve: vi.fn().mockResolvedValue({ openCodeSessionId: "sess-1", channelId: "ch1", senderId: "u1", chatId: "chat1", chatType: "dm", createdAt: 0, lastActiveAt: 0 }),
+    buildKey: vi.fn().mockReturnValue("ch1:dm:chat1"),
+    reset: vi.fn().mockResolvedValue(undefined),
+    findBySessionId: vi.fn().mockResolvedValue(null),
   } as unknown as SessionMap;
 }
 
@@ -100,10 +100,8 @@ describe("Permission handler — isAutoApproved", () => {
     // Instead we test the side-effect: approvePermission called with 'once'
     const perm = makePermission("file_read");
 
-    // Trigger via internal event — access the event handler
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    // Trigger via internal event — use the public getEventHandler() accessor
+    router.getEventHandler().events.emit("permissionRequest", "sess-1", perm);
 
     // Give the async handler a tick
     await new Promise((r) => setImmediate(r));
@@ -188,10 +186,8 @@ describe("Permission handler — user routing", () => {
 
     const router = makeRouter(bridge, registry);
 
-    // Inject a pending context for the session
-    const turnGrouper = (router as unknown as { turnGrouper: { set: (id: string, v: unknown) => void } })
-      .turnGrouper;
-    turnGrouper.set("sess-1", { channelId: "ch1", chatId: "chat1" });
+    // Inject a pending context for the session via the public accessor
+    router.getTurnGrouper().set("sess-1", { channelId: "ch1", chatId: "chat1" });
 
     const perm = makePermission("file_write");
     const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })

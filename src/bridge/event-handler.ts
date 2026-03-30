@@ -7,7 +7,6 @@ export interface EventHandlerEvents {
   error: (sessionId: string, error: unknown) => void;
   toolCall: (sessionId: string, toolName: string, input: unknown) => void;
   permissionRequest: (sessionId: string, permission: Permission) => void;
-  sessionCompacted: (sessionId: string) => void;
 }
 
 const ACCUMULATOR_TTL_MS = 5 * 60_000; // 5 minutes
@@ -46,16 +45,12 @@ function isToolPart(part: unknown): part is { type: "tool"; tool: string; sessio
   return p.type === "tool" && typeof p.tool === "string" && typeof p.sessionID === "string";
 }
 
-function isPermission(obj: Record<string, unknown>): obj is Permission {
-  return typeof obj.id === "string" && typeof obj.sessionID === "string" && typeof obj.type === "string";
-}
-
 export class EventHandler {
   readonly events = new TypedEventEmitter<EventHandlerEvents>();
   private readonly accumulator = new Map<string, { textChunks: string[]; reasoningChunks: string[]; updatedAt: number; delivered: boolean }>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor() {
+  constructor(_logger?: unknown) {
     this.cleanupTimer = setInterval(() => this.pruneStale(), ACCUMULATOR_CLEANUP_INTERVAL_MS);
     this.cleanupTimer.unref();
   }
@@ -134,12 +129,6 @@ export class EventHandler {
         break;
       }
 
-      case "permission.updated": {
-        if (!isPermission(props)) break;
-        this.events.emit("permissionRequest", props.sessionID, props);
-        break;
-      }
-
       case "session.error": {
         const sessionId = typeof props.sessionID === "string" ? props.sessionID : undefined;
         if (!sessionId) break;
@@ -148,10 +137,17 @@ export class EventHandler {
         break;
       }
 
-      case "session.compacted": {
+      case "permission.updated": {
         const sessionId = typeof props.sessionID === "string" ? props.sessionID : undefined;
-        if (!sessionId) break;
-        this.events.emit("sessionCompacted", sessionId);
+        const id = typeof props.id === "string" ? props.id : undefined;
+        if (!sessionId || !id) break;
+        const permission: Permission = {
+          id,
+          sessionID: sessionId,
+          type: typeof props.type === "string" ? props.type : "",
+          title: typeof props.title === "string" ? props.title : "",
+        };
+        this.events.emit("permissionRequest", sessionId, permission);
         break;
       }
     }

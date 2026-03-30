@@ -294,7 +294,7 @@ export class MessageRouter {
     return "chat";
   }
 
-    private handleResponse(sessionId: string, text: string): void {
+  private handleResponse(sessionId: string, text: string): void {
     const pending = this.turnGrouper.get(sessionId);
     if (!pending) {
       this.logger.warn({ sessionId }, "No pending response context");

@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+<<<<<<< HEAD
+import { mkdtempSync, rmSync } from "node:fs";
+=======
+import { mkdtempSync, rmSync } from "node:fs";
+>>>>>>> 8e674a7 (fix(#293): address all review blockers and non-blocking issues)
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { MessageRouter } from "../../src/bridge/message-router.js";
@@ -12,8 +16,11 @@ import { ChannelRegistry } from "../../src/channels/registry.js";
 import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
 import pino from "pino";
 
+const tempDirs: string[] = [];
+
 function makeRouter(channelConfigs: Record<string, any> = {}) {
   const tempDir = mkdtempSync(join(tmpdir(), "iris-agent-sel-"));
+  tempDirs.push(tempDir);
 
   const bridge = new MockOpenCodeBridge();
   const sessionMap = new SessionMap(tempDir);
@@ -25,8 +32,14 @@ function makeRouter(channelConfigs: Record<string, any> = {}) {
   const logger = pino({ level: "silent" });
 
   const router = new MessageRouter(bridge as any, sessionMap, gate, registry, logger, channelConfigs);
-  return { router, tempDir };
+  return { router };
 }
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    try { rmSync(dir, { recursive: true }); } catch {}
+  }
+});
 
 describe("selectAgent() — intent-based routing", () => {
   const tempDirs: string[] = [];

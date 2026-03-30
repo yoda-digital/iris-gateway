@@ -45,6 +45,10 @@ function isToolPart(part: unknown): part is { type: "tool"; tool: string; sessio
   return p.type === "tool" && typeof p.tool === "string" && typeof p.sessionID === "string";
 }
 
+function isPermission(obj: Record<string, unknown>): obj is Permission {
+  return typeof obj.id === "string" && typeof obj.sessionID === "string" && typeof obj.type === "string";
+}
+
 export class EventHandler {
   readonly events = new TypedEventEmitter<EventHandlerEvents>();
   private readonly accumulator = new Map<string, { textChunks: string[]; reasoningChunks: string[]; updatedAt: number; delivered: boolean }>();
@@ -130,9 +134,8 @@ export class EventHandler {
       }
 
       case "permission.updated": {
-        const perm = props as unknown as Permission;
-        if (!perm?.sessionID || !perm?.id) break;
-        this.events.emit("permissionRequest", perm.sessionID, perm);
+        if (!isPermission(props)) break;
+        this.events.emit("permissionRequest", props.sessionID, props);
         break;
       }
 

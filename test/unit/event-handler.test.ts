@@ -324,4 +324,43 @@ describe("EventHandler", () => {
     handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
     expect(onResponse).not.toHaveBeenCalled();
   });
+
+  it("emits permissionRequest for a well-formed permission.updated payload", () => {
+    handler = new EventHandler();
+    const onPerm = vi.fn();
+    handler.events.on("permissionRequest", onPerm);
+
+    handler.handleEvent(
+      makeEvent("permission.updated", {
+        id: "perm-1",
+        sessionID: "s1",
+        type: "bash",
+        title: "Bash access",
+        messageID: "msg-1",
+        metadata: {},
+        time: { created: 0 },
+      }),
+    );
+
+    expect(onPerm).toHaveBeenCalledOnce();
+    expect(onPerm.mock.calls[0]![0]).toBe("s1");
+    expect(onPerm.mock.calls[0]![1]).toMatchObject({ id: "perm-1", type: "bash", sessionID: "s1" });
+  });
+
+  it("ignores permission.updated payload missing id, sessionID, or type", () => {
+    handler = new EventHandler();
+    const onPerm = vi.fn();
+    handler.events.on("permissionRequest", onPerm);
+
+    // Missing id
+    handler.handleEvent(makeEvent("permission.updated", { sessionID: "s1", type: "bash" }));
+    // Missing sessionID
+    handler.handleEvent(makeEvent("permission.updated", { id: "p1", type: "bash" }));
+    // Missing type
+    handler.handleEvent(makeEvent("permission.updated", { id: "p1", sessionID: "s1" }));
+    // Empty object
+    handler.handleEvent(makeEvent("permission.updated", {}));
+
+    expect(onPerm).not.toHaveBeenCalled();
+  });
 });

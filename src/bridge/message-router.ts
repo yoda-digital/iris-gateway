@@ -341,50 +341,28 @@ export class MessageRouter {
       return;
     }
 
-    // Unknown/sensitive: ask user via inline buttons
-    const pending = this.turnGrouper.get(sessionId);
-    if (!pending) {
-      log.warn("No pending context for permission request — auto-denying");
-      await this.bridge.approvePermission(sessionId, permission.id, "reject").catch(() => {});
-      return;
-    }
-
-    await this.requestUserApproval(permission, pending.channelId, pending.chatId).catch((err) => {
-      log.error({ err }, "Failed to send permission approval request to user");
+    // Unknown/sensitive permission type: deny by default.
+    // Interactive user approval (/perm command) is not yet implemented.
+    log.info("Auto-denying unrecognised permission type");
+    await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
+      log.error({ err }, "Failed to deny permission");
     });
   }
 
   private isAutoApproved(permission: Permission): boolean {
     const readOnlyTypes = ["read", "list", "search", "stat"];
-    if (readOnlyTypes.some((t) => permission.type.includes(t))) return true;
-
-    if (this.policyEngine) {
-      // If policy explicitly allows this permission type, auto-approve
-      if (!this.policyEngine.isPermissionDenied(permission.type)) {
-        // Only auto-approve known safe types; unknown fall through to user
-        const safeTypes = ["read", "list", "search"];
-        return safeTypes.some((t) => permission.type.startsWith(t));
-      }
-    }
-    return false;
+    return readOnlyTypes.some((t) => permission.type === t);
   }
 
   private isAutoDenied(permission: Permission): boolean {
-    const blockedTypes = ["doom_loop", "external_directory", "network_egress"];
-    if (blockedTypes.some((t) => permission.type.includes(t))) return true;
-
+    // "bash" and "edit" are dangerous regardless of policy config; deny them
+    // when no policyEngine is present. When policyEngine is present, it is
+    // the authoritative source and covers all permission types including these.
     if (this.policyEngine) {
       return this.policyEngine.isPermissionDenied(permission.type);
     }
-    return false;
+    const blockedTypes = ["bash", "edit"];
+    return blockedTypes.some((t) => permission.type === t);
   }
 
-  private async requestUserApproval(permission: Permission, channelId: string, chatId: string): Promise<void> {
-    const adapter = this.registry.get(channelId);
-    if (!adapter) return;
-
-    const text = `⚙️ Agent requests permission\n*${permission.title}*\nType: \`${permission.type}\`\n\nReply with the permission ID to allow or deny:\nAllow: \`/perm once ${permission.sessionID} ${permission.id}\`\nDeny: \`/perm reject ${permission.sessionID} ${permission.id}\``;
-
-    await adapter.sendText({ to: chatId, text });
-  }
 }

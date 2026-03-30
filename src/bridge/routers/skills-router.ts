@@ -10,7 +10,6 @@ import {
 } from "./skills-handlers.js";
 
 export type { SkillsDeps };
-export type { OpenCodeBridge };
 
 export function skillsRouter(deps: SkillsDeps & { bridge?: OpenCodeBridge | null }): Hono {
   const app = new Hono();

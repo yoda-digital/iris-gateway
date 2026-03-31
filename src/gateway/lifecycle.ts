@@ -335,12 +335,13 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       // Stream ended without error (normal SSE close or server restart).
       // Reconnect unless we were explicitly shut down.
       if (abortController.signal.aborted) return;
-      logger.info("OpenCode SSE subscription ended — reconnecting");
-      // Use the base delay to avoid a tight loop if the server closes immediately
+      logger.info({ nextRetryMs: sseReconnectDelay }, 'OpenCode SSE subscription ended — reconnecting');
+      const delay = sseReconnectDelay;
+      sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
       setTimeout(() => {
         if (abortController.signal.aborted) return;
         void wireSSE();
-      }, SSE_RECONNECT_DELAY_MS);
+      }, delay);
     } catch (err) {
       if (abortController.signal.aborted) return;
       logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);

@@ -1,3 +1,9 @@
+## [1.15.9](https://github.com/yoda-digital/iris-gateway/compare/v1.15.8...v1.15.9) (2026-03-31)
+
+### Bug Fixes
+
+* [#275](https://github.com/yoda-digital/iris-gateway/issues/275) — agent selection: stop hardcoding chat, route to plan/build/explore ([#293](https://github.com/yoda-digital/iris-gateway/issues/293)) ([41d5820](https://github.com/yoda-digital/iris-gateway/commit/41d5820b1572c078949b4e7105173d7c29354bae))
+
 ## [1.15.8](https://github.com/yoda-digital/iris-gateway/compare/v1.15.7...v1.15.8) (2026-03-29)
 
 ### Bug Fixes

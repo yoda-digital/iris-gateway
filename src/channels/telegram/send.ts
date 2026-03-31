@@ -7,11 +7,21 @@ export async function sendText(
   to: string,
   text: string,
   replyToId?: string,
+  buttons?: readonly (readonly { text: string; callbackData: string }[])[],
 ): Promise<{ messageId: string }> {
+  const replyMarkup = buttons && buttons.length > 0
+    ? {
+        inline_keyboard: buttons.map((row) =>
+          row.map((btn) => ({ text: btn.text, callback_data: btn.callbackData }))
+        ),
+      }
+    : undefined;
   const msg = await bot.api.sendMessage(to, text, {
     reply_parameters: replyToId
       ? { message_id: Number(replyToId) }
       : undefined,
+    reply_markup: replyMarkup,
+    parse_mode: "Markdown",
   });
   return { messageId: String(msg.message_id) };
 }

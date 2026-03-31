@@ -5,8 +5,7 @@ import type {
   ChannelEvents,
   SendTextParams,
   SendMediaParams,
-} from "../adapter.js";
-import type { MessageCache } from "../message-cache.js";
+} from "../adapter.js";import type { MessageCache } from "../message-cache.js";
 import { TypedEventEmitter } from "../../utils/typed-emitter.js";
 import type { ChannelAccountConfig } from "../../config/types.js";
 import { normalizeTelegramMessage } from "./normalize.js";
@@ -24,6 +23,7 @@ const CAPABILITIES: ChannelCapabilities = {
   delete: true,
   reply: true,
   thread: false,
+  inlineButtons: true,
   maxTextLength: 4096,
 };
 
@@ -84,9 +84,14 @@ export class TelegramAdapter implements ChannelAdapter {
   private bot: Bot | null = null;
   private botUserId: string | null = null;
   private messageCache: MessageCache | null = null;
+  private permissionApprover: ((sessionId: string, permissionId: string, response: "once" | "reject") => Promise<void>) | null = null;
 
   setMessageCache(cache: MessageCache): void {
     this.messageCache = cache;
+  }
+
+  setPermissionApprover(fn: (sessionId: string, permissionId: string, response: "once" | "reject") => Promise<void>): void {
+    this.permissionApprover = fn;
   }
 
   async start(config: ChannelAccountConfig, signal: AbortSignal, opts?: { skipConflictCheck?: boolean }): Promise<void> {
@@ -99,6 +104,29 @@ export class TelegramAdapter implements ChannelAdapter {
       if (this.botUserId && String(ctx.from?.id) === this.botUserId) return;
       const msg = normalizeTelegramMessage(ctx);
       if (msg) this.events.emit("message", msg);
+    });
+
+    // Handle inline button callbacks for permission approval (perm:once|always|reject:<sessionId>:<permId>)
+    this.bot.on("callback_query:data", async (ctx) => {
+      const data = ctx.callbackQuery.data ?? "";
+      const permMatch = data.match(/^perm:(once|always|reject):([^:]+):(.+)$/);
+      if (permMatch) {
+        const [, action, sessionId, permissionId] = permMatch;
+        const response = action === "reject" ? "reject" : "once";
+        if (this.permissionApprover) {
+          try {
+            await this.permissionApprover(sessionId, permissionId, response as "once" | "reject");
+            await ctx.answerCallbackQuery({ text: action === "reject" ? "Permission denied." : "Permission granted." });
+            await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+          } catch (err) {
+            await ctx.answerCallbackQuery({ text: "Failed to process permission." });
+          }
+        } else {
+          await ctx.answerCallbackQuery({ text: "No permission handler registered." });
+        }
+        return;
+      }
+      await ctx.answerCallbackQuery();
     });
 
     this.bot.catch((err) => {
@@ -143,7 +171,7 @@ export class TelegramAdapter implements ChannelAdapter {
 
   async sendText(params: SendTextParams): Promise<{ messageId: string }> {
     if (!this.bot) throw new Error("Telegram bot not started");
-    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId);
+    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId, params.buttons);
     this.messageCache?.set(result.messageId, {
       channelId: this.id,
       chatId: params.to,

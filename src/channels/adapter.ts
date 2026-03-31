@@ -15,15 +15,22 @@ export interface ChannelCapabilities {
   readonly delete: boolean;
   readonly reply: boolean;
   readonly thread: boolean;
+  readonly inlineButtons: boolean;
   readonly maxTextLength: number;
 }
 
 
 
+export interface InlineButton {
+  readonly text: string;
+  readonly callbackData: string;
+}
+
 export interface SendTextParams {
   readonly to: string;
   readonly text: string;
   readonly replyToId?: string;
+  readonly buttons?: readonly (readonly InlineButton[])[];
 }
 
 export interface SendMediaParams {

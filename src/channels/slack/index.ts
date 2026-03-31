@@ -24,6 +24,7 @@ const CAPABILITIES: ChannelCapabilities = {
   delete: true,
   reply: true,
   thread: false,
+  inlineButtons: false,
   maxTextLength: 40000,
 };
 

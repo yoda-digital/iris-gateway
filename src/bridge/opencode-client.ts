@@ -17,6 +17,13 @@ export type { CircuitState } from "./circuit-breaker.js";
 
 export type { OpenCodeEvent, Part, TextPart, SupervisorOptions, Permission };
 
+export interface Permission {
+  id: string;
+  sessionID: string;
+  type: string;
+  title: string;
+}
+
 export interface SessionInfo {
   readonly id: string;
   readonly title: string;
@@ -408,6 +415,14 @@ export class OpenCodeBridge {
     await this.getClient().session.delete({
       path: { id: sessionId },
       throwOnError: true,
+    });
+  }
+
+  async approvePermission(sessionId: string, permissionId: string, response: "once" | "reject"): Promise<void> {
+    const client = this.getClient();
+    await (client as any).session.permissions({
+      path: { id: sessionId, permissionId },
+      body: { response },
     });
   }
 }

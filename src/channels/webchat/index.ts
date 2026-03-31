@@ -23,6 +23,7 @@ export class WebChatAdapter implements ChannelAdapter {
     delete: false,
     reply: false,
     thread: false,
+    inlineButtons: false,
     maxTextLength: 100_000,
   };
   readonly events = new TypedEventEmitter<ChannelEvents>();

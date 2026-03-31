@@ -31,6 +31,8 @@ describe("sendText", () => {
     const result = await sendText(bot, "123", "Hello world");
     expect(bot.api.sendMessage).toHaveBeenCalledWith("123", "Hello world", {
       reply_parameters: undefined,
+      reply_markup: undefined,
+      parse_mode: "Markdown",
     });
     expect(result).toEqual({ messageId: "42" });
   });
@@ -40,6 +42,8 @@ describe("sendText", () => {
     await sendText(bot, "123", "Reply text", "99");
     expect(bot.api.sendMessage).toHaveBeenCalledWith("123", "Reply text", {
       reply_parameters: { message_id: 99 },
+      reply_markup: undefined,
+      parse_mode: "Markdown",
     });
   });
 });

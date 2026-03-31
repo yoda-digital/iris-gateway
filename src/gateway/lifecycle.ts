@@ -240,7 +240,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   }
 
   // 8. Message router
-  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, profileEnricher, vaultStore, policyEngine);
+  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, policyEngine, templateEngine, profileEnricher, vaultStore);
 
   // 8.5 Canvas server
   let canvasServer: CanvasServer | null = null;
@@ -276,7 +276,6 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     sessionMap, pluginTools: pluginRegistry.tools, usageTracker, canvasServer,
     intentStore, signalStore, cliExecutor, cliRegistry, intelligenceStore,
     goalLifecycle, arcLifecycle, arcDetector, outcomeAnalyzer, promptAssembler,
-    bridge,
   });
   await toolServer.start();
 
@@ -333,15 +332,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
       await bridge.subscribeEvents((event) => {
         router.getEventHandler().handleEvent(event);
       }, abortController.signal);
-      logger.info("OpenCode SSE subscription ended — reconnecting after normal close");
-      // Reconnect on normal close (non-abort) — same pattern as error path but no backoff
-      if (!abortController.signal.aborted) {
-        const delay = SSE_RECONNECT_DELAY_MS;
-        setTimeout(() => {
-          if (abortController.signal.aborted) return;
-          void wireSSE();
-        }, delay);
-      }
+      logger.info("OpenCode SSE subscription ended");
     } catch (err) {
       if (abortController.signal.aborted) return;
       logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);

@@ -166,7 +166,7 @@ describe("TelegramAdapter — sendText", () => {
 
     const result = await adapter.sendText({ to: "12345", text: "Hello" });
 
-    expect(sendMod.sendText).toHaveBeenCalledWith(expect.anything(), "12345", "Hello", undefined);
+    expect(sendMod.sendText).toHaveBeenCalledWith(expect.anything(), "12345", "Hello", undefined, undefined);
     expect(result.messageId).toBe("100");
     expect(cache.set).toHaveBeenCalledWith("100", expect.objectContaining({ chatId: "12345" }));
   });

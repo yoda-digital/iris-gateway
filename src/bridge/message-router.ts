@@ -206,7 +206,8 @@ export class MessageRouter {
     let response: string | null = null;
     try {
       const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
-      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs);
+      const agent = this.selectAgent(messageText, msg.channelId);
+      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs, undefined, agent);
     } catch (err) {
       cb.onFailure();
       recordError(msg.channelId, "bridge_error");
@@ -266,6 +267,31 @@ export class MessageRouter {
       this.outboundQueue.enqueue({ channelId, chatId, text: chunk, replyToId: currentReplyToId });
       currentReplyToId = undefined;
     }
+  }
+
+  private selectAgent(text: string, channelId: string): string {
+    // Per-channel override takes priority
+    const override = this.channelConfigs[channelId]?.defaultAgent;
+    if (override) return override;
+
+    const t = text.toLowerCase();
+
+    // Coding execution — needs real tools
+    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
+      return "build";
+    }
+
+    // Architecture and planning
+    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
+      return "plan";
+    }
+
+    // Codebase investigation
+    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
+      return "explore";
+    }
+
+    return "chat";
   }
 
   private handleResponse(sessionId: string, text: string): void {

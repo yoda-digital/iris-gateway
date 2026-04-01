@@ -172,7 +172,7 @@ export class TelegramAdapter implements ChannelAdapter {
 
   async sendText(params: SendTextParams): Promise<{ messageId: string }> {
     if (!this.bot) throw new Error("Telegram bot not started");
-    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId, params.buttons, params.parseMode);
+    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId, params.buttons);
     this.messageCache?.set(result.messageId, {
       channelId: this.id,
       chatId: params.to,

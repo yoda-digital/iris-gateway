@@ -31,6 +31,7 @@ const channelAccountSchema = z.object({
   streaming: streamingSchema.optional(),
   sendAndWaitTimeoutMs: z.number().positive().optional(),
   defaultAgent: z.enum(["chat", "build", "plan", "explore"]).optional(),
+  notifyOnCompaction: z.boolean().optional(),
 });
 
 const gatewaySchema = z.object({

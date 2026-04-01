@@ -178,6 +178,63 @@ describe("MessageRouter", () => {
 
     expect(capturedTimeoutMs).toBeUndefined();
   });
+
+  it("sends compaction notification when notifyOnCompaction is true and session is pending", async () => {
+    const pairingStore2 = new PairingStore(tempDir);
+    const allowlistStore2 = new AllowlistStore(tempDir);
+    const rateLimiter2 = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate2 = new SecurityGate(pairingStore2, allowlistStore2, rateLimiter2, {
+      defaultDmPolicy: "open",
+      pairingCodeTtlMs: 3_600_000,
+      pairingCodeLength: 8,
+      rateLimitPerMinute: 30,
+      rateLimitPerHour: 300,
+    });
+
+    const notifyAdapter = new MockAdapter();
+    const notifyRegistry = new ChannelRegistry();
+    notifyRegistry.register(notifyAdapter);
+
+    const routerWithNotify = new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      securityGate2,
+      notifyRegistry,
+      pino({ level: "silent" }),
+      { mock: { notifyOnCompaction: true } },
+    );
+
+    // Seed the turn grouper with a pending session so the router can look up channelId/chatId
+    const eventHandler = routerWithNotify.getEventHandler();
+    const turnGrouperSet = (routerWithNotify as any).turnGrouper.set.bind(
+      (routerWithNotify as any).turnGrouper
+    );
+    turnGrouperSet("session-xyz", { channelId: "mock", chatId: "chat-42" });
+
+    // Fire the sessionCompacted event (OpenCodeEvent uses { type, properties } shape)
+    eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-xyz" } } as any);
+
+    // Allow microtasks to flush
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const sendCalls = notifyAdapter.calls.filter((c) => c.method === "sendText");
+    expect(sendCalls.length).toBe(1);
+    expect((sendCalls[0]!.args[0] as any).to).toBe("chat-42");
+    expect((sendCalls[0]!.args[0] as any).text).toContain("context was compressed");
+  });
+
+  it("does not send compaction notification when notifyOnCompaction is false", async () => {
+    const msg = makeInboundMessage({ channelId: "mock" });
+    // router in beforeEach has no channelConfigs (notifyOnCompaction defaults to off)
+    const eventHandler = router.getEventHandler();
+    (router as any).turnGrouper.set("session-no-notify", { channelId: "mock", chatId: "chat-99" });
+
+    eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-no-notify" } } as any);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const sendCalls = adapter.calls.filter((c) => c.method === "sendText");
+    expect(sendCalls.length).toBe(0);
+  });
 })
 
 describe("MessageRouter — isAutoApproved", () => {

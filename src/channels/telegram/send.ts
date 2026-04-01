@@ -8,6 +8,7 @@ export async function sendText(
   text: string,
   replyToId?: string,
   buttons?: readonly (readonly { text: string; callbackData: string }[])[],
+  parseMode?: "Markdown" | "HTML",
 ): Promise<{ messageId: string }> {
   const replyMarkup = buttons && buttons.length > 0
     ? {
@@ -21,7 +22,7 @@ export async function sendText(
       ? { message_id: Number(replyToId) }
       : undefined,
     reply_markup: replyMarkup,
-    parse_mode: "Markdown",
+    parse_mode: parseMode,
   });
   return { messageId: String(msg.message_id) };
 }

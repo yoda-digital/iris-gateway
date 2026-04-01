@@ -7,6 +7,7 @@ import type { MessageCache } from "../channels/message-cache.js";
 import type { CanvasServer } from "../canvas/server.js";
 import type { VaultStore } from "../vault/store.js";
 import type { MessageRouter } from "../bridge/message-router.js";
+import type { OpenCodeBridge } from "../bridge/opencode-client.js";
 import type { ActivityTracker } from "../heartbeat/activity.js";
 import type { InferenceEngine } from "../intelligence/inference/engine.js";
 import type { OutcomeAnalyzer } from "../intelligence/outcomes/analyzer.js";
@@ -37,6 +38,7 @@ export interface AdapterWiringDeps {
   canvasServer: CanvasServer | null;
   vaultStore: VaultStore;
   router: MessageRouter;
+  bridge: OpenCodeBridge;
   activityTracker: ActivityTracker | null;
   inferenceEngine: InferenceEngine | null;
   outcomeAnalyzer: OutcomeAnalyzer | null;
@@ -54,7 +56,7 @@ export interface AdapterWiringDeps {
 export async function startChannelAdapters(deps: AdapterWiringDeps): Promise<void> {
   const {
     config, logger, registry, messageCache, canvasServer, vaultStore,
-    router, activityTracker, inferenceEngine, outcomeAnalyzer, arcDetector,
+    router, bridge, activityTracker, inferenceEngine, outcomeAnalyzer, arcDetector,
     profileEnricher, signalStore, pluginRegistry, abortController,
   } = deps;
 
@@ -124,6 +126,21 @@ export async function startChannelAdapters(deps: AdapterWiringDeps): Promise<voi
     try {
       await adapter.start(channelConfig, abortController.signal);
       registry.register(adapter);
+
+      // Wire permission approver for adapters that support it (e.g., Telegram inline buttons)
+      if ("setPermissionApprover" in adapter && typeof adapter.setPermissionApprover === "function") {
+        const approver = async (sessionId: string, permissionId: string, response: "once" | "reject") => {
+          try {
+            await bridge.approvePermission(sessionId, permissionId, response);
+            logger.info({ sessionId, permissionId, response }, "Permission approved via inline button");
+          } catch (err) {
+            logger.error({ err, sessionId, permissionId }, "Failed to approve permission");
+          }
+        };
+        (adapter as { setPermissionApprover(fn: typeof approver): void }).setPermissionApprover(approver);
+        logger.debug({ channel: id }, "Permission approver wired");
+      }
+
       logger.info({ channel: id }, "Channel started");
     } catch (err) {
       logger.error({ err, channel: id }, "Failed to start channel");

@@ -31,6 +31,7 @@ export interface SendTextParams {
   readonly text: string;
   readonly replyToId?: string;
   readonly buttons?: readonly (readonly InlineButton[])[];
+  readonly parseMode?: "Markdown" | "HTML";
 }
 
 export interface SendMediaParams {

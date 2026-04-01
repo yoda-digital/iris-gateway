@@ -471,4 +471,128 @@ describe("OpenCodeBridge", () => {
       expect(result).toBe("");
     });
   });
+
+  /* ── deleteSession ───────────────────────────────────────────── */
+
+  describe("deleteSession", () => {
+    it("deletes a session successfully", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const deleteFn = vi.fn().mockResolvedValue({});
+      const client = { session: { delete: deleteFn } };
+      injectClient(bridge, client);
+
+      await bridge.deleteSession("s1");
+
+      expect(deleteFn).toHaveBeenCalledWith({
+        path: { id: "s1" },
+        throwOnError: true,
+      });
+    });
+
+    it("throws when client is null", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      (bridge as any).client = null;
+
+      await expect(bridge.deleteSession("s1")).rejects.toThrow("OpenCode bridge not started");
+    });
+  });
+
+  /* ── abortSession ────────────────────────────────────────────── */
+
+  describe("abortSession", () => {
+    it("aborts a session successfully", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const abortFn = vi.fn().mockResolvedValue({});
+      const client = { session: { abort: abortFn } };
+      injectClient(bridge, client);
+
+      await bridge.abortSession("s1");
+
+      expect(abortFn).toHaveBeenCalledWith({
+        path: { id: "s1" },
+        throwOnError: true,
+      });
+    });
+
+    it("throws when client is null", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      (bridge as any).client = null;
+
+      await expect(bridge.abortSession("s1")).rejects.toThrow("OpenCode bridge not started");
+    });
+  });
+
+  /* ── listSessions ────────────────────────────────────────────── */
+
+  describe("listSessions", () => {
+    it("lists sessions successfully", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const listFn = vi.fn().mockResolvedValue({
+        data: {
+          s1: { id: "s1", title: "Session 1", time: { created: 1000 } },
+          s2: { id: "s2", title: null, time: { created: 2000 } },
+        },
+      });
+      const client = { session: { list: listFn } };
+      injectClient(bridge, client);
+
+      const sessions = await bridge.listSessions();
+
+      expect(listFn).toHaveBeenCalledWith({ throwOnError: true });
+      expect(sessions).toEqual([
+        { id: "s1", title: "Session 1", createdAt: 1000 },
+        { id: "s2", title: "", createdAt: 2000 },
+      ]);
+    });
+
+    it("throws when client is null", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      (bridge as any).client = null;
+
+      await expect(bridge.listSessions()).rejects.toThrow("OpenCode bridge not started");
+    });
+  });
+
+  /* ── checkHealth ─────────────────────────────────────────────── */
+
+  describe("checkHealth", () => {
+    it("returns true when session.list succeeds", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const listFn = vi.fn().mockResolvedValue({ data: {} });
+      const client = { session: { list: listFn } };
+      injectClient(bridge, client);
+
+      const result = await bridge.checkHealth();
+
+      expect(result).toBe(true);
+      expect(listFn).toHaveBeenCalled();
+    });
+
+    it("returns false and logs warning when session.list fails", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const listFn = vi.fn().mockRejectedValue(new Error("connection refused"));
+      const client = { session: { list: listFn } };
+      injectClient(bridge, client);
+      const loggerWarnSpy = vi.spyOn((bridge as any).logger, "warn");
+
+      const result = await bridge.checkHealth();
+
+      expect(result).toBe(false);
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        { err: new Error("connection refused") },
+        "OpenCode health check failed",
+      );
+    });
+
+    it("returns false when client is null (health check catches error)", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      (bridge as any).client = null;
+      const loggerWarnSpy = vi.spyOn((bridge as any).logger, "warn");
+
+      const result = await bridge.checkHealth();
+
+      expect(result).toBe(false);
+      expect(loggerWarnSpy).toHaveBeenCalled();
+    });
+  });
 });

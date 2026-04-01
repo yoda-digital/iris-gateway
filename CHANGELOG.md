@@ -1,3 +1,9 @@
+## [1.15.11](https://github.com/yoda-digital/iris-gateway/compare/v1.15.10...v1.15.11) (2026-04-01)
+
+### Bug Fixes
+
+* [#309](https://github.com/yoda-digital/iris-gateway/issues/309) — deliver error message to user on session.error event ([#310](https://github.com/yoda-digital/iris-gateway/issues/310)) ([3775048](https://github.com/yoda-digital/iris-gateway/commit/37750489968707b6e61c0ade8b7409a319a36716))
+
 ## [1.15.10](https://github.com/yoda-digital/iris-gateway/compare/v1.15.9...v1.15.10) (2026-04-01)
 
 ### Bug Fixes

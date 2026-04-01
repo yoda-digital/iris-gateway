@@ -9,7 +9,11 @@ import type {
 import type { MessageCache } from "../message-cache.js";
 import { TypedEventEmitter } from "../../utils/typed-emitter.js";
 import type { ChannelAccountConfig } from "../../config/types.js";
-import { normalizeSlackMessage, type SlackMessageEvent } from "./normalize.js";
+import {
+  normalizeSlackMessage,
+  type SlackMessageEvent,
+  type UserDisplayNameCache,
+} from "./normalize.js";
 import * as send from "./send.js";
 
 const CAPABILITIES: ChannelCapabilities = {
@@ -38,6 +42,8 @@ export class SlackAdapter implements ChannelAdapter {
 
   private app: App | null = null;
   private messageCache: MessageCache | null = null;
+  /** Cache for Slack user display names to avoid repeated API calls */
+  private displayNameCache: UserDisplayNameCache = new Map();
 
   setMessageCache(cache: MessageCache): void {
     this.messageCache = cache;
@@ -57,8 +63,13 @@ export class SlackAdapter implements ChannelAdapter {
       socketMode: true,
     });
 
-    this.app.message(async ({ message }) => {
-      const msg = normalizeSlackMessage(message as SlackMessageEvent);
+    // Pass client and cache to normalizeSlackMessage for display name resolution
+    this.app.message(async ({ message, client }) => {
+      const msg = await normalizeSlackMessage(
+        message as SlackMessageEvent,
+        client,
+        this.displayNameCache,
+      );
       if (msg) this.events.emit("message", msg);
     });
 
@@ -82,6 +93,8 @@ export class SlackAdapter implements ChannelAdapter {
     await this.app?.stop();
     this.app = null;
     this._isConnected = false;
+    // Clear the display name cache on stop
+    this.displayNameCache.clear();
     this.events.emit("disconnected", "stopped");
   }
 

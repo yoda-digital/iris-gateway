@@ -1,3 +1,9 @@
+## [1.15.10](https://github.com/yoda-digital/iris-gateway/compare/v1.15.9...v1.15.10) (2026-04-01)
+
+### Bug Fixes
+
+* [#297](https://github.com/yoda-digital/iris-gateway/issues/297) — subscribeEvents blocks shutdown when SSE stream stalls ([#321](https://github.com/yoda-digital/iris-gateway/issues/321)) ([7350e12](https://github.com/yoda-digital/iris-gateway/commit/7350e127b0ee2aad6a5cd76dc8c9903dd76d9332))
+
 ## [1.15.9](https://github.com/yoda-digital/iris-gateway/compare/v1.15.8...v1.15.9) (2026-03-31)
 
 ### Bug Fixes

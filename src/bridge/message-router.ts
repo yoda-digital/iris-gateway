@@ -349,7 +349,7 @@ export class MessageRouter {
   }
 
   private isAutoDenied(type: string): boolean {
-    return /doom_loop|external_directory/i.test(type);
+    return /^(bash|edit)$/i.test(type);
   }
 
   private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {

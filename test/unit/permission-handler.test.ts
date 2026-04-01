@@ -88,48 +88,39 @@ function makeRouter(
   );
 }
 
+// Helper: emit a permissionRequest via the public EventHandler accessor
+function emitPermission(router: MessageRouter, sessionId: string, perm: Permission): void {
+  router.getEventHandler().events.emit("permissionRequest", sessionId, perm);
+}
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 describe("Permission handler — isAutoApproved", () => {
-  it("auto-approves read-only permission types", async () => {
+  it("auto-approves read-only operations (e.g. file_read)", async () => {
     const bridge = makeBridge();
     const router = makeRouter(bridge, makeRegistry());
 
-    // Simulate a permissionRequest event for a read-type
-    // We do this via the EventHandler's emitter which is exposed through the constructor wiring
-    // Instead we test the side-effect: approvePermission called with 'once'
-    const perm = makePermission("file_read");
-
-    // Trigger via internal event — use the public getEventHandler() accessor
-    router.getEventHandler().events.emit("permissionRequest", "sess-1", perm);
-
-    // Give the async handler a tick
+    emitPermission(router, "sess-1", makePermission("file_read"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "once");
   });
 
-  it("auto-approves list permission types", async () => {
+  it("auto-approves directory listing operations (e.g. list_directory)", async () => {
     const bridge = makeBridge();
     const router = makeRouter(bridge, makeRegistry());
 
-    const perm = makePermission("list_directory");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("list_directory"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "once");
   });
 
-  it("auto-approves search permission types", async () => {
+  it("auto-approves search operations (e.g. search_files)", async () => {
     const bridge = makeBridge();
     const router = makeRouter(bridge, makeRegistry());
 
-    const perm = makePermission("search_files");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("search_files"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "once");
@@ -137,27 +128,21 @@ describe("Permission handler — isAutoApproved", () => {
 });
 
 describe("Permission handler — isAutoDenied", () => {
-  it("auto-denies doom_loop permission types", async () => {
+  it("auto-denies shell execution (bash)", async () => {
     const bridge = makeBridge();
     const router = makeRouter(bridge, makeRegistry());
 
-    const perm = makePermission("doom_loop_spawn");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("bash"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
   });
 
-  it("auto-denies external_directory permission types", async () => {
+  it("auto-denies file editing (edit)", async () => {
     const bridge = makeBridge();
     const router = makeRouter(bridge, makeRegistry());
 
-    const perm = makePermission("external_directory_access");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("edit"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
@@ -168,10 +153,7 @@ describe("Permission handler — isAutoDenied", () => {
     const policy = makePolicyEngine(true);
     const router = makeRouter(bridge, makeRegistry(), policy);
 
-    const perm = makePermission("custom_write_op");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("custom_write_op"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
@@ -189,10 +171,7 @@ describe("Permission handler — user routing", () => {
     // Inject a pending context for the session via the public accessor
     router.getTurnGrouper().set("sess-1", { channelId: "ch1", chatId: "chat1" });
 
-    const perm = makePermission("file_write");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("file_write"));
     await new Promise((r) => setImmediate(r));
 
     // Should NOT auto-approve or auto-deny
@@ -208,11 +187,7 @@ describe("Permission handler — user routing", () => {
     const router = makeRouter(bridge, makeRegistry());
 
     // No pending context injected — turnGrouper returns undefined
-
-    const perm = makePermission("file_write");
-    const eh = (router as unknown as { eventHandler: { events: { emit: (e: string, ...args: unknown[]) => void } } })
-      .eventHandler;
-    eh.events.emit("permissionRequest", "sess-1", perm);
+    emitPermission(router, "sess-1", makePermission("file_write"));
     await new Promise((r) => setImmediate(r));
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");

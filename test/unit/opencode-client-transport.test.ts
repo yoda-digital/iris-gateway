@@ -297,6 +297,39 @@ describe("OpenCodeBridge — subscribeEvents abort signal handling", () => {
     expect(iteratorReturnCalled).toBe(true);
   });
 
+  it("resolves immediately when signal is already aborted before iteration begins", async () => {
+    const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+
+    // A stream that never yields — should never be iterated at all
+    let iteratorReturnCalled = false;
+    const neverEndingIterator = {
+      next: () => new Promise<{ done: boolean; value: unknown }>(() => {}), // never resolves
+      return: async () => {
+        iteratorReturnCalled = true;
+        return { done: true, value: undefined };
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
+
+    const mockClient = {
+      event: {
+        subscribe: vi.fn().mockResolvedValue({
+          stream: neverEndingIterator,
+        }),
+      },
+    };
+    injectClient(bridge, mockClient as any);
+
+    // Abort the controller BEFORE calling subscribeEvents
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(bridge.subscribeEvents(() => {}, controller.signal)).resolves.toBeUndefined();
+    expect(iteratorReturnCalled).toBe(true);
+  });
+
   it("resolves normally when stream ends without abort", async () => {
     const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
 

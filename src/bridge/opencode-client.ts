@@ -278,11 +278,13 @@ export class OpenCodeBridge {
           // eslint-disable-next-line no-constant-condition
           while (true) {
             const chunkPromise = chunkIterator.next();
-            const result = await Promise.race([
+            const raceResult = await Promise.race([
               chunkPromise.then((r) => ({ kind: "chunk" as const, done: r.done })),
               abortPromise.then(() => ({ kind: "abort" as const, done: false })),
             ]);
-            if (result.kind === "abort" || result.done) {
+            if (raceResult.kind === "abort" || raceResult.done) {
+              // Prevent unhandled rejection if the discarded chunkPromise later throws
+              chunkPromise.catch(() => {});
               // Terminate the underlying stream iterator
               if (typeof chunkIterator.return === "function") {
                 await chunkIterator.return(undefined);
@@ -293,7 +295,6 @@ export class OpenCodeBridge {
         } else {
           for await (const _ of stream) {
             // Events are delivered via onSseEvent callback
-            if (signal?.aborted) break;
           }
         }
       } finally {

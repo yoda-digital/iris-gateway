@@ -81,7 +81,7 @@ export class MessageRouter {
       this.registry.get(pending.channelId)?.sendText({
         to: pending.chatId,
         text: "💭 Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
-      }).catch(() => {});
+      })?.catch(() => {});
     });
 
     this.outboundQueue = new MessageQueue(logger);

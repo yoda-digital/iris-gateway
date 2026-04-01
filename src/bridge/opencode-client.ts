@@ -254,11 +254,53 @@ export class OpenCodeBridge {
         }
       },
     });
-    const stream = result.stream as AsyncIterable<unknown> | undefined;
+    const stream = result.stream as (AsyncIterable<unknown> & { return?: (value?: unknown) => Promise<IteratorResult<unknown>> }) | undefined;
     if (stream) {
-      for await (const _ of stream) {
-        // Events are delivered via onSseEvent callback
-        if (signal?.aborted) break;
+      // Register abort listener to terminate the stream immediately when signal fires,
+      // rather than waiting for the next chunk (which may never arrive on a stalled stream).
+      let abortListener: (() => void) | undefined;
+      const abortPromise = signal
+        ? new Promise<void>((resolve) => {
+            if (signal.aborted) {
+              // Signal already aborted before we set up the listener
+              resolve();
+              return;
+            }
+            abortListener = () => resolve();
+            signal.addEventListener("abort", abortListener, { once: true });
+          })
+        : null;
+
+      try {
+        if (abortPromise) {
+          // Race each chunk against the abort signal
+          const chunkIterator = stream[Symbol.asyncIterator]();
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const chunkPromise = chunkIterator.next();
+            const raceResult = await Promise.race([
+              chunkPromise.then((r) => ({ kind: "chunk" as const, done: r.done })),
+              abortPromise.then(() => ({ kind: "abort" as const, done: false })),
+            ]);
+            if (raceResult.kind === "abort" || raceResult.done) {
+              // Prevent unhandled rejection if the discarded chunkPromise later throws
+              chunkPromise.catch(() => {});
+              // Terminate the underlying stream iterator
+              if (typeof chunkIterator.return === "function") {
+                await chunkIterator.return(undefined);
+              }
+              break;
+            }
+          }
+        } else {
+          for await (const _ of stream) {
+            // Events are delivered via onSseEvent callback
+          }
+        }
+      } finally {
+        if (signal && abortListener) {
+          signal.removeEventListener("abort", abortListener);
+        }
       }
     }
   }

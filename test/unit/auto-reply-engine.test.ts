@@ -80,7 +80,6 @@ describe("TemplateEngine", () => {
     expect(engine.match(msg("hi"))).not.toBeNull();
     expect(engine.match(msg("hi"))).toBeNull();
   });
-});
 
   describe("schedule trigger with timezone", () => {
     it("uses server local time when no timezone specified", () => {
@@ -145,3 +144,4 @@ describe("TemplateEngine", () => {
       expect(engine.match(msg("test"))).not.toBeNull();
     });
   });
+});

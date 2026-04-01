@@ -267,6 +267,7 @@ export const irisConfigSchema = z.object({
         when: z.object({
           hours: z.tuple([z.number(), z.number()]).optional(),
           days: z.array(z.number()).optional(),
+          timezone: z.string().optional(),
         }).optional(),
       }),
       response: z.string().min(1),

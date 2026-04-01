@@ -72,6 +72,17 @@ export class MessageRouter {
     this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
       void this.handlePermissionRequest(sessionId, permission);
     });
+    this.eventHandler.events.on("sessionCompacted", (sessionId) => {
+      this.logger.info({ sessionId }, "Session context compacted by OpenCode");
+      const pending = this.turnGrouper.get(sessionId);
+      if (!pending) return;
+      const channelConfig = this.channelConfigs[pending.channelId];
+      if (!channelConfig?.notifyOnCompaction) return;
+      this.registry.get(pending.channelId)?.sendText({
+        to: pending.chatId,
+        text: "💭 Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
+      }).catch(() => {});
+    });
 
     this.outboundQueue = new MessageQueue(logger);
     this.outboundQueue.setDeliveryFn(async (msg) => {

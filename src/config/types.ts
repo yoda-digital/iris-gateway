@@ -77,6 +77,7 @@ export interface ChannelAccountConfig {
   readonly streaming?: StreamingConfig;
   readonly sendAndWaitTimeoutMs?: number;
   readonly defaultAgent?: string;
+  readonly notifyOnCompaction?: boolean;
 }
 
 export interface StreamingConfig {

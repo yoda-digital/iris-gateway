@@ -364,3 +364,45 @@ describe("EventHandler", () => {
     expect(onPerm).not.toHaveBeenCalled();
   });
 });
+
+describe("session.compacted event", () => {
+  it("emits sessionCompacted event with sessionId", () => {
+    const handler = new EventHandler();
+    const onCompacted = vi.fn();
+    handler.events.on("sessionCompacted", onCompacted);
+
+    handler.handleEvent(makeEvent("session.compacted", { sessionID: "s1" }));
+
+    expect(onCompacted).toHaveBeenCalledOnce();
+    expect(onCompacted).toHaveBeenCalledWith("s1");
+  });
+
+  it("does not emit sessionCompacted when sessionID is missing", () => {
+    const handler = new EventHandler();
+    const onCompacted = vi.fn();
+    handler.events.on("sessionCompacted", onCompacted);
+
+    handler.handleEvent(makeEvent("session.compacted", {}));
+
+    expect(onCompacted).not.toHaveBeenCalled();
+  });
+
+  it("does not reset accumulator on compaction", () => {
+    const handler = new EventHandler();
+    const onResponse = vi.fn();
+    handler.events.on("response", onResponse);
+
+    handler.handleEvent(
+      makeEvent("message.part.updated", {
+        part: { type: "text", text: "hello", sessionID: "s1" },
+        delta: "hello",
+      }),
+    );
+
+    handler.handleEvent(makeEvent("session.compacted", { sessionID: "s1" }));
+    handler.handleEvent(makeEvent("session.idle", { sessionID: "s1" }));
+
+    expect(onResponse).toHaveBeenCalledOnce();
+    expect(onResponse).toHaveBeenCalledWith("s1", "hello");
+  });
+});

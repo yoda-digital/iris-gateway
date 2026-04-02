@@ -179,37 +179,43 @@ describe("MessageRouter", () => {
     expect(capturedTimeoutMs).toBeUndefined();
   });
 
-  it("sends compaction notification when notifyOnCompaction is true and session is pending", async () => {
-    const pairingStore2 = new PairingStore(tempDir);
-    const allowlistStore2 = new AllowlistStore(tempDir);
-    const rateLimiter2 = new RateLimiter({ perMinute: 30, perHour: 300 });
-    const securityGate2 = new SecurityGate(pairingStore2, allowlistStore2, rateLimiter2, {
+  function makeRouterWithConfig(
+    channelConfigs: Record<string, unknown>,
+    overrideRegistry?: ChannelRegistry,
+  ): MessageRouter {
+    const ps = new PairingStore(tempDir);
+    const als = new AllowlistStore(tempDir);
+    const rl = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const sg = new SecurityGate(ps, als, rl, {
       defaultDmPolicy: "open",
       pairingCodeTtlMs: 3_600_000,
       pairingCodeLength: 8,
       rateLimitPerMinute: 30,
       rateLimitPerHour: 300,
     });
+    return new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      sg,
+      overrideRegistry ?? registry,
+      pino({ level: "silent" }),
+      channelConfigs as unknown as Record<string, import("../../src/config/types.js").ChannelAccountConfig>,
+    );
+  }
 
+  it("sends compaction notification when notifyOnCompaction is true and session is pending", async () => {
     const notifyAdapter = new MockAdapter();
     const notifyRegistry = new ChannelRegistry();
     notifyRegistry.register(notifyAdapter);
 
-    const routerWithNotify = new MessageRouter(
-      bridge as any,
-      new SessionMap(tempDir),
-      securityGate2,
+    const routerWithNotify = makeRouterWithConfig(
+      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } },
       notifyRegistry,
-      pino({ level: "silent" }),
-      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } } as unknown as Record<string, import("../../src/config/types.js").ChannelAccountConfig>,
     );
 
     // Seed the turn grouper with a pending session so the router can look up channelId/chatId
     const eventHandler = routerWithNotify.getEventHandler();
-    const turnGrouperSet = (routerWithNotify as any).turnGrouper.set.bind(
-      (routerWithNotify as any).turnGrouper
-    );
-    turnGrouperSet("session-xyz", { channelId: "mock", chatId: "chat-42" });
+    (routerWithNotify as any).turnGrouper.set("session-xyz", { channelId: "mock", chatId: "chat-42" });
 
     // Fire the sessionCompacted event (OpenCodeEvent uses { type, properties } shape)
     eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-xyz" } } as any);
@@ -236,27 +242,12 @@ describe("MessageRouter", () => {
   });
 
   it("does not throw when adapter is absent during compaction notification", async () => {
-    const pairingStore3 = new PairingStore(tempDir);
-    const allowlistStore3 = new AllowlistStore(tempDir);
-    const rateLimiter3 = new RateLimiter({ perMinute: 30, perHour: 300 });
-    const securityGate3 = new SecurityGate(pairingStore3, allowlistStore3, rateLimiter3, {
-      defaultDmPolicy: "open",
-      pairingCodeTtlMs: 3_600_000,
-      pairingCodeLength: 8,
-      rateLimitPerMinute: 30,
-      rateLimitPerHour: 300,
-    });
-
     // Registry with NO adapter registered for "mock" channel
     const emptyRegistry = new ChannelRegistry();
 
-    const routerNoAdapter = new MessageRouter(
-      bridge as any,
-      new SessionMap(tempDir),
-      securityGate3,
+    const routerNoAdapter = makeRouterWithConfig(
+      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } },
       emptyRegistry,
-      pino({ level: "silent" }),
-      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } } as unknown as Record<string, import("../../src/config/types.js").ChannelAccountConfig>,
     );
 
     const eventHandler = routerNoAdapter.getEventHandler();

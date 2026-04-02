@@ -80,8 +80,8 @@ export class MessageRouter {
       if (!channelConfig?.notifyOnCompaction) return;
       this.registry.get(pending.channelId)?.sendText({
         to: pending.chatId,
-        text: "💭 Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
-      })?.catch(() => {});
+        text: "Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
+      })?.catch((err) => this.logger.warn({ err, sessionId }, "Failed to send compaction notification"));
     });
 
     this.outboundQueue = new MessageQueue(logger);

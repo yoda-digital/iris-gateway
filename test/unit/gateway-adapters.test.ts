@@ -57,6 +57,10 @@ function makeBaseDeps(channelsConfig: Record<string, { type: string; enabled: bo
     handleInbound: vi.fn().mockResolvedValue(undefined),
   };
 
+  const bridge = {
+    approvePermission: vi.fn().mockResolvedValue(undefined),
+  };
+
   return {
     config: { channels: channelsConfig } as any,
     logger,
@@ -65,6 +69,7 @@ function makeBaseDeps(channelsConfig: Record<string, { type: string; enabled: bo
     canvasServer: null,
     vaultStore: vaultStore as any,
     router: router as any,
+    bridge: bridge as any,
     activityTracker: null,
     inferenceEngine: null,
     outcomeAnalyzer: null,

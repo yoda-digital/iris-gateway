@@ -40,6 +40,8 @@ export class MockOpenCodeBridge {
 
   async abortSession(_sessionId: string): Promise<void> {}
 
+  async approvePermission(_sessionId: string, _permissionId: string, _response: "once" | "reject"): Promise<void> {}
+
   async checkHealth(): Promise<boolean> {
     return true;
   }

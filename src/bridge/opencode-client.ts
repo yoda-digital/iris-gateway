@@ -420,9 +420,10 @@ export class OpenCodeBridge {
 
   async approvePermission(sessionId: string, permissionId: string, response: "once" | "reject"): Promise<void> {
     const client = this.getClient();
-    await (client as any).session.permissions({
-      path: { id: sessionId, permissionId },
+    await client.postSessionIdPermissionsPermissionId({
+      path: { id: sessionId, permissionID: permissionId },
       body: { response },
+      throwOnError: true,
     });
   }
 }

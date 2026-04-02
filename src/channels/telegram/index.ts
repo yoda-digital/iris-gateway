@@ -110,7 +110,7 @@ export class TelegramAdapter implements ChannelAdapter {
     // Handle inline button callbacks for permission approval (perm:once|always|reject:<sessionId>:<permId>)
     this.bot.on("callback_query:data", async (ctx) => {
       const data = ctx.callbackQuery.data ?? "";
-      const permMatch = data.match(/^perm:(once|always|reject):([^:]+):(.+)$/);
+      const permMatch = data.match(/^perm:(once|reject):([^:]+):(.+)$/);
       if (permMatch) {
         const [, action, sessionId, permissionId] = permMatch;
         const response = action === "reject" ? "reject" : "once";
@@ -172,7 +172,7 @@ export class TelegramAdapter implements ChannelAdapter {
 
   async sendText(params: SendTextParams): Promise<{ messageId: string }> {
     if (!this.bot) throw new Error("Telegram bot not started");
-    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId, params.buttons);
+    const result = await send.sendText(this.bot, params.to, params.text, params.replyToId, params.buttons, params.parseMode);
     this.messageCache?.set(result.messageId, {
       channelId: this.id,
       chatId: params.to,

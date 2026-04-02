@@ -60,34 +60,52 @@ describe("wireSSEReconnect", () => {
     expect(bridge.subscribeEvents).toHaveBeenCalledWith(expect.any(Function), abortController.signal);
   });
 
-  it("resets reconnect delay on successful connection", async () => {
+  it("resets reconnect delay to initialDelayMs after successful reconnect", async () => {
     const bridge = makeBridge();
     const router = makeRouter();
     const abortController = new AbortController();
     const logger = makeLogger();
 
+    // Simulate: fail → fail (backoff accumulates) → succeed (delay resets)
+    // A second wireSSEReconnect call confirms the delay was reset.
     let callCount = 0;
     vi.mocked(bridge.subscribeEvents).mockImplementation(async () => {
       callCount++;
-      if (callCount === 1) {
-        throw new Error("Connection failed");
-      }
+      if (callCount === 1) throw new Error("first failure");
+      if (callCount === 2) throw new Error("second failure");
+      // call 3: success — resolves normally, delay resets
       return undefined;
     });
 
     wireSSEReconnect(bridge, router, abortController, logger, 1000, 5000);
 
-    // First call fails
+    // call 1 fails — delay used = 1000ms, backoff accumulates to 2000ms
     await vi.advanceTimersByTimeAsync(0);
     expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logger.warn).mock.calls[0][0]).toMatchObject({ nextRetryMs: 1000 });
 
-    // Retry after 1000ms
+    // call 2 fires after 1000ms, fails — delay used = 2000ms, backoff accumulates to 4000ms
     await vi.advanceTimersByTimeAsync(1000);
     await vi.advanceTimersByTimeAsync(0);
-
-    // Second call succeeds - delay should reset to 1000ms
     expect(bridge.subscribeEvents).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(logger.warn).mock.calls[1][0]).toMatchObject({ nextRetryMs: 2000 });
+
+    // call 3 fires after 2000ms, succeeds — delay resets to 1000ms
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(3);
     expect(logger.info).toHaveBeenCalledWith("OpenCode SSE subscription ended");
+
+    // Confirm reset: spawn a second reconnector with same params; first failure
+    // should again use initialDelayMs (1000ms) not the accumulated 4000ms.
+    const bridge2 = makeBridge();
+    vi.mocked(bridge2.subscribeEvents).mockRejectedValue(new Error("new drop"));
+    wireSSEReconnect(bridge2, router, abortController, logger, 1000, 5000);
+    await vi.advanceTimersByTimeAsync(0);
+    const warnCalls = vi.mocked(logger.warn).mock.calls;
+    expect(warnCalls[warnCalls.length - 1][0]).toMatchObject({ nextRetryMs: 1000 });
+
+    abortController.abort();
   });
 
   it("implements exponential backoff on repeated failures", async () => {
@@ -98,19 +116,26 @@ describe("wireSSEReconnect", () => {
 
     vi.mocked(bridge.subscribeEvents).mockRejectedValue(new Error("Connection failed"));
 
-    wireSSEReconnect(bridge, router, abortController, logger, 1000, 5000);
+    wireSSEReconnect(bridge, router, abortController, logger, 1000, 16000);
 
-    // Initial call is synchronous
+    // call 1 fails immediately
+    await vi.advanceTimersByTimeAsync(0);
     expect(bridge.subscribeEvents).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logger.warn).mock.calls[0][0]).toMatchObject({ nextRetryMs: 1000 });
 
-    // Advance timers to trigger multiple retries
-    // Vitest executes all nested timers, so we verify the behavior by checking
-    // that multiple retries occurred
-    await vi.advanceTimersByTimeAsync(10000);
-    
-    // Verify multiple retries occurred (initial + several retries)
-    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(11);
-    expect(logger.warn).toHaveBeenCalledTimes(11);
+    // call 2 after 1000ms delay — backoff doubles to 2000ms
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(logger.warn).mock.calls[1][0]).toMatchObject({ nextRetryMs: 2000 });
+
+    // call 3 after 2000ms delay — backoff doubles to 4000ms
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(logger.warn).mock.calls[2][0]).toMatchObject({ nextRetryMs: 4000 });
+
+    abortController.abort();
   });
 
   it("caps reconnect delay at maxDelayMs", async () => {
@@ -123,16 +148,26 @@ describe("wireSSEReconnect", () => {
 
     wireSSEReconnect(bridge, router, abortController, logger, 1000, 3000);
 
-    // Initial call is synchronous
-    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(1);
+    // call 1: delay = 1000ms → doubles to 2000ms
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(logger.warn).mock.calls[0][0]).toMatchObject({ nextRetryMs: 1000 });
 
-    // Advance timers to trigger multiple retries with capped delay
-    await vi.advanceTimersByTimeAsync(15000);
-    
-    // Verify multiple retries occurred with capped delay
-    // With max delay of 3000ms, we expect more retries than without capping
-    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(16);
-    expect(logger.warn).toHaveBeenCalledTimes(16);
+    // call 2: delay = 2000ms → doubles to 4000ms, capped at 3000ms
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(logger.warn).mock.calls[1][0]).toMatchObject({ nextRetryMs: 2000 });
+
+    // call 3: delay = 3000ms (capped) → stays at 3000ms
+    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(logger.warn).mock.calls[2][0]).toMatchObject({ nextRetryMs: 3000 });
+
+    // call 4: delay = 3000ms (still capped)
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.mocked(logger.warn).mock.calls[3][0]).toMatchObject({ nextRetryMs: 3000 });
+
+    abortController.abort();
   });
 
   it("does not reconnect if abort signal is already set", async () => {

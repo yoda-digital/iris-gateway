@@ -148,8 +148,8 @@ export function wireSSEReconnect(bridge: OpenCodeBridge, router: MessageRouter, 
   const wireSSE = async (): Promise<void> => {
     if (abortController.signal.aborted) return;
     try {
-      reconnectDelay = initialDelayMs;
       await bridge.subscribeEvents((event) => { router.getEventHandler().handleEvent(event); }, abortController.signal);
+      reconnectDelay = initialDelayMs;
       logger.info("OpenCode SSE subscription ended");
     } catch (err) {
       if (abortController.signal.aborted) return;

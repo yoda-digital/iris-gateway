@@ -213,20 +213,24 @@ describe("MessageRouter", () => {
       notifyRegistry,
     );
 
-    // Seed the turn grouper with a pending session so the router can look up channelId/chatId
-    const eventHandler = routerWithNotify.getEventHandler();
-    (routerWithNotify as any).turnGrouper.set("session-xyz", { channelId: "mock", chatId: "chat-42" });
+    try {
+      // Seed the turn grouper with a pending session so the router can look up channelId/chatId
+      const eventHandler = routerWithNotify.getEventHandler();
+      (routerWithNotify as any).turnGrouper.set("session-xyz", { channelId: "mock", chatId: "chat-42" });
 
-    // Fire the sessionCompacted event (OpenCodeEvent uses { type, properties } shape)
-    eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-xyz" } } as any);
+      // Fire the sessionCompacted event (OpenCodeEvent uses { type, properties } shape)
+      eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-xyz" } } as any);
 
-    // Allow microtasks to flush
-    await new Promise((resolve) => setTimeout(resolve, 0));
+      // Allow microtasks to flush
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const sendCalls = notifyAdapter.calls.filter((c) => c.method === "sendText");
-    expect(sendCalls.length).toBe(1);
-    expect((sendCalls[0]!.args[0] as any).to).toBe("chat-42");
-    expect((sendCalls[0]!.args[0] as any).text).toContain("context was compressed");
+      const sendCalls = notifyAdapter.calls.filter((c) => c.method === "sendText");
+      expect(sendCalls.length).toBe(1);
+      expect((sendCalls[0]!.args[0] as any).to).toBe("chat-42");
+      expect((sendCalls[0]!.args[0] as any).text).toContain("context was compressed");
+    } finally {
+      routerWithNotify.dispose();
+    }
   });
 
   it("does not send compaction notification when notifyOnCompaction is false", async () => {
@@ -250,16 +254,20 @@ describe("MessageRouter", () => {
       emptyRegistry,
     );
 
-    const eventHandler = routerNoAdapter.getEventHandler();
-    (routerNoAdapter as any).turnGrouper.set("session-no-adapter", { channelId: "mock", chatId: "chat-0" });
+    try {
+      const eventHandler = routerNoAdapter.getEventHandler();
+      (routerNoAdapter as any).turnGrouper.set("session-no-adapter", { channelId: "mock", chatId: "chat-0" });
 
-    // Must not throw even though registry.get("mock") returns undefined
-    await expect(
-      (async () => {
-        eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-no-adapter" } } as any);
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      })()
-    ).resolves.toBeUndefined();
+      // Must not throw even though registry.get("mock") returns undefined
+      await expect(
+        (async () => {
+          eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-no-adapter" } } as any);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        })()
+      ).resolves.toBeUndefined();
+    } finally {
+      routerNoAdapter.dispose();
+    }
   });
 })
 

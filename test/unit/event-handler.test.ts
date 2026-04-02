@@ -366,8 +366,14 @@ describe("EventHandler", () => {
 });
 
 describe("session.compacted event", () => {
+  let handler: EventHandler;
+
+  afterEach(() => {
+    handler.dispose();
+  });
+
   it("emits sessionCompacted event with sessionId", () => {
-    const handler = new EventHandler();
+    handler = new EventHandler();
     const onCompacted = vi.fn();
     handler.events.on("sessionCompacted", onCompacted);
 
@@ -378,7 +384,7 @@ describe("session.compacted event", () => {
   });
 
   it("does not emit sessionCompacted when sessionID is missing", () => {
-    const handler = new EventHandler();
+    handler = new EventHandler();
     const onCompacted = vi.fn();
     handler.events.on("sessionCompacted", onCompacted);
 
@@ -388,7 +394,7 @@ describe("session.compacted event", () => {
   });
 
   it("does not reset accumulator on compaction", () => {
-    const handler = new EventHandler();
+    handler = new EventHandler();
     const onResponse = vi.fn();
     handler.events.on("response", onResponse);
 

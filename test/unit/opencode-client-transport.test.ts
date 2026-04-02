@@ -66,7 +66,7 @@ function makeMockClient(messages: Array<{ role: string; text: string; hasParts: 
 describe("OpenCodeBridge — transport selection and circuit breaker", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 200 }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve("") }));
     vi.mocked(createOpencodeClient).mockReturnValue({} as any);
     vi.mocked(createOpencode).mockResolvedValue({
       client: {} as any,
@@ -160,6 +160,47 @@ describe("OpenCodeBridge — transport selection and circuit breaker", () => {
       await vi.advanceTimersByTimeAsync(100);
       const result = await promise;
       expect(result).toBe("answer");
+    });
+  });
+
+  /* ── HTTP error fast-fail ────────────────────────────────────── */
+
+  describe("HTTP error fast-fail on prompt_async", () => {
+    it("throws immediately on 500 — does not enter poll loop", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const client = makeMockClient([]);
+      injectClient(bridge, client);
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      }));
+
+      await expect(
+        (bridge as any)._sendAndWaitInternal("s1", "hi", 10_000, 100),
+      ).rejects.toThrow("prompt_async failed: HTTP 500");
+
+      // poll loop must NOT have been entered — session.messages called at most once (baseline)
+      expect(client.session.messages.mock.calls.length).toBeLessThanOrEqual(1);
+    });
+
+    it("throws immediately on 400 — does not enter poll loop", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const client = makeMockClient([]);
+      injectClient(bridge, client);
+
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve("Bad Request"),
+      }));
+
+      await expect(
+        (bridge as any)._sendAndWaitInternal("s1", "hi", 10_000, 100),
+      ).rejects.toThrow("prompt_async failed: HTTP 400");
+
+      expect(client.session.messages.mock.calls.length).toBeLessThanOrEqual(1);
     });
   });
 

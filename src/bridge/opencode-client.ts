@@ -185,6 +185,10 @@ export class OpenCodeBridge {
       body,
     });
     this.logger.info({ status: res.status }, "prompt_async response");
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      throw new Error(`prompt_async failed: HTTP ${res.status} — ${errBody.substring(0, 200)}`);
+    }
 
     const deadline = Date.now() + timeoutMs;
     let lastNewCount = 0;

@@ -1,3 +1,9 @@
+## [1.15.14](https://github.com/yoda-digital/iris-gateway/compare/v1.15.13...v1.15.14) (2026-04-03)
+
+### Bug Fixes
+
+* [#327](https://github.com/yoda-digital/iris-gateway/issues/327) — check HTTP status after prompt_async POST, throw on 4xx/5xx ([#328](https://github.com/yoda-digital/iris-gateway/issues/328)) ([e35b913](https://github.com/yoda-digital/iris-gateway/commit/e35b9133ddeba1fac37cc40988bf7f780f99695e))
+
 ## [1.15.13](https://github.com/yoda-digital/iris-gateway/compare/v1.15.12...v1.15.13) (2026-04-03)
 
 ### Bug Fixes

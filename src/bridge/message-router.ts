@@ -184,6 +184,7 @@ export class MessageRouter {
     const streamConfig = channelConfig?.streaming;
     if (streamConfig?.enabled && adapter) {
       const maxLen = PLATFORM_LIMITS[msg.channelId] ?? adapter.capabilities.maxTextLength ?? 4096;
+      let sentMessageId: string | null = null;
       const coalescer = new StreamCoalescer(
         {
           enabled: true,
@@ -195,9 +196,18 @@ export class MessageRouter {
         },
         (text, isEdit) => {
           if (isEdit && adapter.editMessage) {
-            adapter.editMessage({ messageId: "", text, chatId: msg.chatId }).catch(() => {});
+            if (sentMessageId) {
+              adapter.editMessage({ messageId: sentMessageId, text, chatId: msg.chatId }).catch(() => {});
+            }
+            // If sentMessageId not yet known, skip edit — first chunk hasn't landed yet
           } else {
-            this.outboundQueue.enqueue({ channelId: msg.channelId, chatId: msg.chatId, text, replyToId: msg.id });
+            // Send first chunk directly to capture the messageId for subsequent edits
+            adapter
+              .sendText({ to: msg.chatId, text, replyToId: msg.id })
+              .then((result) => {
+                sentMessageId = result.messageId;
+              })
+              .catch(() => {});
           }
         },
       );

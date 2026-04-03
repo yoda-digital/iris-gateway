@@ -288,3 +288,24 @@ describe("SlackAdapter — events", () => {
     ctrl.abort();
   });
 });
+
+// ─── ChannelRegistry ──────────────────────────────────────────────────────────
+
+import { ChannelRegistry } from "../../src/channels/registry.js";
+
+describe("ChannelRegistry", () => {
+  const makeAdapter = (id: string) => ({ id } as any);
+
+  it("register() throws on duplicate adapter id", () => {
+    const registry = new ChannelRegistry();
+    registry.register(makeAdapter("telegram"));
+    expect(() => registry.register(makeAdapter("telegram"))).toThrow(
+      "Channel adapter already registered: telegram",
+    );
+  });
+
+  it("get() returns undefined for unknown id", () => {
+    const registry = new ChannelRegistry();
+    expect(registry.get("unknown")).toBeUndefined();
+  });
+});

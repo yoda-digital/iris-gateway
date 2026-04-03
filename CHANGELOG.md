@@ -1,3 +1,9 @@
+## [1.15.15](https://github.com/yoda-digital/iris-gateway/compare/v1.15.14...v1.15.15) (2026-04-03)
+
+### Bug Fixes
+
+* [#335](https://github.com/yoda-digital/iris-gateway/issues/335) — capture sentMessageId for editInPlace streaming ([#340](https://github.com/yoda-digital/iris-gateway/issues/340)) ([ccdda1b](https://github.com/yoda-digital/iris-gateway/commit/ccdda1b32be16afddb78a185129a18b2ee2d4a13))
+
 ## [1.15.14](https://github.com/yoda-digital/iris-gateway/compare/v1.15.13...v1.15.14) (2026-04-03)
 
 ### Bug Fixes

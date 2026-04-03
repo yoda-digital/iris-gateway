@@ -26,6 +26,7 @@ import { governanceRouter } from "./routers/governance.js";
 import { intelligenceRouter } from "./routers/intelligence.js";
 import { systemRouter } from "./routers/system.js";
 import { skillsRouter } from "./routers/skills.js";
+import type { OpenCodeBridge } from "./opencode-client.js";
 import { cliRouter } from "./routers/cli.js";
 import { randomUUID } from "node:crypto";
 
@@ -56,6 +57,7 @@ export interface ToolServerDeps {
   promptAssembler?: PromptAssembler | null;
   /** Idle window (ms) before a new turn ID is assigned. Default: 2000 */
   turnIdleWindowMs?: number;
+  bridge?: OpenCodeBridge | null;
 }
 
 export class ToolServer {
@@ -249,6 +251,7 @@ export class ToolServer {
     this.app.route("/", skillsRouter({
       policyEngine: deps.policyEngine,
       cliRegistry: deps.cliRegistry,
+      bridge: deps.bridge,
     }));
 
     this.app.route("/", cliRouter({

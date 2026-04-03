@@ -12,7 +12,22 @@ import { ChannelRegistry } from "../../src/channels/registry.js";
 import { MockAdapter } from "../helpers/mock-adapter.js";
 import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
 import { makeInboundMessage } from "../helpers/fixtures.js";
+import type { Permission } from "../../src/bridge/opencode-client.js";
 import pino from "pino";
+
+function makePermission(type: string, overrides: Partial<Permission> = {}): Permission {
+  return {
+    id: "perm-1",
+    sessionID: "session-1",
+    type,
+    title: `Permission: ${type}`,
+    pattern: undefined,
+    messageID: "msg-1",
+    metadata: {},
+    time: { created: Date.now() },
+    ...overrides,
+  } as Permission;
+}
 
 describe("MessageRouter", () => {
   let tempDir: string;
@@ -162,5 +177,174 @@ describe("MessageRouter", () => {
     await router.handleInbound(msg);
 
     expect(capturedTimeoutMs).toBeUndefined();
+  });
+})
+
+describe("MessageRouter — isAutoApproved", () => {
+  let tempDir: string;
+  let bridge: MockOpenCodeBridge;
+  let router: MessageRouter;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-perm-test-"));
+    writeFileSync(join(tempDir, "pairing.json"), "[]");
+    writeFileSync(join(tempDir, "allowlist.json"), "[]");
+    bridge = new MockOpenCodeBridge();
+    const sessionMap = new SessionMap(tempDir);
+    const pairingStore = new PairingStore(tempDir);
+    const allowlistStore = new AllowlistStore(tempDir);
+    const rateLimiter = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate = new SecurityGate(pairingStore, allowlistStore, rateLimiter, {
+      defaultDmPolicy: "open", pairingCodeTtlMs: 3_600_000, pairingCodeLength: 8,
+      rateLimitPerMinute: 30, rateLimitPerHour: 300,
+    });
+    router = new MessageRouter(bridge as any, sessionMap, securityGate, new ChannelRegistry(), pino({ level: "silent" }));
+  });
+
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it("approves exact 'read' type", () => {
+    expect((router as any).isAutoApproved(makePermission("read"))).toBe(true);
+  });
+
+  it("approves exact 'list' type", () => {
+    expect((router as any).isAutoApproved(makePermission("list"))).toBe(true);
+  });
+
+  it("approves exact 'search' type", () => {
+    expect((router as any).isAutoApproved(makePermission("search"))).toBe(true);
+  });
+
+  it("does NOT approve 'external_read' (no substring matching)", () => {
+    expect((router as any).isAutoApproved(makePermission("external_read"))).toBe(false);
+  });
+
+  it("does NOT approve 'bulk_search_egress' (no substring matching)", () => {
+    expect((router as any).isAutoApproved(makePermission("bulk_search_egress"))).toBe(false);
+  });
+
+  it("does NOT approve 'bash'", () => {
+    expect((router as any).isAutoApproved(makePermission("bash"))).toBe(false);
+  });
+
+  it("does NOT approve 'edit'", () => {
+    expect((router as any).isAutoApproved(makePermission("edit"))).toBe(false);
+  });
+});
+
+describe("MessageRouter — isAutoDenied", () => {
+  let tempDir: string;
+  let bridge: MockOpenCodeBridge;
+  let router: MessageRouter;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-perm-test-"));
+    writeFileSync(join(tempDir, "pairing.json"), "[]");
+    writeFileSync(join(tempDir, "allowlist.json"), "[]");
+    bridge = new MockOpenCodeBridge();
+    const sessionMap = new SessionMap(tempDir);
+    const pairingStore = new PairingStore(tempDir);
+    const allowlistStore = new AllowlistStore(tempDir);
+    const rateLimiter = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate = new SecurityGate(pairingStore, allowlistStore, rateLimiter, {
+      defaultDmPolicy: "open", pairingCodeTtlMs: 3_600_000, pairingCodeLength: 8,
+      rateLimitPerMinute: 30, rateLimitPerHour: 300,
+    });
+    router = new MessageRouter(bridge as any, sessionMap, securityGate, new ChannelRegistry(), pino({ level: "silent" }));
+  });
+
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it("denies 'bash' when no policyEngine", () => {
+    expect((router as any).isAutoDenied(makePermission("bash"))).toBe(true);
+  });
+
+  it("denies 'edit' when no policyEngine", () => {
+    expect((router as any).isAutoDenied(makePermission("edit"))).toBe(true);
+  });
+
+  it("does NOT deny 'read' when no policyEngine", () => {
+    expect((router as any).isAutoDenied(makePermission("read"))).toBe(false);
+  });
+
+  it("does NOT deny speculative/unknown types when no policyEngine", () => {
+    expect((router as any).isAutoDenied(makePermission("network_egress"))).toBe(false);
+    expect((router as any).isAutoDenied(makePermission("doom_loop"))).toBe(false);
+  });
+
+  it("delegates to policyEngine when present", () => {
+    const policyEngine = { isPermissionDenied: (t: string) => t === "bash" };
+    const td = mkdtempSync(join(tmpdir(), "iris-perm-policy-"));
+    writeFileSync(join(td, "pairing.json"), "[]");
+    writeFileSync(join(td, "allowlist.json"), "[]");
+    const pairingStore = new PairingStore(td);
+    const allowlistStore = new AllowlistStore(td);
+    const rateLimiter = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate = new SecurityGate(pairingStore, allowlistStore, rateLimiter, {
+      defaultDmPolicy: "open", pairingCodeTtlMs: 3_600_000, pairingCodeLength: 8,
+      rateLimitPerMinute: 30, rateLimitPerHour: 300,
+    });
+    const r = new MessageRouter(
+      bridge as any, new SessionMap(td), securityGate, new ChannelRegistry(),
+      pino({ level: "silent" }), {}, null, null, null, policyEngine as any,
+    );
+    try {
+      expect((r as any).isAutoDenied(makePermission("bash"))).toBe(true);
+      expect((r as any).isAutoDenied(makePermission("read"))).toBe(false);
+    } finally {
+      rmSync(td, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("MessageRouter — handlePermissionRequest", () => {
+  let tempDir: string;
+  let bridge: MockOpenCodeBridge;
+  let router: MessageRouter;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-perm-test-"));
+    writeFileSync(join(tempDir, "pairing.json"), "[]");
+    writeFileSync(join(tempDir, "allowlist.json"), "[]");
+    bridge = new MockOpenCodeBridge();
+    const sessionMap = new SessionMap(tempDir);
+    const pairingStore = new PairingStore(tempDir);
+    const allowlistStore = new AllowlistStore(tempDir);
+    const rateLimiter = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const securityGate = new SecurityGate(pairingStore, allowlistStore, rateLimiter, {
+      defaultDmPolicy: "open", pairingCodeTtlMs: 3_600_000, pairingCodeLength: 8,
+      rateLimitPerMinute: 30, rateLimitPerHour: 300,
+    });
+    router = new MessageRouter(bridge as any, sessionMap, securityGate, new ChannelRegistry(), pino({ level: "silent" }));
+  });
+
+  afterEach(() => rmSync(tempDir, { recursive: true, force: true }));
+
+  it("auto-approves read-only permissions", async () => {
+    await (router as any).handlePermissionRequest("session-1", makePermission("read"));
+    expect(bridge.permissionDecisions).toEqual([
+      { sessionId: "session-1", permissionId: "perm-1", response: "once" },
+    ]);
+  });
+
+  it("auto-denies bash permissions", async () => {
+    await (router as any).handlePermissionRequest("session-1", makePermission("bash"));
+    expect(bridge.permissionDecisions).toEqual([
+      { sessionId: "session-1", permissionId: "perm-1", response: "reject" },
+    ]);
+  });
+
+  it("auto-denies edit permissions", async () => {
+    await (router as any).handlePermissionRequest("session-1", makePermission("edit"));
+    expect(bridge.permissionDecisions).toEqual([
+      { sessionId: "session-1", permissionId: "perm-1", response: "reject" },
+    ]);
+  });
+
+  it("auto-denies unknown permission types by default", async () => {
+    await (router as any).handlePermissionRequest("session-1", makePermission("unknown_custom_type"));
+    expect(bridge.permissionDecisions).toEqual([
+      { sessionId: "session-1", permissionId: "perm-1", response: "reject" },
+    ]);
   });
 })

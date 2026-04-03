@@ -5,7 +5,8 @@ import type { Logger } from "../logging/logger.js";
 import type { ChannelAccountConfig } from "../config/types.js";
 import { chunkText, PLATFORM_LIMITS } from "../utils/text-chunker.js";
 import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-gating.js";
-import type { OpenCodeBridge } from "./opencode-client.js";
+import type { OpenCodeBridge, Permission } from "./opencode-client.js";
+import type { PolicyEngine } from "../governance/policy.js";
 import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
@@ -30,6 +31,7 @@ export class MessageRouter {
     private readonly templateEngine?: TemplateEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly policyEngine?: PolicyEngine | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -65,6 +67,10 @@ export class MessageRouter {
           this.logger.error({ err, sessionId }, "Failed to send error response");
         });
       }
+    });
+
+    this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
+      void this.handlePermissionRequest(sessionId, permission);
     });
 
     this.outboundQueue = new MessageQueue(logger);
@@ -312,4 +318,51 @@ export class MessageRouter {
       this.logger.error({ err, sessionId }, "Failed to send response");
     });
   }
+
+  // ── Permission handling ──
+
+  private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
+    const log = this.logger.child({ sessionId, permissionId: permission.id, permissionType: permission.type });
+    log.info("Permission request received");
+
+    if (this.isAutoDenied(permission)) {
+      log.info("Auto-denying permission (policy or blocked type)");
+      await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
+        log.error({ err }, "Failed to auto-deny permission");
+      });
+      return;
+    }
+
+    if (this.isAutoApproved(permission)) {
+      log.info("Auto-approving permission (read-only / policy allowed)");
+      await this.bridge.approvePermission(sessionId, permission.id, "once").catch((err) => {
+        log.error({ err }, "Failed to auto-approve permission");
+      });
+      return;
+    }
+
+    // Unknown/sensitive permission type: deny by default.
+    // Interactive user approval (/perm command) is not yet implemented.
+    log.info("Auto-denying unrecognised permission type");
+    await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
+      log.error({ err }, "Failed to deny permission");
+    });
+  }
+
+  private isAutoApproved(permission: Permission): boolean {
+    const readOnlyTypes = ["read", "list", "search", "stat"];
+    return readOnlyTypes.some((t) => permission.type === t);
+  }
+
+  private isAutoDenied(permission: Permission): boolean {
+    // "bash" and "edit" are dangerous regardless of policy config; deny them
+    // when no policyEngine is present. When policyEngine is present, it is
+    // the authoritative source and covers all permission types including these.
+    if (this.policyEngine) {
+      return this.policyEngine.isPermissionDenied(permission.type);
+    }
+    const blockedTypes = ["bash", "edit"];
+    return blockedTypes.some((t) => permission.type === t);
+  }
+
 }

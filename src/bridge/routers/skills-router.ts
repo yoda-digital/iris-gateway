@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { OpenCodeBridge } from "../opencode-client.js";
 import {
   type SkillsDeps,
   buildHandlerDirs,
@@ -10,7 +11,7 @@ import {
 
 export type { SkillsDeps };
 
-export function skillsRouter(deps: SkillsDeps): Hono {
+export function skillsRouter(deps: SkillsDeps & { bridge?: OpenCodeBridge | null }): Hono {
   const app = new Hono();
   const dirs = buildHandlerDirs(deps);
 

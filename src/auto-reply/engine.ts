@@ -49,14 +49,41 @@ export class TemplateEngine {
     }
   }
 
-  private scheduleActive(when: { hours?: [number, number]; days?: number[] }): boolean {
+  private scheduleActive(when: { hours?: [number, number]; days?: number[]; timezone?: string }): boolean {
     const now = new Date();
+    let hour: number;
+    let day: number;
+
+    if (when.timezone) {
+      try {
+        const fmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: when.timezone,
+          hour: "numeric",
+          weekday: "short",
+          hour12: false,
+        });
+        const parts = fmt.formatToParts(now);
+        const hourPart = parts.find((p) => p.type === "hour");
+        const weekdayPart = parts.find((p) => p.type === "weekday");
+        hour = hourPart ? parseInt(hourPart.value, 10) : now.getHours();
+        const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        day = weekdayPart ? weekdays.indexOf(weekdayPart.value) : now.getDay();
+        if (day === -1) day = now.getDay();
+      } catch {
+        // Invalid timezone — fall back to local time
+        hour = now.getHours();
+        day = now.getDay();
+      }
+    } else {
+      hour = now.getHours();
+      day = now.getDay();
+    }
+
     if (when.hours) {
-      const hour = now.getHours();
       if (hour < when.hours[0] || hour >= when.hours[1]) return false;
     }
     if (when.days) {
-      if (!when.days.includes(now.getDay())) return false;
+      if (!when.days.includes(day)) return false;
     }
     return true;
   }

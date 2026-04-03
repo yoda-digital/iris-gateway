@@ -80,4 +80,68 @@ describe("TemplateEngine", () => {
     expect(engine.match(msg("hi"))).not.toBeNull();
     expect(engine.match(msg("hi"))).toBeNull();
   });
+
+  describe("schedule trigger with timezone", () => {
+    it("uses server local time when no timezone specified", () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentDay = now.getDay();
+
+      const engine = new TemplateEngine([
+        {
+          id: "sched",
+          trigger: {
+            type: "schedule",
+            when: { hours: [currentHour, currentHour + 1], days: [currentDay] },
+          },
+          response: "Scheduled!",
+        },
+      ]);
+      expect(engine.match(msg("anything"))).not.toBeNull();
+    });
+
+    it("uses timezone-aware hour when timezone is specified", () => {
+      // UTC+0 timezone — get the expected hour from Intl
+      const now = new Date();
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: "UTC",
+        hour: "numeric",
+        hour12: false,
+      });
+      const parts = fmt.formatToParts(now);
+      const utcHour = parseInt(parts.find((p) => p.type === "hour")!.value, 10);
+
+      const engine = new TemplateEngine([
+        {
+          id: "utc-sched",
+          trigger: {
+            type: "schedule",
+            when: { hours: [utcHour, utcHour + 1], timezone: "UTC" },
+          },
+          response: "UTC time match!",
+        },
+      ]);
+      expect(engine.match(msg("test"))).not.toBeNull();
+    });
+
+    it("falls back to local time for invalid timezone string", () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+
+      const engine = new TemplateEngine([
+        {
+          id: "bad-tz",
+          trigger: {
+            type: "schedule",
+            when: { hours: [currentHour, currentHour + 1], timezone: "Invalid/Timezone_ZZZ" },
+          },
+          response: "Fallback!",
+        },
+      ]);
+      // Should not throw, should fall back to local time
+      expect(() => engine.match(msg("test"))).not.toThrow();
+      // local time should match
+      expect(engine.match(msg("test"))).not.toBeNull();
+    });
+  });
 });

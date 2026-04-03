@@ -61,6 +61,10 @@ function makeBaseDeps(channelsConfig: Record<string, { type: string; enabled: bo
     approvePermission: vi.fn().mockResolvedValue(undefined),
   };
 
+  const sessionMap = {
+    findBySessionId: vi.fn().mockResolvedValue(null),
+  };
+
   return {
     config: { channels: channelsConfig } as any,
     logger,
@@ -70,6 +74,7 @@ function makeBaseDeps(channelsConfig: Record<string, { type: string; enabled: bo
     vaultStore: vaultStore as any,
     router: router as any,
     bridge: bridge as any,
+    sessionMap: sessionMap as any,
     activityTracker: null,
     inferenceEngine: null,
     outcomeAnalyzer: null,

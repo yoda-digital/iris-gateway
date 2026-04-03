@@ -151,6 +151,21 @@ describe("auto-approve logic", () => {
     }
   });
 
+  it("does NOT auto-approve read_credentials (not in allowlist despite read prefix)", async () => {
+    const { tempDir, bridge, router } = makeEnv();
+    try {
+      const eventHandler = router.getEventHandler();
+      const perm: Permission = { id: "p-cred", sessionID: "s-cred", type: "read_credentials", title: "Read creds" };
+      eventHandler.events.emit("permissionRequest", "s-cred", perm);
+      await new Promise(r => setTimeout(r, 20));
+      // No pending context → auto-deny (it is NOT in the allowlist)
+      expect(bridge.approvePermissionSpy).toHaveBeenCalledWith("s-cred", "p-cred", "reject");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
   it("does NOT auto-approve write_file (non-read/list/search)", async () => {
     const { tempDir, bridge, router } = makeEnv();
     try {
@@ -238,6 +253,28 @@ describe("handlePermissionRequest — inline buttons path", () => {
       expect(params.buttons).toBeDefined();
       expect(params.buttons.length).toBeGreaterThan(0);
       expect(params.parseMode).toBe("Markdown");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+});
+
+describe("handlePermissionRequest — adapter not found (silent hang prevention)", () => {
+  it("auto-denies when pending context exists but adapter is missing from registry", async () => {
+    const { tempDir, bridge, router } = makeEnv();
+    try {
+      const turnGrouper = router.getTurnGrouper();
+      // Register a pending context for a channel that is NOT in the registry
+      turnGrouper.set("session-no-adapter", { channelId: "nonexistent-channel", chatId: "chat-1", replyToId: "msg-1" });
+
+      const eventHandler = router.getEventHandler();
+      const perm: Permission = { id: "hang-perm", sessionID: "session-no-adapter", type: "write_file", title: "Write file" };
+      eventHandler.events.emit("permissionRequest", "session-no-adapter", perm);
+      await new Promise(r => setTimeout(r, 30));
+
+      // Should auto-deny to prevent the AI turn from hanging permanently
+      expect(bridge.approvePermissionSpy).toHaveBeenCalledWith("session-no-adapter", "hang-perm", "reject");
     } finally {
       router.dispose();
       cleanup(tempDir);

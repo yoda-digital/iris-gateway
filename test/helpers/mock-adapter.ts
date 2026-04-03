@@ -37,6 +37,7 @@ export class MockAdapter implements ChannelAdapter {
       delete: false,
       reply: true,
       thread: false,
+      inlineButtons: false,
       maxTextLength: 4096,
     };
   }

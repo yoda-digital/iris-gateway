@@ -85,13 +85,13 @@ export class TelegramAdapter implements ChannelAdapter {
   private bot: Bot | null = null;
   private botUserId: string | null = null;
   private messageCache: MessageCache | null = null;
-  private permissionApprover: ((sessionId: string, permissionId: string, response: "once" | "reject") => Promise<void>) | null = null;
+  private permissionApprover: ((sessionId: string, permissionId: string, response: "once" | "reject", senderId?: string) => Promise<void>) | null = null;
 
   setMessageCache(cache: MessageCache): void {
     this.messageCache = cache;
   }
 
-  setPermissionApprover(fn: (sessionId: string, permissionId: string, response: "once" | "reject") => Promise<void>): void {
+  setPermissionApprover(fn: (sessionId: string, permissionId: string, response: "once" | "reject", senderId?: string) => Promise<void>): void {
     this.permissionApprover = fn;
   }
 
@@ -107,20 +107,24 @@ export class TelegramAdapter implements ChannelAdapter {
       if (msg) this.events.emit("message", msg);
     });
 
-    // Handle inline button callbacks for permission approval (perm:once|always|reject:<sessionId>:<permId>)
+    // Handle inline button callbacks for permission approval (perm:once|reject:<sessionId>:<permId>)
     this.bot.on("callback_query:data", async (ctx) => {
       const data = ctx.callbackQuery.data ?? "";
       const permMatch = data.match(/^perm:(once|reject):([^:]+):(.+)$/);
       if (permMatch) {
         const [, action, sessionId, permissionId] = permMatch;
-        const response = action === "reject" ? "reject" : "once";
+        const response: "once" | "reject" = action === "reject" ? "reject" : "once";
+        // Pass the Telegram sender ID so the approver can validate session ownership
+        const senderId = String(ctx.callbackQuery.from.id);
         if (this.permissionApprover) {
           try {
-            await this.permissionApprover(sessionId, permissionId, response as "once" | "reject");
+            await this.permissionApprover(sessionId, permissionId, response, senderId);
             await ctx.answerCallbackQuery({ text: action === "reject" ? "Permission denied." : "Permission granted." });
             await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
           } catch (err) {
             await ctx.answerCallbackQuery({ text: "Failed to process permission." });
+            // Strip buttons on error to prevent non-functional keyboard from lingering
+            await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
           }
         } else {
           await ctx.answerCallbackQuery({ text: "No permission handler registered." });

@@ -292,7 +292,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
 
   // 12. Channel adapters
   await startChannelAdapters({
-    config, logger, registry, messageCache, canvasServer, vaultStore, router, bridge,
+    config, logger, registry, messageCache, canvasServer, vaultStore, router, bridge, sessionMap,
     activityTracker, inferenceEngine, outcomeAnalyzer, arcDetector, profileEnricher,
     signalStore,
     pluginRegistry, abortController,

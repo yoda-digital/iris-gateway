@@ -1,3 +1,9 @@
+## [1.15.13](https://github.com/yoda-digital/iris-gateway/compare/v1.15.12...v1.15.13) (2026-04-03)
+
+### Bug Fixes
+
+* [#333](https://github.com/yoda-digital/iris-gateway/issues/333) — add branch coverage for non-Error session.error payload ([#336](https://github.com/yoda-digital/iris-gateway/issues/336)) ([0001340](https://github.com/yoda-digital/iris-gateway/commit/0001340a01e7d83ce4a0300039b4ce9cb68d0adc))
+
 ## [1.15.12](https://github.com/yoda-digital/iris-gateway/compare/v1.15.11...v1.15.12) (2026-04-03)
 
 ### Bug Fixes

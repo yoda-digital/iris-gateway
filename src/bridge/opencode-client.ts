@@ -420,10 +420,13 @@ export class OpenCodeBridge {
 
   async approvePermission(sessionId: string, permissionId: string, verdict: "once" | "reject"): Promise<void> {
     const url = `${this.getBaseUrl()}/session/${sessionId}/permission/${permissionId}/respond`;
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ verdict }),
     });
+    if (!res.ok) {
+      throw new Error(`approvePermission failed: ${res.status} ${res.statusText}`);
+    }
   }
 }

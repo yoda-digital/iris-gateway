@@ -353,12 +353,18 @@ export class MessageRouter {
   }
 
   private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
+    // Policy is the structural ceiling — check before any auto-approve logic
+    if (this.policyEngine?.isPermissionDenied(permission.type)) {
+      await this.bridge.approvePermission(sessionId, permission.id, "reject");
+      return;
+    }
+
     if (this.isAutoApproved(permission.type)) {
       await this.bridge.approvePermission(sessionId, permission.id, "once");
       return;
     }
 
-    if (this.isAutoDenied(permission.type) || this.policyEngine?.isPermissionDenied(permission.type)) {
+    if (this.isAutoDenied(permission.type)) {
       await this.bridge.approvePermission(sessionId, permission.id, "reject");
       return;
     }
@@ -370,6 +376,8 @@ export class MessageRouter {
         const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
         await adapter.sendText({ to: pending.chatId, text: msg });
       }
+      // No response handler implemented — reject to prevent session deadlock
+      await this.bridge.approvePermission(sessionId, permission.id, "reject");
       return;
     }
 

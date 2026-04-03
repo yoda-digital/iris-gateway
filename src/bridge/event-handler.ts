@@ -50,7 +50,7 @@ export class EventHandler {
   private readonly accumulator = new Map<string, { textChunks: string[]; reasoningChunks: string[]; updatedAt: number; delivered: boolean }>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(_logger?: unknown) {
+  constructor() {
     this.cleanupTimer = setInterval(() => this.pruneStale(), ACCUMULATOR_CLEANUP_INTERVAL_MS);
     this.cleanupTimer.unref();
   }

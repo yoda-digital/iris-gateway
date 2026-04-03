@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { EventHandler } from "../../src/bridge/event-handler.js";
 import type { Permission } from "../../src/bridge/opencode-client.js";
 import type { OpenCodeBridge } from "../../src/bridge/opencode-client.js";
@@ -158,10 +158,23 @@ describe("Permission handler — isAutoDenied", () => {
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
   });
+
+  it("policy deny overrides auto-approve — policy is the structural ceiling", async () => {
+    const bridge = makeBridge();
+    // policyEngine denies 'read' type — must win over isAutoApproved
+    const policy = makePolicyEngine(true);
+    const router = makeRouter(bridge, makeRegistry(), policy);
+
+    emitPermission(router, "sess-1", makePermission("read_files"));
+    await new Promise((r) => setImmediate(r));
+
+    // Should be rejected, NOT approved, even though read_files matches isAutoApproved
+    expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
+  });
 });
 
 describe("Permission handler — user routing", () => {
-  it("routes unknown permissions to user when there is a pending context", async () => {
+  it("routes unknown permissions to user when there is a pending context, then rejects to prevent deadlock", async () => {
     const bridge = makeBridge();
     const sendText = vi.fn().mockResolvedValue(undefined);
     const registry = makeRegistry(sendText);
@@ -174,12 +187,12 @@ describe("Permission handler — user routing", () => {
     emitPermission(router, "sess-1", makePermission("file_write"));
     await new Promise((r) => setImmediate(r));
 
-    // Should NOT auto-approve or auto-deny
-    expect(bridge.approvePermission).not.toHaveBeenCalled();
     // Should notify the user via adapter
     expect(sendText).toHaveBeenCalled();
     const callArg = sendText.mock.calls[0][0] as { text: string };
     expect(callArg.text).toContain("permission");
+    // Must also reject to prevent OpenCode session deadlock (no response handler implemented)
+    expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
   });
 
   it("auto-denies unknown permissions when no pending context", async () => {
@@ -197,7 +210,7 @@ describe("Permission handler — user routing", () => {
 describe("Permission handler — event-handler wiring", () => {
   it("emits permissionRequest for permission.updated events with valid sessionID and id", () => {
     const onPermissionRequest = vi.fn();
-    const handler = new EventHandler(makeLogger());
+    const handler = new EventHandler();
     handler.events.on("permissionRequest", onPermissionRequest);
 
     handler.handleEvent({
@@ -215,7 +228,7 @@ describe("Permission handler — event-handler wiring", () => {
 
   it("ignores permission.updated events missing sessionID or id", () => {
     const onPermissionRequest = vi.fn();
-    const handler = new EventHandler(makeLogger());
+    const handler = new EventHandler();
     handler.events.on("permissionRequest", onPermissionRequest);
 
     handler.handleEvent({ type: "permission.updated", properties: { type: "file_write" } } as unknown as import("../../src/bridge/opencode-client.js").OpenCodeEvent);

@@ -449,6 +449,48 @@ describe("MessageRouter — event handler paths", () => {
     }
   });
 
+  it("'error' event with non-Error string payload uses fallback message", async () => {
+    const { tempDir, router, adapter } = makeEnv();
+    try {
+      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
+      pr.set("test-session", { channelId: "mock", chatId: "c1", replyToId: "r1", createdAt: Date.now() });
+
+      const eh = router.getEventHandler();
+      (eh.events as any).emit("error", "test-session", "stream closed");
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c1");
+      expect(sendCall).toBeDefined();
+      const sentText = (sendCall?.args[0] as any)?.text as string;
+      expect(sentText).toContain("An unexpected error occurred");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
+  it("'error' event with null payload uses fallback message", async () => {
+    const { tempDir, router, adapter } = makeEnv();
+    try {
+      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
+      pr.set("test-session-2", { channelId: "mock", chatId: "c2", replyToId: "r2", createdAt: Date.now() });
+
+      const eh = router.getEventHandler();
+      (eh.events as any).emit("error", "test-session-2", null);
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c2");
+      expect(sendCall).toBeDefined();
+      const sentText = (sendCall?.args[0] as any)?.text as string;
+      expect(sentText).toContain("An unexpected error occurred");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
   it("'response' event via handleResponse logs warning for unknown session", () => {
     const { tempDir, router } = makeEnv();
     try {

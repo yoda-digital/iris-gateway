@@ -295,7 +295,7 @@ describe("OpenCodeBridge", () => {
 
     beforeEach(() => {
       bridge = new OpenCodeBridge(makeConfig(), makeLogger());
-      fetchSpy = vi.fn().mockResolvedValue({ status: 200 });
+      fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve("") });
       vi.stubGlobal("fetch", fetchSpy);
     });
 

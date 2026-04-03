@@ -1,3 +1,9 @@
+## [1.15.16](https://github.com/yoda-digital/iris-gateway/compare/v1.15.15...v1.15.16) (2026-04-03)
+
+### Bug Fixes
+
+* [#269](https://github.com/yoda-digital/iris-gateway/issues/269) — respect timezone in ScheduleCondition.scheduleActive() ([#318](https://github.com/yoda-digital/iris-gateway/issues/318)) ([55492a7](https://github.com/yoda-digital/iris-gateway/commit/55492a704dbcc5eea70550a176f3db4805208404))
+
 ## [1.15.15](https://github.com/yoda-digital/iris-gateway/compare/v1.15.14...v1.15.15) (2026-04-03)
 
 ### Bug Fixes

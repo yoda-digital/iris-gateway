@@ -53,6 +53,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { syncModelsToOpenCode } from "../config/model-sync.js";
 import { waitForOpenCodeReady } from "./readiness.js";
 import { printStartupSummary } from "./startup-summary.js";
+import { CompactionNotifier } from "../bridge/compaction-notifier.js";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -240,7 +241,10 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   }
 
   // 8. Message router
-  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, profileEnricher, vaultStore, policyEngine);
+  const compactionNotifier = (goalLifecycle && arcLifecycle)
+    ? new CompactionNotifier(goalLifecycle, arcLifecycle, registry, logger, config.opencode.notifyOnCompaction ?? true)
+    : null;
+  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, profileEnricher, vaultStore, policyEngine, compactionNotifier);
 
   // 8.5 Canvas server
   let canvasServer: CanvasServer | null = null;

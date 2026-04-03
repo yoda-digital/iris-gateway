@@ -364,3 +364,27 @@ describe("EventHandler", () => {
     expect(onPerm).not.toHaveBeenCalled();
   });
 });
+
+describe("EventHandler — session.compacted", () => {
+  it("emits compacted event with sessionId", () => {
+    const handler = new EventHandler();
+    const onCompacted = vi.fn();
+    handler.events.on("compacted", onCompacted);
+
+    handler.handleEvent(makeEvent("session.compacted", { sessionID: "s1" }));
+
+    expect(onCompacted).toHaveBeenCalledWith("s1");
+    handler.dispose();
+  });
+
+  it("ignores session.compacted without sessionID", () => {
+    const handler = new EventHandler();
+    const onCompacted = vi.fn();
+    handler.events.on("compacted", onCompacted);
+
+    handler.handleEvent(makeEvent("session.compacted", {}));
+
+    expect(onCompacted).not.toHaveBeenCalled();
+    handler.dispose();
+  });
+});

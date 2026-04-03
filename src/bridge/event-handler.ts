@@ -7,6 +7,7 @@ export interface EventHandlerEvents {
   error: (sessionId: string, error: unknown) => void;
   toolCall: (sessionId: string, toolName: string, input: unknown) => void;
   permissionRequest: (sessionId: string, permission: Permission) => void;
+  compacted: (sessionId: string) => void;
 }
 
 const ACCUMULATOR_TTL_MS = 5 * 60_000; // 5 minutes
@@ -136,6 +137,13 @@ export class EventHandler {
       case "permission.updated": {
         if (!isPermission(props)) break;
         this.events.emit("permissionRequest", props.sessionID, props);
+        break;
+      }
+
+      case "session.compacted": {
+        const sessionId = typeof props.sessionID === "string" ? props.sessionID : undefined;
+        if (!sessionId) break;
+        this.events.emit("compacted", sessionId);
         break;
       }
 

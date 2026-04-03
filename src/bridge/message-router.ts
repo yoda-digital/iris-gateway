@@ -14,6 +14,7 @@ import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
+import type { CompactionNotifier } from "./compaction-notifier.js";
 
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
@@ -32,6 +33,7 @@ export class MessageRouter {
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
     private readonly policyEngine?: PolicyEngine | null,
+    private readonly compactionNotifier?: CompactionNotifier | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -71,6 +73,10 @@ export class MessageRouter {
 
     this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
       void this.handlePermissionRequest(sessionId, permission);
+    });
+
+    this.eventHandler.events.on("compacted", (sessionId) => {
+      void this.handleCompacted(sessionId);
     });
 
     this.outboundQueue = new MessageQueue(logger);
@@ -346,6 +352,18 @@ export class MessageRouter {
     log.info("Auto-denying unrecognised permission type");
     await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
       log.error({ err }, "Failed to deny permission");
+    });
+  }
+
+  private async handleCompacted(sessionId: string): Promise<void> {
+    if (!this.compactionNotifier) return;
+    const pending = this.turnGrouper.get(sessionId);
+    if (!pending) {
+      this.logger.debug({ sessionId }, "Compaction event: no pending turn, skipping notification");
+      return;
+    }
+    await this.compactionNotifier.notify(pending.chatId, pending.channelId).catch((err) => {
+      this.logger.error({ err, sessionId }, "Failed to send compaction notification");
     });
   }
 

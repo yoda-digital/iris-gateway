@@ -66,6 +66,7 @@ interface EnvOptions {
   withAdapter?: boolean;
   dmPolicy?: "open" | "disabled" | "allowlist" | "pairing";
   channelConfigs?: Record<string, any>;
+  opencodeConfig?: import("../../src/config/types.js").OpenCodeConfig | null;
   templateEngine?: TemplateEngine | null;
   profileEnricher?: { isFirstContact(profile: any): boolean } | null;
   vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null;
@@ -104,6 +105,7 @@ function makeEnv(opts: EnvOptions = {}) {
     registry,
     logger,
     opts.channelConfigs ?? {},
+    opts.opencodeConfig ?? null,
     opts.templateEngine,
     opts.profileEnricher,
     opts.vaultStoreRef,

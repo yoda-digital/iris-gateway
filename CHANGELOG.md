@@ -1,3 +1,10 @@
+## [1.15.12](https://github.com/yoda-digital/iris-gateway/compare/v1.15.11...v1.15.12) (2026-04-03)
+
+### Bug Fixes
+
+* [#269](https://github.com/yoda-digital/iris-gateway/issues/269) — respect timezone in ScheduleCondition.scheduleActive() ([#316](https://github.com/yoda-digital/iris-gateway/issues/316)) ([e6bdf84](https://github.com/yoda-digital/iris-gateway/commit/e6bdf842440e4fcc06d6c01a9143a203df828f46))
+* [#277](https://github.com/yoda-digital/iris-gateway/issues/277) — replace static IRIS_TOOL_CATALOG with live tool discovery via client.tool.ids() ([#308](https://github.com/yoda-digital/iris-gateway/issues/308)) ([789fdc8](https://github.com/yoda-digital/iris-gateway/commit/789fdc8df1852d5365637325d7202ab3314a6fdc))
+
 ## [1.15.11](https://github.com/yoda-digital/iris-gateway/compare/v1.15.10...v1.15.11) (2026-04-01)
 
 ### Bug Fixes

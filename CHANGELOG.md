@@ -1,3 +1,11 @@
+## [1.15.19](https://github.com/yoda-digital/iris-gateway/compare/v1.15.18...v1.15.19) (2026-04-04)
+
+### Bug Fixes
+
+* [#274](https://github.com/yoda-digital/iris-gateway/issues/274) — unit tests for permission handler (auto-approve/deny, user routing, event wiring) ([#307](https://github.com/yoda-digital/iris-gateway/issues/307)) ([61b9f8f](https://github.com/yoda-digital/iris-gateway/commit/61b9f8f497d5a8189dda4e100709a5017f8336c2))
+* **message-router:** remove duplicate policyEngine param + duplicate method impls ([#350](https://github.com/yoda-digital/iris-gateway/issues/350)) ([0fa4f9b](https://github.com/yoda-digital/iris-gateway/commit/0fa4f9b7c2a9da07720658546d62bb123dbaf871)), closes [#349](https://github.com/yoda-digital/iris-gateway/issues/349)
+* remove duplicate Permission import from SDK in opencode-client.ts ([43fbeb2](https://github.com/yoda-digital/iris-gateway/commit/43fbeb287774e885f0e8947d9bf9f738372fcad2))
+
 ## [1.15.18](https://github.com/yoda-digital/iris-gateway/compare/v1.15.17...v1.15.18) (2026-04-04)
 
 ### Bug Fixes

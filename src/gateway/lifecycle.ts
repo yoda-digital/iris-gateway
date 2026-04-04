@@ -240,7 +240,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   }
 
   // 8. Message router
-  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, policyEngine, profileEnricher, vaultStore);
+  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, profileEnricher, vaultStore, policyEngine);
 
   // 8.5 Canvas server
   let canvasServer: CanvasServer | null = null;

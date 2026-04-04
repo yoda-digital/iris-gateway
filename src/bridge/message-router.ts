@@ -29,7 +29,6 @@ export class MessageRouter {
     private readonly logger: Logger,
     private readonly channelConfigs: Record<string, ChannelAccountConfig> = {},
     private readonly templateEngine?: TemplateEngine | null,
-    private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
     private readonly policyEngine?: PolicyEngine | null,
@@ -75,9 +74,6 @@ export class MessageRouter {
       });
     });
 
-    this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
-      void this.handlePermissionRequest(sessionId, permission);
-    });
     this.eventHandler.events.on("sessionCompacted", (sessionId) => {
       this.logger.info({ sessionId }, "Session context compacted by OpenCode");
       const pending = this.turnGrouper.get(sessionId);
@@ -344,63 +340,21 @@ export class MessageRouter {
     return "chat";
   }
 
-  private isAutoApproved(type: string): boolean {
-    return /^(read|list|search)/i.test(type) || /_(read|list|search)$/i.test(type);
+  private isAutoApproved(permission: Permission): boolean {
+    const readOnlyTypes = ["read", "list", "search", "stat"];
+    return readOnlyTypes.some((t) => permission.type === t);
   }
 
-  private isAutoDenied(type: string): boolean {
-    return /^(bash|edit)$/i.test(type);
+  private isAutoDenied(permission: Permission): boolean {
+    // "bash" and "edit" are dangerous regardless of policy config; deny them
+    // when no policyEngine is present. When policyEngine is present, it is
+    // the authoritative source and covers all permission types including these.
+    if (this.policyEngine) {
+      return this.policyEngine.isPermissionDenied(permission.type);
+    }
+    const blockedTypes = ["bash", "edit"];
+    return blockedTypes.some((t) => permission.type === t);
   }
-
-  private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
-    // Policy is the structural ceiling — check before any auto-approve logic
-    if (this.policyEngine?.isPermissionDenied(permission.type)) {
-      await this.bridge.approvePermission(sessionId, permission.id, "reject");
-      return;
-    }
-
-    if (this.isAutoApproved(permission.type)) {
-      await this.bridge.approvePermission(sessionId, permission.id, "once");
-      return;
-    }
-
-    if (this.isAutoDenied(permission.type)) {
-      await this.bridge.approvePermission(sessionId, permission.id, "reject");
-      return;
-    }
-
-    const pending = this.turnGrouper.get(sessionId);
-    if (pending) {
-      const adapter = this.registry.get(pending.channelId);
-      try {
-        if (adapter) {
-          const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
-          await adapter.sendText({ to: pending.chatId, text: msg });
-        }
-      } finally {
-        // No response handler implemented — reject to prevent session deadlock.
-        // Using finally ensures approvePermission is always called even if sendText throws.
-        await this.bridge.approvePermission(sessionId, permission.id, "reject");
-      }
-      return;
-    }
-
-    await this.bridge.approvePermission(sessionId, permission.id, "reject");
-  }
-
-  private handleResponse(sessionId: string, text: string): void {
-    const pending = this.turnGrouper.get(sessionId);
-    if (!pending) {
-      this.logger.warn({ sessionId }, "No pending response context");
-      return;
-    }
-    this.turnGrouper.delete(sessionId);
-    this.sendResponse(pending.channelId, pending.chatId, text, pending.replyToId).catch((err) => {
-      this.logger.error({ err, sessionId }, "Failed to send response");
-    });
-  }
-
-  // ── Permission handling ──
 
   private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
     const log = this.logger.child({ sessionId, permissionId: permission.id, permissionType: permission.type });
@@ -430,20 +384,16 @@ export class MessageRouter {
     });
   }
 
-  private isAutoApproved(permission: Permission): boolean {
-    const readOnlyTypes = ["read", "list", "search", "stat"];
-    return readOnlyTypes.some((t) => permission.type === t);
-  }
-
-  private isAutoDenied(permission: Permission): boolean {
-    // "bash" and "edit" are dangerous regardless of policy config; deny them
-    // when no policyEngine is present. When policyEngine is present, it is
-    // the authoritative source and covers all permission types including these.
-    if (this.policyEngine) {
-      return this.policyEngine.isPermissionDenied(permission.type);
+  private handleResponse(sessionId: string, text: string): void {
+    const pending = this.turnGrouper.get(sessionId);
+    if (!pending) {
+      this.logger.warn({ sessionId }, "No pending response context");
+      return;
     }
-    const blockedTypes = ["bash", "edit"];
-    return blockedTypes.some((t) => permission.type === t);
+    this.turnGrouper.delete(sessionId);
+    this.sendResponse(pending.channelId, pending.chatId, text, pending.replyToId).catch((err) => {
+      this.logger.error({ err, sessionId }, "Failed to send response");
+    });
   }
 
 }

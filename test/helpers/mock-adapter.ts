@@ -64,4 +64,8 @@ export class MockAdapter implements ChannelAdapter {
   async sendTyping(params: { to: string }): Promise<void> {
     this.calls.push({ method: "sendTyping", args: [params] });
   }
+
+  async editMessage(params: { messageId: string; text: string; chatId?: string }): Promise<void> {
+    this.calls.push({ method: "editMessage", args: [params] });
+  }
 }

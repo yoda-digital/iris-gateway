@@ -32,7 +32,7 @@ describe("sendText", () => {
     expect(bot.api.sendMessage).toHaveBeenCalledWith("123", "Hello world", {
       reply_parameters: undefined,
       reply_markup: undefined,
-      parse_mode: "Markdown",
+      parse_mode: undefined,
     });
     expect(result).toEqual({ messageId: "42" });
   });
@@ -42,6 +42,16 @@ describe("sendText", () => {
     await sendText(bot, "123", "Reply text", "99");
     expect(bot.api.sendMessage).toHaveBeenCalledWith("123", "Reply text", {
       reply_parameters: { message_id: 99 },
+      reply_markup: undefined,
+      parse_mode: undefined,
+    });
+  });
+
+  it("passes parse_mode when explicitly provided", async () => {
+    const bot = mockBot();
+    await sendText(bot, "123", "*bold*", undefined, undefined, "Markdown");
+    expect(bot.api.sendMessage).toHaveBeenCalledWith("123", "*bold*", {
+      reply_parameters: undefined,
       reply_markup: undefined,
       parse_mode: "Markdown",
     });

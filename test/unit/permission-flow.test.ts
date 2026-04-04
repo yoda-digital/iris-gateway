@@ -479,4 +479,51 @@ describe("EventHandler — permission.updated event", () => {
 
     expect(onPermission).not.toHaveBeenCalled();
   });
+
+  it("does not emit permissionRequest when metadata.status is not pending", () => {
+    handler = new EventHandler();
+    const onPermission = vi.fn();
+    handler.events.on("permissionRequest", onPermission);
+
+    const event: OpenCodeEvent = {
+      type: "permission.updated",
+      properties: {
+        sessionID: "sess-abc",
+        id: "perm-xyz",
+        type: "write_file",
+        title: "Write file",
+        metadata: { status: "approved" },
+      },
+    } as unknown as OpenCodeEvent;
+
+    handler.handleEvent(event);
+
+    expect(onPermission).not.toHaveBeenCalled();
+  });
+
+  it("emits permissionRequest when metadata.status is pending", () => {
+    handler = new EventHandler();
+    const onPermission = vi.fn();
+    handler.events.on("permissionRequest", onPermission);
+
+    const event: OpenCodeEvent = {
+      type: "permission.updated",
+      properties: {
+        sessionID: "sess-abc",
+        id: "perm-xyz",
+        type: "write_file",
+        title: "Write file",
+        metadata: { status: "pending" },
+      },
+    } as unknown as OpenCodeEvent;
+
+    handler.handleEvent(event);
+
+    expect(onPermission).toHaveBeenCalledWith("sess-abc", {
+      id: "perm-xyz",
+      sessionID: "sess-abc",
+      type: "write_file",
+      title: "Write file",
+    });
+  });
 });

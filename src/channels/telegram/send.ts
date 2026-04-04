@@ -8,7 +8,7 @@ export async function sendText(
   text: string,
   replyToId?: string,
   buttons?: readonly (readonly { text: string; callbackData: string }[])[],
-  parseMode: "Markdown" | "HTML" = "Markdown",
+  parseMode?: "Markdown" | "HTML",
 ): Promise<{ messageId: string }> {
   const replyMarkup = buttons && buttons.length > 0
     ? {

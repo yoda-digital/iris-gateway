@@ -1,3 +1,9 @@
+## [1.15.18](https://github.com/yoda-digital/iris-gateway/compare/v1.15.17...v1.15.18) (2026-04-04)
+
+### Bug Fixes
+
+* [#282](https://github.com/yoda-digital/iris-gateway/issues/282) — handle session.compacted event to prevent silent context loss ([#319](https://github.com/yoda-digital/iris-gateway/issues/319)) ([fab0cc7](https://github.com/yoda-digital/iris-gateway/commit/fab0cc78a4ba8199185b729a41e2941625ccf97b))
+
 ## [1.15.17](https://github.com/yoda-digital/iris-gateway/compare/v1.15.16...v1.15.17) (2026-04-04)
 
 ### Bug Fixes

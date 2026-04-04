@@ -12,9 +12,9 @@ export class CompactionNotifier {
     private readonly enabled: boolean = true,
   ) {}
 
-  async notify(senderId: string, channelId: string): Promise<void> {
+  async notify(senderId: string, chatId: string, channelId: string): Promise<void> {
     if (!this.enabled) {
-      this.logger.debug({ senderId, channelId }, "Compaction notifier disabled");
+      this.logger.debug({ senderId, chatId, channelId }, "Compaction notifier disabled");
       return;
     }
 
@@ -33,10 +33,10 @@ export class CompactionNotifier {
     const message = `Context refreshed after compaction. Currently tracking: ${activeGoals} active goals, ${activeArcs} memory arcs.`;
 
     try {
-      await adapter.sendText({ to: channelId, text: message });
-      this.logger.info({ senderId, channelId, activeGoals, activeArcs }, "Compaction notification sent");
+      await adapter.sendText({ to: chatId, text: message });
+      this.logger.info({ senderId, chatId, channelId, activeGoals, activeArcs }, "Compaction notification sent");
     } catch (err) {
-      this.logger.error({ err, senderId, channelId }, "Failed to send compaction notification");
+      this.logger.error({ err, senderId, chatId, channelId }, "Failed to send compaction notification");
     }
   }
 

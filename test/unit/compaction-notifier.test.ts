@@ -57,14 +57,14 @@ describe("CompactionNotifier", () => {
       true,
     );
 
-    await notifier.notify("user123", "test-channel");
+    await notifier.notify("user123", "chat456", "test-channel");
 
     expect(mockAdapter.sendText).toHaveBeenCalledWith({
-      to: "test-channel",
+      to: "chat456",
       text: "Context refreshed after compaction. Currently tracking: 2 active goals, 1 memory arcs.",
     });
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { senderId: "user123", channelId: "test-channel", activeGoals: 2, activeArcs: 1 },
+      { senderId: "user123", chatId: "chat456", channelId: "test-channel", activeGoals: 2, activeArcs: 1 },
       "Compaction notification sent",
     );
   });
@@ -78,11 +78,11 @@ describe("CompactionNotifier", () => {
       false,
     );
 
-    await notifier.notify("user123", "test-channel");
+    await notifier.notify("user123", "chat456", "test-channel");
 
     expect(mockAdapter.sendText).not.toHaveBeenCalled();
     expect(mockLogger.debug).toHaveBeenCalledWith(
-      { senderId: "user123", channelId: "test-channel" },
+      { senderId: "user123", chatId: "chat456", channelId: "test-channel" },
       "Compaction notifier disabled",
     );
   });
@@ -100,10 +100,10 @@ describe("CompactionNotifier", () => {
       true,
     );
 
-    await notifier.notify("user123", "test-channel");
+    await notifier.notify("user123", "chat456", "test-channel");
 
     expect(mockAdapter.sendText).toHaveBeenCalledWith({
-      to: "test-channel",
+      to: "chat456",
       text: "Context refreshed after compaction. Currently tracking: 0 active goals, 0 memory arcs.",
     });
   });
@@ -119,7 +119,7 @@ describe("CompactionNotifier", () => {
       true,
     );
 
-    await notifier.notify("user123", "test-channel");
+    await notifier.notify("user123", "chat456", "test-channel");
 
     expect(mockAdapter.sendText).not.toHaveBeenCalled();
     expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -142,10 +142,10 @@ describe("CompactionNotifier", () => {
       true,
     );
 
-    await notifier.notify("user123", "test-channel");
+    await notifier.notify("user123", "chat456", "test-channel");
 
     expect(mockLogger.error).toHaveBeenCalledWith(
-      { err: expect.any(Error), senderId: "user123", channelId: "test-channel" },
+      { err: expect.any(Error), senderId: "user123", chatId: "chat456", channelId: "test-channel" },
       "Failed to send compaction notification",
     );
   });

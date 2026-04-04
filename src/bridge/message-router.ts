@@ -357,14 +357,12 @@ export class MessageRouter {
 
   private async handleCompacted(sessionId: string): Promise<void> {
     if (!this.compactionNotifier) return;
-    const pending = this.turnGrouper.get(sessionId);
-    if (!pending) {
-      this.logger.debug({ sessionId }, "Compaction event: no pending turn, skipping notification");
+    const entry = await this.sessionMap.findBySessionId(sessionId);
+    if (!entry) {
+      this.logger.debug({ sessionId }, "Compaction event: no session mapping found, skipping notification");
       return;
     }
-    await this.compactionNotifier.notify(pending.chatId, pending.channelId).catch((err) => {
-      this.logger.error({ err, sessionId }, "Failed to send compaction notification");
-    });
+    await this.compactionNotifier.notify(entry.senderId, entry.chatId, entry.channelId);
   }
 
   private isAutoApproved(permission: Permission): boolean {

@@ -242,7 +242,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
 
   // 8. Message router
   const compactionNotifier = (goalLifecycle && arcLifecycle)
-    ? new CompactionNotifier(goalLifecycle, arcLifecycle, registry, logger, config.opencode.notifyOnCompaction ?? true)
+    ? new CompactionNotifier(goalLifecycle, arcLifecycle, registry, logger, config.opencode.notifyOnCompaction)
     : null;
   const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, profileEnricher, vaultStore, policyEngine, compactionNotifier);
 

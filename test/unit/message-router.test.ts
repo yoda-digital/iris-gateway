@@ -306,11 +306,11 @@ describe("MessageRouter — isAutoApproved", () => {
     expect((router as any).isAutoApproved(makePermission("search"))).toBe(true);
   });
 
-  it("does NOT approve 'external_read' (no substring matching)", () => {
-    expect((router as any).isAutoApproved(makePermission("external_read"))).toBe(false);
+  it("approves 'external_read' (_read suffix matching)", () => {
+    expect((router as any).isAutoApproved(makePermission("external_read"))).toBe(true);
   });
 
-  it("does NOT approve 'bulk_search_egress' (no substring matching)", () => {
+  it("does NOT approve 'bulk_search_egress' (suffix must be _read/_list/_search)", () => {
     expect((router as any).isAutoApproved(makePermission("bulk_search_egress"))).toBe(false);
   });
 
@@ -377,7 +377,7 @@ describe("MessageRouter — isAutoDenied", () => {
     });
     const r = new MessageRouter(
       bridge as any, new SessionMap(td), securityGate, new ChannelRegistry(),
-      pino({ level: "silent" }), {}, null, null, null, policyEngine as any,
+      pino({ level: "silent" }), {}, null, policyEngine as any,
     );
     try {
       expect((r as any).isAutoDenied(makePermission("bash"))).toBe(true);

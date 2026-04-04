@@ -32,7 +32,6 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
-    private readonly policyEngine?: PolicyEngine | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -75,9 +74,6 @@ export class MessageRouter {
       });
     });
 
-    this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
-      void this.handlePermissionRequest(sessionId, permission);
-    });
     this.eventHandler.events.on("sessionCompacted", (sessionId) => {
       this.logger.info({ sessionId }, "Session context compacted by OpenCode");
       const pending = this.turnGrouper.get(sessionId);
@@ -344,12 +340,17 @@ export class MessageRouter {
     return "chat";
   }
 
-  private isAutoApproved(type: string): boolean {
-    return /^(read|list|search)/i.test(type) || /_(read|list|search)$/i.test(type);
+  private isAutoApproved(permission: Permission): boolean {
+    return /^(read|list|search)/i.test(permission.type) || /_(read|list|search)$/i.test(permission.type);
   }
 
-  private isAutoDenied(type: string): boolean {
-    return /^(bash|edit)$/i.test(type);
+  private isAutoDenied(permission: Permission): boolean {
+    // When policyEngine is present, it is the authoritative source.
+    if (this.policyEngine) {
+      return this.policyEngine.isPermissionDenied(permission.type);
+    }
+    const blockedTypes = ["bash", "edit"];
+    return blockedTypes.some((t) => permission.type === t);
   }
 
   private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
@@ -359,12 +360,12 @@ export class MessageRouter {
       return;
     }
 
-    if (this.isAutoApproved(permission.type)) {
+    if (this.isAutoApproved(permission)) {
       await this.bridge.approvePermission(sessionId, permission.id, "once");
       return;
     }
 
-    if (this.isAutoDenied(permission.type)) {
+    if (this.isAutoDenied(permission)) {
       await this.bridge.approvePermission(sessionId, permission.id, "reject");
       return;
     }
@@ -398,52 +399,6 @@ export class MessageRouter {
     this.sendResponse(pending.channelId, pending.chatId, text, pending.replyToId).catch((err) => {
       this.logger.error({ err, sessionId }, "Failed to send response");
     });
-  }
-
-  // ── Permission handling ──
-
-  private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
-    const log = this.logger.child({ sessionId, permissionId: permission.id, permissionType: permission.type });
-    log.info("Permission request received");
-
-    if (this.isAutoDenied(permission)) {
-      log.info("Auto-denying permission (policy or blocked type)");
-      await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
-        log.error({ err }, "Failed to auto-deny permission");
-      });
-      return;
-    }
-
-    if (this.isAutoApproved(permission)) {
-      log.info("Auto-approving permission (read-only / policy allowed)");
-      await this.bridge.approvePermission(sessionId, permission.id, "once").catch((err) => {
-        log.error({ err }, "Failed to auto-approve permission");
-      });
-      return;
-    }
-
-    // Unknown/sensitive permission type: deny by default.
-    // Interactive user approval (/perm command) is not yet implemented.
-    log.info("Auto-denying unrecognised permission type");
-    await this.bridge.approvePermission(sessionId, permission.id, "reject").catch((err) => {
-      log.error({ err }, "Failed to deny permission");
-    });
-  }
-
-  private isAutoApproved(permission: Permission): boolean {
-    const readOnlyTypes = ["read", "list", "search", "stat"];
-    return readOnlyTypes.some((t) => permission.type === t);
-  }
-
-  private isAutoDenied(permission: Permission): boolean {
-    // "bash" and "edit" are dangerous regardless of policy config; deny them
-    // when no policyEngine is present. When policyEngine is present, it is
-    // the authoritative source and covers all permission types including these.
-    if (this.policyEngine) {
-      return this.policyEngine.isPermissionDenied(permission.type);
-    }
-    const blockedTypes = ["bash", "edit"];
-    return blockedTypes.some((t) => permission.type === t);
   }
 
 }

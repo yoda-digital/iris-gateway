@@ -1,3 +1,9 @@
+## [1.15.17](https://github.com/yoda-digital/iris-gateway/compare/v1.15.16...v1.15.17) (2026-04-04)
+
+### Bug Fixes
+
+* [#338](https://github.com/yoda-digital/iris-gateway/issues/338) — notify user on empty sendAndWait response ([#343](https://github.com/yoda-digital/iris-gateway/issues/343)) ([67698da](https://github.com/yoda-digital/iris-gateway/commit/67698dadef0567f6f56ff9a850623579aaf0fe3c))
+
 ## [1.15.16](https://github.com/yoda-digital/iris-gateway/compare/v1.15.15...v1.15.16) (2026-04-03)
 
 ### Bug Fixes

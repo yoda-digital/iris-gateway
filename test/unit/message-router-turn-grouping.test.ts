@@ -145,7 +145,7 @@ describe("MessageRouter — idle window flush and error recovery edge paths", ()
     }
   });
 
-  it("when bridge returns empty string, no text is delivered to the channel", async () => {
+  it("when bridge returns empty string, a fallback message is delivered to the channel", async () => {
     const { router, adapter, bridge, tempDir } = makeEnv();
     try {
       bridge.responseText = "";
@@ -155,7 +155,8 @@ describe("MessageRouter — idle window flush and error recovery edge paths", ()
       await vi.advanceTimersByTimeAsync(500);
 
       const sends = adapter.calls.filter(c => c.method === "sendText");
-      expect(sends.length).toBe(0);
+      expect(sends.length).toBe(1);
+      expect(sends[0].args[0].text).toContain("No response received");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

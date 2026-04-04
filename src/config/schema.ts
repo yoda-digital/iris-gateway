@@ -29,6 +29,10 @@ const channelAccountSchema = z.object({
   mentionPattern: z.string().optional(),
   maxTextLength: z.number().positive().optional(),
   streaming: streamingSchema.optional(),
+  model: z.object({
+    providerID: z.string(),
+    modelID: z.string(),
+  }).optional(),
 });
 
 const gatewaySchema = z.object({

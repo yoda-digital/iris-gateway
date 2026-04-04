@@ -505,13 +505,13 @@ describe("OpenCodeBridge", () => {
 
     it("includes model in prompt body when set", async () => {
       fetchSpy.mockResolvedValue({ status: 200 });
-      const options = { model: { providerID: "anthropic", modelID: "claude-3-5-sonnet" } };
+      const options = { model: { providerID: "openrouter", modelID: "openai/gpt-oss-120b:free" } };
       const promise = (bridge as any)._sendAndWaitInternal("s1", "hi", 500, 100, options);
       await vi.advanceTimersByTimeAsync(600);
       await promise;
 
       const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
-      expect(callBody.model).toEqual({ providerID: "anthropic", modelID: "claude-3-5-sonnet" });
+      expect(callBody.model).toEqual({ providerID: "openrouter", modelID: "openai/gpt-oss-120b:free" });
     });
 
     it("includes system in prompt body when set", async () => {
@@ -573,7 +573,7 @@ describe("OpenCodeBridge", () => {
       fetchSpy.mockResolvedValue({ status: 200 });
       const options = {
         agent: "translator",
-        model: { providerID: "openai", modelID: "gpt-4" },
+        model: { providerID: "openrouter", modelID: "qwen/qwen3-coder:free" },
         system: "Translate to French",
         tools: { bash: false },
         noReply: true,
@@ -585,7 +585,7 @@ describe("OpenCodeBridge", () => {
       const callBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(callBody).toEqual({
         agent: "translator",
-        model: { providerID: "openai", modelID: "gpt-4" },
+        model: { providerID: "openrouter", modelID: "qwen/qwen3-coder:free" },
         system: "Translate to French",
         tools: { bash: false },
         noReply: true,

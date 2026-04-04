@@ -6,7 +6,6 @@ import {
   type Event as OpenCodeEvent,
   type Part,
   type TextPart,
-  type Permission,
 } from "@opencode-ai/sdk";
 import type { OpenCodeConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
@@ -15,7 +14,7 @@ import { BridgeSupervisor, type SupervisorOptions } from "./supervisor.js";
 export { CircuitBreaker };
 export type { CircuitState } from "./circuit-breaker.js";
 
-export type { OpenCodeEvent, Part, TextPart, SupervisorOptions, Permission };
+export type { OpenCodeEvent, Part, TextPart, SupervisorOptions };
 
 export interface SessionInfo {
   readonly id: string;
@@ -418,13 +417,4 @@ export class OpenCodeBridge {
     });
   }
 
-  async approvePermission(sessionId: string, permissionId: string, verdict: "once" | "reject"): Promise<void> {
-    // Use the typed SDK client method (postSessionIdPermissionsPermissionId) rather than raw fetch,
-    // consistent with how all other write operations in this class use this.getClient().
-    await this.getClient().postSessionIdPermissionsPermissionId({
-      path: { id: sessionId, permissionID: permissionId },
-      body: { response: verdict },
-      throwOnError: true,
-    });
-  }
 }

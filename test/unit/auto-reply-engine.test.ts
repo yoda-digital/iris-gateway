@@ -65,6 +65,30 @@ describe("TemplateEngine", () => {
     expect(engine.match(msg("hi", { channelId: "discord" }))).toBeNull();
   });
 
+  it("respects chatType filter — dm only", () => {
+    const engine = new TemplateEngine([
+      { id: "dm-only", trigger: { type: "exact", pattern: "hi" }, response: "DM!", chatTypes: ["dm"] },
+    ]);
+    expect(engine.match(msg("hi", { chatType: "dm" }))).not.toBeNull();
+    expect(engine.match(msg("hi", { chatType: "group" }))).toBeNull();
+  });
+
+  it("respects chatType filter — group only", () => {
+    const engine = new TemplateEngine([
+      { id: "group-only", trigger: { type: "exact", pattern: "hi" }, response: "Group!", chatTypes: ["group"] },
+    ]);
+    expect(engine.match(msg("hi", { chatType: "group" }))).not.toBeNull();
+    expect(engine.match(msg("hi", { chatType: "dm" }))).toBeNull();
+  });
+
+  it("respects chatType filter — dm and group", () => {
+    const engine = new TemplateEngine([
+      { id: "both", trigger: { type: "exact", pattern: "hi" }, response: "Both!", chatTypes: ["dm", "group"] },
+    ]);
+    expect(engine.match(msg("hi", { chatType: "dm" }))).not.toBeNull();
+    expect(engine.match(msg("hi", { chatType: "group" }))).not.toBeNull();
+  });
+
   it("enforces cooldown", () => {
     const engine = new TemplateEngine([
       { id: "cool", trigger: { type: "exact", pattern: "hi" }, response: "Hey!", cooldown: 60 },
@@ -101,7 +125,6 @@ describe("TemplateEngine", () => {
     });
 
     it("uses timezone-aware hour when timezone is specified", () => {
-      // UTC+0 timezone — get the expected hour from Intl
       const now = new Date();
       const fmt = new Intl.DateTimeFormat("en-US", {
         timeZone: "UTC",
@@ -138,74 +161,8 @@ describe("TemplateEngine", () => {
           response: "Fallback!",
         },
       ]);
-      // Should not throw, should fall back to local time
       expect(() => engine.match(msg("test"))).not.toThrow();
-      // local time should match
       expect(engine.match(msg("test"))).not.toBeNull();
     });
   });
 });
-
-  describe("schedule trigger with timezone", () => {
-    it("uses server local time when no timezone specified", () => {
-      const now = new Date();
-      const currentHour = now.getHours();
-      const currentDay = now.getDay();
-
-      const engine = new TemplateEngine([
-        {
-          id: "sched",
-          trigger: {
-            type: "schedule",
-            when: { hours: [currentHour, currentHour + 1], days: [currentDay] },
-          },
-          response: "Scheduled!",
-        },
-      ]);
-      expect(engine.match(msg("anything"))).not.toBeNull();
-    });
-
-    it("uses timezone-aware hour when timezone is specified", () => {
-      // UTC+0 timezone — get the expected hour from Intl
-      const now = new Date();
-      const fmt = new Intl.DateTimeFormat("en-US", {
-        timeZone: "UTC",
-        hour: "numeric",
-        hour12: false,
-      });
-      const parts = fmt.formatToParts(now);
-      const utcHour = parseInt(parts.find((p) => p.type === "hour")!.value, 10);
-
-      const engine = new TemplateEngine([
-        {
-          id: "utc-sched",
-          trigger: {
-            type: "schedule",
-            when: { hours: [utcHour, utcHour + 1], timezone: "UTC" },
-          },
-          response: "UTC time match!",
-        },
-      ]);
-      expect(engine.match(msg("test"))).not.toBeNull();
-    });
-
-    it("falls back to local time for invalid timezone string", () => {
-      const now = new Date();
-      const currentHour = now.getHours();
-
-      const engine = new TemplateEngine([
-        {
-          id: "bad-tz",
-          trigger: {
-            type: "schedule",
-            when: { hours: [currentHour, currentHour + 1], timezone: "Invalid/Timezone_ZZZ" },
-          },
-          response: "Fallback!",
-        },
-      ]);
-      // Should not throw, should fall back to local time
-      expect(() => engine.match(msg("test"))).not.toThrow();
-      // local time should match
-      expect(engine.match(msg("test"))).not.toBeNull();
-    });
-  });

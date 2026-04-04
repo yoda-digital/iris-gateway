@@ -272,8 +272,14 @@ export class MessageRouter {
     } else {
       cb.onFailure();
       recordError(msg.channelId, "empty_response");
-      log.warn(` 10 ▸ Response      ✗ empty (${elapsed}ms) — model may be unavailable`);
-      log.info(`──── DONE ──── ${elapsed}ms total (no response) ────`);
+      log.warn(` 10 ▸ Response      ✗ empty (${elapsed}ms) — notifying user`);
+      await this.sendResponse(
+        msg.channelId,
+        msg.chatId,
+        "⚠️ No response received — the model may be unavailable. Please try again.",
+        msg.id,
+      );
+      log.info(`──── DONE ──── ${elapsed}ms total (empty — user notified) ────`);
     }
   }
 

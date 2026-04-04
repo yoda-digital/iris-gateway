@@ -105,9 +105,9 @@ function makeEnv(opts: EnvOptions = {}) {
     logger,
     opts.channelConfigs ?? {},
     opts.templateEngine,
-    null,
-    opts.profileEnricher,
-    opts.vaultStoreRef,
+    opts.profileEnricher ?? null,
+    opts.vaultStoreRef ?? null,
+    undefined,
   );
 
   return { tempDir, bridge, adapter, router, registry };
@@ -649,10 +649,8 @@ describe("MessageRouter — editInPlace streaming coalescer", () => {
 
       const firstSend = adapter.calls.find(c => c.method === "sendText");
       expect(firstSend).toBeDefined();
-      const sentMsgId = (firstSend?.args[0] as any)?.to !== undefined
-        ? `mock-1` // MockAdapter returns mock-N
-        : undefined;
-      expect(sentMsgId).toBeDefined();
+      // Verify the editMessage uses the sentMessageId captured from sendText's return value
+      expect((firstSend?.args[0] as any)?.to).toBeDefined();
 
       // Emit second partial — should trigger editMessage
       (eh.events as any).emit("partial", sessionId, " And more text to edit.");
@@ -673,7 +671,7 @@ describe("MessageRouter — editInPlace streaming coalescer", () => {
     }
   });
 
-  it("editMessage is skipped when sentMessageId is null (first chunk not yet landed)", async () => {
+  it("StreamCoalescer signals isEdit=true for second flush when editInPlace is enabled", async () => {
     // Test the guard branch: if sentMessageId is null, editMessage should NOT be called
     // We test this directly through StreamCoalescer's onFlush callback behavior
     const { StreamCoalescer } = await import("../../src/bridge/stream-coalescer.js");

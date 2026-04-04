@@ -125,6 +125,16 @@ describe("Permission handler — isAutoApproved", () => {
 
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "once");
   });
+
+  it("auto-approves operations ending in _search suffix (e.g. web_search)", async () => {
+    const bridge = makeBridge();
+    const router = makeRouter(bridge, makeRegistry());
+
+    emitPermission(router, "sess-1", makePermission("web_search"));
+    await new Promise((r) => setImmediate(r));
+
+    expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "once");
+  });
 });
 
 describe("Permission handler — isAutoDenied", () => {
@@ -203,6 +213,21 @@ describe("Permission handler — user routing", () => {
     emitPermission(router, "sess-1", makePermission("file_write"));
     await new Promise((r) => setImmediate(r));
 
+    expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
+  });
+
+  it("calls approvePermission(reject) even when adapter.sendText throws — prevents session deadlock", async () => {
+    const bridge = makeBridge();
+    const sendText = vi.fn().mockRejectedValue(new Error("adapter unavailable"));
+    const registry = makeRegistry(sendText);
+
+    const router = makeRouter(bridge, registry);
+    router.getTurnGrouper().set("sess-1", { channelId: "ch1", chatId: "chat1" });
+
+    emitPermission(router, "sess-1", makePermission("file_write"));
+    await new Promise((r) => setImmediate(r));
+
+    // approvePermission must still be called via finally, even though sendText threw
     expect(bridge.approvePermission).toHaveBeenCalledWith("sess-1", "perm-1", "reject");
   });
 });

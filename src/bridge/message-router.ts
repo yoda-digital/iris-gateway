@@ -372,12 +372,16 @@ export class MessageRouter {
     const pending = this.turnGrouper.get(sessionId);
     if (pending) {
       const adapter = this.registry.get(pending.channelId);
-      if (adapter) {
-        const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
-        await adapter.sendText({ to: pending.chatId, text: msg });
+      try {
+        if (adapter) {
+          const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
+          await adapter.sendText({ to: pending.chatId, text: msg });
+        }
+      } finally {
+        // No response handler implemented — reject to prevent session deadlock.
+        // Using finally ensures approvePermission is always called even if sendText throws.
+        await this.bridge.approvePermission(sessionId, permission.id, "reject");
       }
-      // No response handler implemented — reject to prevent session deadlock
-      await this.bridge.approvePermission(sessionId, permission.id, "reject");
       return;
     }
 

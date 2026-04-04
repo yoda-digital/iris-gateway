@@ -178,6 +178,97 @@ describe("MessageRouter", () => {
 
     expect(capturedTimeoutMs).toBeUndefined();
   });
+
+  function makeRouterWithConfig(
+    channelConfigs: Record<string, unknown>,
+    overrideRegistry?: ChannelRegistry,
+  ): MessageRouter {
+    const ps = new PairingStore(tempDir);
+    const als = new AllowlistStore(tempDir);
+    const rl = new RateLimiter({ perMinute: 30, perHour: 300 });
+    const sg = new SecurityGate(ps, als, rl, {
+      defaultDmPolicy: "open",
+      pairingCodeTtlMs: 3_600_000,
+      pairingCodeLength: 8,
+      rateLimitPerMinute: 30,
+      rateLimitPerHour: 300,
+    });
+    return new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      sg,
+      overrideRegistry ?? registry,
+      pino({ level: "silent" }),
+      channelConfigs as unknown as Record<string, import("../../src/config/types.js").ChannelAccountConfig>,
+    );
+  }
+
+  it("sends compaction notification when notifyOnCompaction is true and session is pending", async () => {
+    const notifyAdapter = new MockAdapter();
+    const notifyRegistry = new ChannelRegistry();
+    notifyRegistry.register(notifyAdapter);
+
+    const routerWithNotify = makeRouterWithConfig(
+      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } },
+      notifyRegistry,
+    );
+
+    try {
+      // Seed the turn grouper with a pending session so the router can look up channelId/chatId
+      const eventHandler = routerWithNotify.getEventHandler();
+      (routerWithNotify as any).turnGrouper.set("session-xyz", { channelId: "mock", chatId: "chat-42" });
+
+      // Fire the sessionCompacted event (OpenCodeEvent uses { type, properties } shape)
+      eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-xyz" } } as any);
+
+      // Allow microtasks to flush
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const sendCalls = notifyAdapter.calls.filter((c) => c.method === "sendText");
+      expect(sendCalls.length).toBe(1);
+      expect((sendCalls[0]!.args[0] as any).to).toBe("chat-42");
+      expect((sendCalls[0]!.args[0] as any).text).toContain("context was compressed");
+    } finally {
+      routerWithNotify.dispose();
+    }
+  });
+
+  it("does not send compaction notification when notifyOnCompaction is false", async () => {
+    // router in beforeEach has no channelConfigs (notifyOnCompaction defaults to off)
+    const eventHandler = router.getEventHandler();
+    (router as any).turnGrouper.set("session-no-notify", { channelId: "mock", chatId: "chat-99" });
+
+    eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-no-notify" } } as any);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const sendCalls = adapter.calls.filter((c) => c.method === "sendText");
+    expect(sendCalls.length).toBe(0);
+  });
+
+  it("does not throw when adapter is absent during compaction notification", async () => {
+    // Registry with NO adapter registered for "mock" channel
+    const emptyRegistry = new ChannelRegistry();
+
+    const routerNoAdapter = makeRouterWithConfig(
+      { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } },
+      emptyRegistry,
+    );
+
+    try {
+      const eventHandler = routerNoAdapter.getEventHandler();
+      (routerNoAdapter as any).turnGrouper.set("session-no-adapter", { channelId: "mock", chatId: "chat-0" });
+
+      // Must not throw even though registry.get("mock") returns undefined
+      await expect(
+        (async () => {
+          eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-no-adapter" } } as any);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        })()
+      ).resolves.toBeUndefined();
+    } finally {
+      routerNoAdapter.dispose();
+    }
+  });
 })
 
 describe("MessageRouter — isAutoApproved", () => {

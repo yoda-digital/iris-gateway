@@ -105,6 +105,7 @@ function makeEnv(opts: EnvOptions = {}) {
     logger,
     opts.channelConfigs ?? {},
     opts.templateEngine,
+    null,
     opts.profileEnricher,
     opts.vaultStoreRef,
   );

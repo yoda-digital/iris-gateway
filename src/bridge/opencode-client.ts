@@ -23,6 +23,13 @@ export interface SessionInfo {
   readonly createdAt: number;
 }
 
+export interface Permission {
+  readonly id: string;
+  readonly sessionID: string;
+  readonly type: string;
+  readonly title: string;
+}
+
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
@@ -407,6 +414,16 @@ export class OpenCodeBridge {
   async deleteSession(sessionId: string): Promise<void> {
     await this.getClient().session.delete({
       path: { id: sessionId },
+      throwOnError: true,
+    });
+  }
+
+  async approvePermission(sessionId: string, permissionId: string, verdict: "once" | "reject"): Promise<void> {
+    // Use the typed SDK client method (postSessionIdPermissionsPermissionId) rather than raw fetch,
+    // consistent with how all other write operations in this class use this.getClient().
+    await this.getClient().postSessionIdPermissionsPermissionId({
+      path: { id: sessionId, permissionID: permissionId },
+      body: { response: verdict },
       throwOnError: true,
     });
   }

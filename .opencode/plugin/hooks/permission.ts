@@ -18,5 +18,5 @@ export const permissionHook = {
     if (input.permission === "edit" || input.permission === "bash") {
       output.status = "deny";
     }
-  },,
+  },
 } as const;

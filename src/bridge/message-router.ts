@@ -29,6 +29,7 @@ export class MessageRouter {
     private readonly logger: Logger,
     private readonly channelConfigs: Record<string, ChannelAccountConfig> = {},
     private readonly templateEngine?: TemplateEngine | null,
+    private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
     private readonly policyEngine?: PolicyEngine | null,
@@ -68,6 +69,11 @@ export class MessageRouter {
         });
       }
     });
+    this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
+      this.handlePermissionRequest(sessionId, permission).catch((err) => {
+        this.logger.error({ err, sessionId }, "Permission handler error");
+      });
+    });
 
     this.eventHandler.events.on("permissionRequest", (sessionId, permission) => {
       void this.handlePermissionRequest(sessionId, permission);
@@ -99,6 +105,10 @@ export class MessageRouter {
 
   getEventHandler(): EventHandler {
     return this.eventHandler;
+  }
+
+  getTurnGrouper(): TurnGrouper {
+    return this.turnGrouper;
   }
 
   async handleInbound(msg: InboundMessage): Promise<void> {
@@ -332,6 +342,50 @@ export class MessageRouter {
     }
 
     return "chat";
+  }
+
+  private isAutoApproved(type: string): boolean {
+    return /^(read|list|search)/i.test(type) || /_(read|list|search)$/i.test(type);
+  }
+
+  private isAutoDenied(type: string): boolean {
+    return /^(bash|edit)$/i.test(type);
+  }
+
+  private async handlePermissionRequest(sessionId: string, permission: Permission): Promise<void> {
+    // Policy is the structural ceiling — check before any auto-approve logic
+    if (this.policyEngine?.isPermissionDenied(permission.type)) {
+      await this.bridge.approvePermission(sessionId, permission.id, "reject");
+      return;
+    }
+
+    if (this.isAutoApproved(permission.type)) {
+      await this.bridge.approvePermission(sessionId, permission.id, "once");
+      return;
+    }
+
+    if (this.isAutoDenied(permission.type)) {
+      await this.bridge.approvePermission(sessionId, permission.id, "reject");
+      return;
+    }
+
+    const pending = this.turnGrouper.get(sessionId);
+    if (pending) {
+      const adapter = this.registry.get(pending.channelId);
+      try {
+        if (adapter) {
+          const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
+          await adapter.sendText({ to: pending.chatId, text: msg });
+        }
+      } finally {
+        // No response handler implemented — reject to prevent session deadlock.
+        // Using finally ensures approvePermission is always called even if sendText throws.
+        await this.bridge.approvePermission(sessionId, permission.id, "reject");
+      }
+      return;
+    }
+
+    await this.bridge.approvePermission(sessionId, permission.id, "reject");
   }
 
   private handleResponse(sessionId: string, text: string): void {

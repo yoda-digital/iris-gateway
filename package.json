@@ -58,7 +58,7 @@
     ]
   },
   "devDependencies": {
-    "@clack/prompts": "^0.10.0",
+    "@clack/prompts": "^1.1.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@types/better-sqlite3": "^7.6.13",

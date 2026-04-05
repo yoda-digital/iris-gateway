@@ -116,7 +116,7 @@ export class InitCommand extends Command {
       const token = await p.text({
         message: "Enter your Telegram bot token:",
         placeholder: "123456:ABC-DEF…  (get one from @BotFather)",
-        validate: (v) => (v.trim() === "" ? "Token cannot be empty" : undefined),
+        validate: (v) => (!v || v.trim() === "" ? "Token cannot be empty" : undefined),
       });
       if (p.isCancel(token)) { p.cancel("Setup cancelled."); return 1; }
 
@@ -145,7 +145,7 @@ export class InitCommand extends Command {
       const token = await p.text({
         message: "Enter your Discord bot token:",
         placeholder: "MTI3… (Discord Developer Portal → Bot → Token)",
-        validate: (v) => (v.trim() === "" ? "Token cannot be empty" : undefined),
+        validate: (v) => (!v || v.trim() === "" ? "Token cannot be empty" : undefined),
       });
       if (p.isCancel(token)) { p.cancel("Setup cancelled."); return 1; }
 
@@ -166,13 +166,13 @@ export class InitCommand extends Command {
     if (channels.includes("slack")) {
       const appToken = await p.text({
         message: "Enter your Slack App-Level token (xapp-…):",
-        validate: (v) => (v.trim() === "" ? "Token cannot be empty" : undefined),
+        validate: (v) => (!v || v.trim() === "" ? "Token cannot be empty" : undefined),
       });
       if (p.isCancel(appToken)) { p.cancel("Setup cancelled."); return 1; }
 
       const botToken = await p.text({
         message: "Enter your Slack Bot token (xoxb-…):",
-        validate: (v) => (v.trim() === "" ? "Token cannot be empty" : undefined),
+        validate: (v) => (!v || v.trim() === "" ? "Token cannot be empty" : undefined),
       });
       if (p.isCancel(botToken)) { p.cancel("Setup cancelled."); return 1; }
 
@@ -199,7 +199,7 @@ export class InitCommand extends Command {
     const modelResult = await p.text({
       message: "Enter AI model identifier (see iris.config.example.json for options):",
       placeholder: "provider/org/model-name:tier",
-      validate: (v) => (v.trim() === "" ? "Model identifier cannot be empty" : undefined),
+      validate: (v) => (!v || v.trim() === "" ? "Model identifier cannot be empty" : undefined),
     });
 
     if (p.isCancel(modelResult)) { p.cancel("Setup cancelled."); return 1; }
@@ -209,7 +209,7 @@ export class InitCommand extends Command {
     if (finalModel.startsWith("openai/")) {
       const apiKey = await p.text({
         message: "Enter your OpenAI API key:",
-        validate: (v) => (v.trim() === "" ? "Key cannot be empty" : undefined),
+        validate: (v) => (!v || v.trim() === "" ? "Key cannot be empty" : undefined),
       });
       if (p.isCancel(apiKey)) { p.cancel("Setup cancelled."); return 1; }
       env["OPENAI_API_KEY"] = apiKey as string;

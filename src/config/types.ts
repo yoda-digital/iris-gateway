@@ -102,6 +102,7 @@ export interface OpenCodeConfig {
   readonly hostname: string;
   readonly autoSpawn: boolean;
   readonly projectDir?: string;
+  readonly reportDiff?: boolean;
 }
 
 export interface GroupPolicyConfig {

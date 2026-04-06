@@ -29,6 +29,16 @@ export interface Permission {
   readonly title: string;
 }
 
+export interface SessionDiffFile {
+  readonly path: string;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
+export interface SessionDiff {
+  readonly files: SessionDiffFile[];
+}
+
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
@@ -415,6 +425,19 @@ export class OpenCodeBridge {
       path: { id: sessionId },
       throwOnError: true,
     });
+  }
+
+  async getSessionDiff(sessionId: string): Promise<SessionDiff | null> {
+    try {
+      const response = await this.getClient().session.diff({
+        path: { id: sessionId },
+        throwOnError: true,
+      });
+      return response.data ?? null;
+    } catch (err) {
+      this.logger.warn({ err, sessionId }, "Failed to fetch session diff");
+      return null;
+    }
   }
 
 }

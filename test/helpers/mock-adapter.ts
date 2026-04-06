@@ -22,7 +22,7 @@ export class MockAdapter implements ChannelAdapter {
 
   private messageCounter = 0;
 
-  constructor(id = "mock", label = "Mock Channel") {
+  constructor(id = "mock", label = "Mock Channel", options: { edit?: boolean } = {}) {
     this.id = id;
     this.label = label;
     this.capabilities = {
@@ -33,7 +33,7 @@ export class MockAdapter implements ChannelAdapter {
       document: false,
       reaction: false,
       typing: true,
-      edit: false,
+      edit: options.edit ?? false,
       delete: false,
       reply: true,
       thread: false,
@@ -63,5 +63,9 @@ export class MockAdapter implements ChannelAdapter {
 
   async sendTyping(params: { to: string }): Promise<void> {
     this.calls.push({ method: "sendTyping", args: [params] });
+  }
+
+  async editMessage(params: { messageId: string; text: string; chatId: string }): Promise<void> {
+    this.calls.push({ method: "editMessage", args: [params] });
   }
 }

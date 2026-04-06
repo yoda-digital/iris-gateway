@@ -506,3 +506,121 @@ describe("OpenCode readiness check (issue #176)", () => {
     expect(logger.info).toHaveBeenCalledWith("OpenCode ready (health check passed)");
   });
 });
+
+// ─── SSE reconnection tests (issue #306) ─────────────────────────────────────
+
+describe("wireSSE reconnection (issue #306)", () => {
+  it("reconnects when subscribeEvents resolves normally (non-abort)", async () => {
+    vi.useFakeTimers();
+
+    const bridge = {
+      subscribeEvents: vi.fn()
+        .mockResolvedValueOnce(undefined) // first call: normal close
+        .mockResolvedValueOnce(undefined), // second call: reconnect succeeds
+    };
+    const logger = makeLogger();
+    const abortController = new AbortController();
+
+    // Manually construct the wireSSE function to test it in isolation
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    let callCount = 0;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        await bridge.subscribeEvents(vi.fn(), abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+        // Reconnect on normal close (unless shutting down)
+        if (!abortController.signal.aborted) {
+          logger.info({ nextRetryMs: SSE_RECONNECT_DELAY_MS }, "SSE stream closed normally — reconnecting");
+          setTimeout(() => {
+            if (abortController.signal.aborted) return;
+            callCount++;
+            void wireSSE();
+          }, SSE_RECONNECT_DELAY_MS);
+        }
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: SSE_RECONNECT_DELAY_MS }, `SSE subscription dropped — reconnecting in ${SSE_RECONNECT_DELAY_MS}ms`);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          callCount++;
+          void wireSSE();
+        }, SSE_RECONNECT_DELAY_MS);
+      }
+    };
+
+    // Start the SSE subscription
+    void wireSSE();
+    await vi.runOnlyPendingTimersAsync(); // resolve first subscribeEvents
+
+    // Verify first call logged normal close
+    expect(logger.info).toHaveBeenCalledWith("OpenCode SSE subscription ended");
+    expect(logger.info).toHaveBeenCalledWith(
+      { nextRetryMs: SSE_RECONNECT_DELAY_MS },
+      "SSE stream closed normally — reconnecting"
+    );
+
+    // Advance timer to trigger reconnect
+    await vi.advanceTimersByTimeAsync(SSE_RECONNECT_DELAY_MS);
+
+    // Verify second call was made
+    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(2);
+    expect(callCount).toBe(1); // reconnect scheduled once
+
+    vi.useRealTimers();
+  });
+
+  it("does NOT reconnect when abortController.signal.aborted is true", async () => {
+    vi.useFakeTimers();
+
+    const bridge = {
+      subscribeEvents: vi.fn().mockResolvedValue(undefined),
+    };
+    const logger = makeLogger();
+    const abortController = new AbortController();
+
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        await bridge.subscribeEvents(vi.fn(), abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+        // Reconnect on normal close (unless shutting down)
+        if (!abortController.signal.aborted) {
+          logger.info({ nextRetryMs: SSE_RECONNECT_DELAY_MS }, "SSE stream closed normally — reconnecting");
+          setTimeout(() => {
+            if (abortController.signal.aborted) return;
+            void wireSSE();
+          }, SSE_RECONNECT_DELAY_MS);
+        }
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: SSE_RECONNECT_DELAY_MS }, `SSE subscription dropped — reconnecting in ${SSE_RECONNECT_DELAY_MS}ms`);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, SSE_RECONNECT_DELAY_MS);
+      }
+    };
+
+    // Start the SSE subscription
+    void wireSSE();
+    await vi.runOnlyPendingTimersAsync(); // resolve subscribeEvents
+
+    // Abort before reconnect timer fires
+    abortController.abort();
+
+    // Advance timer
+    await vi.advanceTimersByTimeAsync(SSE_RECONNECT_DELAY_MS);
+
+    // Verify reconnect was NOT scheduled (only one call to subscribeEvents)
+    expect(bridge.subscribeEvents).toHaveBeenCalledTimes(1);
+    expect(logger.info).toHaveBeenCalledWith("OpenCode SSE subscription ended");
+    expect(logger.info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ nextRetryMs: SSE_RECONNECT_DELAY_MS }),
+      "SSE stream closed normally — reconnecting"
+    );
+
+    vi.useRealTimers();
+  });
+});

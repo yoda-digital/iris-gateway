@@ -41,10 +41,12 @@ describe("HealthServer", () => {
   beforeEach(async () => {
     registry = mockRegistry();
     bridge = mockBridge();
-    port = 19900 + Math.floor(Math.random() * 100);
+    port = 0;
     server = new HealthServer(registry, bridge, port, "127.0.0.1");
     await server.start();
-    base = `http://127.0.0.1:${port}`;
+    const addr = server.address();
+    if (!addr) throw new Error("Server failed to bind");
+    base = `http://127.0.0.1:${addr.port}`;
   });
 
   afterEach(async () => {

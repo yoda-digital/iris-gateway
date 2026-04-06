@@ -109,18 +109,35 @@ export class HealthServer {
   }
 
   async start(): Promise<void> {
-    this.server = serve({
-      fetch: this.app.fetch,
-      port: this.port,
-      hostname: this.hostname,
+    return new Promise((resolve, reject) => {
+      try {
+        this.server = serve({
+          fetch: this.app.fetch,
+          port: this.port,
+          hostname: this.hostname,
+        }, (info) => {
+          resolve();
+        });
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
   async stop(): Promise<void> {
     if (this.server) {
-      this.server.close();
+      await new Promise<void>((resolve) => {
+        this.server!.close(() => resolve());
+      });
       this.server = null;
     }
+  }
+
+  address(): { port: number; address: string } | null {
+    if (!this.server) return null;
+    const addr = (this.server as any).address?.();
+    if (!addr || typeof addr === 'string') return null;
+    return { port: addr.port, address: addr.address };
   }
 }
 

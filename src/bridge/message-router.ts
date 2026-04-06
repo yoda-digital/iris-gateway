@@ -322,18 +322,22 @@ export class MessageRouter {
 
     const t = text.toLowerCase();
 
-    // Coding execution — needs real tools
-    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
+    // Coding execution — English + Romanian + Russian
+    // Relaxed: action word alone is sufficient (no required target word)
+    // This allows short commands like "fix auth" and non-English messages like "rezolvă eroarea"
+    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update|rezolv[ăa]|implement[ăa]|scrie|creaz[ăa]|refactorizeaz[ăa]|șterge|redenume[șs]te|mut[ăa]|actualizeaz[ăa]|исправь|исправи|реализуй|реализуи|напиши|создай|создаи|рефактори|удали|переименуй|перемести|обнови)\b/.test(t)) {
       return "build";
     }
 
-    // Architecture and planning
-    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
+    // Architecture and planning — English + Romanian + Russian
+    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach|planific[ăa]|proiecteaz[ăa]|arhitectur[ăa]|structur[ăa]|abordare|планируй|планируи|проектируй|проектируи|архитектур[аы]|структур[аы]|подход)\b/.test(t)) {
       return "plan";
     }
 
-    // Codebase investigation
-    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
+    // Codebase investigation — English + Romanian + Russian
+    // Relaxed: query word alone is sufficient (no required target word)
+    // This allows short queries like "where is sendMessage" and "unde se află funcția"
+    if (/\b(explore|understand|find|where|what does|explain|navigate|show me|locate|explic[ăa]|înțelege|caut[ăa]|găse[șs]te|unde|arat[ăa]|navighează|localizează|объясни|пойми|найди|где|что делает|покажи|расположи)\b/.test(t)) {
       return "explore";
     }
 

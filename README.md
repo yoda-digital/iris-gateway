@@ -1,6 +1,6 @@
 # Iris Gateway
 
-[![npm](https://img.shields.io/npm/v/@yoda.digital/iris-gateway?label=v1.15.11)](https://www.npmjs.com/package/@yoda.digital/iris-gateway)
+[![npm](https://img.shields.io/npm/v/@yoda.digital/iris-gateway?label=v1.15.20)](https://www.npmjs.com/package/@yoda.digital/iris-gateway)
 
 **Your self-hosted AI assistant that talks to you on Telegram, WhatsApp, Discord, and Slack — powered entirely by free AI models.**
 

@@ -176,7 +176,6 @@ function makeBridge() {
     createSession: vi.fn().mockResolvedValue({ id: "sess-1" }),
     sendMessage: vi.fn().mockResolvedValue("pong"),
     deleteSession: vi.fn().mockResolvedValue(undefined),
-    getQueueSize: vi.fn().mockReturnValue(0),
     getInFlightCount: vi.fn().mockReturnValue(0),
   };
 }

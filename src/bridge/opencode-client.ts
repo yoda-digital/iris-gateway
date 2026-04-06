@@ -370,11 +370,6 @@ export class OpenCodeBridge {
     return this.supervisor.pendingQueue.length;
   }
 
-  /** @deprecated Use getInFlightCount() for heartbeat suppression or getPendingQueueSize() for circuit-breaker queue depth */
-  getQueueSize(): number {
-    return this.inFlightCount;
-  }
-
   async listSessions(): Promise<SessionInfo[]> {
     const response = await this.getClient().session.list({ throwOnError: true });
     return Object.values(response.data).map((s) => ({

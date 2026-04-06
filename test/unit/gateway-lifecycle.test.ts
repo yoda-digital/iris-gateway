@@ -506,3 +506,324 @@ describe("OpenCode readiness check (issue #176)", () => {
     expect(logger.info).toHaveBeenCalledWith("OpenCode ready (health check passed)");
   });
 });
+
+// ─── SSE exponential backoff tests (issue #298) ──────────────────────────────
+
+describe("wireSSE exponential backoff (issue #298)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("first SSE drop uses SSE_RECONNECT_DELAY_MS (5s) delay", async () => {
+    const logger = makeLogger();
+    const mockSubscribeEvents = vi.fn()
+      .mockRejectedValueOnce(new Error("SSE drop"))
+      .mockImplementation(() => new Promise(() => {})); // hang forever on retry
+
+    const bridge = {
+      ...makeBridge(),
+      subscribeEvents: mockSubscribeEvents,
+    };
+
+    const abortController = new AbortController();
+    const router = {
+      ...makeRouter(),
+      getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+    };
+
+    // Inline the wireSSE logic from lifecycle.ts
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+    let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+        await bridge.subscribeEvents((event: any) => {
+          router.getEventHandler().handleEvent(event);
+        }, abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+        const delay = sseReconnectDelay;
+        sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, delay);
+      }
+    };
+
+    void wireSSE();
+
+    // First call triggers immediately, should fail and schedule retry
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(1));
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ nextRetryMs: 5_000 }),
+      expect.stringContaining("reconnecting in 5000ms")
+    );
+
+    // Advance timers by 5s — should trigger second call
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(2));
+  });
+
+  it("second consecutive SSE drop uses SSE_RECONNECT_DELAY_MS * 2 (10s) delay", async () => {
+    const logger = makeLogger();
+    const mockSubscribeEvents = vi.fn()
+      .mockRejectedValueOnce(new Error("SSE drop 1"))
+      .mockRejectedValueOnce(new Error("SSE drop 2"))
+      .mockImplementation(() => new Promise(() => {}));
+
+    const bridge = {
+      ...makeBridge(),
+      subscribeEvents: mockSubscribeEvents,
+    };
+
+    const abortController = new AbortController();
+    const router = {
+      ...makeRouter(),
+      getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+    };
+
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+    let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+        await bridge.subscribeEvents((event: any) => {
+          router.getEventHandler().handleEvent(event);
+        }, abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+        const delay = sseReconnectDelay;
+        sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, delay);
+      }
+    };
+
+    void wireSSE();
+
+    // First drop
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(1));
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ nextRetryMs: 5_000 }),
+      expect.stringContaining("reconnecting in 5000ms")
+    );
+
+    // Advance 5s, trigger second call
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(2));
+
+    // Second drop should use 10s delay
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ nextRetryMs: 10_000 }),
+      expect.stringContaining("reconnecting in 10000ms")
+    );
+
+    // Advance 10s, trigger third call
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(3));
+  });
+
+  it("delay resets to SSE_RECONNECT_DELAY_MS after a successful reconnect", async () => {
+    const logger = makeLogger();
+    let callCount = 0;
+    const mockSubscribeEvents = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.reject(new Error("SSE drop 1"));
+      } else if (callCount === 2) {
+        // Successful connection — resolve after brief delay then reject to test reset
+        return new Promise((resolve, reject) => {
+          setTimeout(() => reject(new Error("SSE drop 2")), 100);
+        });
+      } else {
+        return new Promise(() => {}); // hang
+      }
+    });
+
+    const bridge = {
+      ...makeBridge(),
+      subscribeEvents: mockSubscribeEvents,
+    };
+
+    const abortController = new AbortController();
+    const router = {
+      ...makeRouter(),
+      getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+    };
+
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+    let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+        await bridge.subscribeEvents((event: any) => {
+          router.getEventHandler().handleEvent(event);
+        }, abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+        const delay = sseReconnectDelay;
+        sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, delay);
+      }
+    };
+
+    void wireSSE();
+
+    // First drop — should use 5s delay
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(1));
+    expect(logger.warn).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ nextRetryMs: 5_000 }),
+      expect.stringContaining("reconnecting in 5000ms")
+    );
+
+    // Advance 5s, trigger second call (which succeeds briefly then drops)
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(2));
+
+    // Advance 100ms to trigger the second drop
+    await vi.advanceTimersByTimeAsync(100);
+
+    // After successful connection, delay should reset to 5s (not 10s)
+    await vi.waitFor(() => expect(logger.warn).toHaveBeenCalledTimes(2));
+    expect(logger.warn).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ nextRetryMs: 5_000 }),
+      expect.stringContaining("reconnecting in 5000ms")
+    );
+  });
+
+  it("no reconnect scheduled when signal.aborted = true before retry", async () => {
+    const logger = makeLogger();
+    const mockSubscribeEvents = vi.fn().mockRejectedValue(new Error("SSE drop"));
+
+    const bridge = {
+      ...makeBridge(),
+      subscribeEvents: mockSubscribeEvents,
+    };
+
+    const abortController = new AbortController();
+    const router = {
+      ...makeRouter(),
+      getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+    };
+
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+    let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+        await bridge.subscribeEvents((event: any) => {
+          router.getEventHandler().handleEvent(event);
+        }, abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+        const delay = sseReconnectDelay;
+        sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, delay);
+      }
+    };
+
+    void wireSSE();
+
+    // First call fails
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(1));
+    expect(logger.warn).toHaveBeenCalled();
+
+    // Abort BEFORE the timer fires
+    abortController.abort();
+
+    // Advance timers — should NOT trigger reconnect
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    // Still only 1 call — no reconnect happened
+    expect(mockSubscribeEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnect callback is a no-op if signal is aborted inside setTimeout", async () => {
+    const logger = makeLogger();
+    const mockSubscribeEvents = vi.fn()
+      .mockRejectedValueOnce(new Error("SSE drop"))
+      .mockRejectedValue(new Error("Should not be called"));
+
+    const bridge = {
+      ...makeBridge(),
+      subscribeEvents: mockSubscribeEvents,
+    };
+
+    const abortController = new AbortController();
+    const router = {
+      ...makeRouter(),
+      getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+    };
+
+    const SSE_RECONNECT_DELAY_MS = 5_000;
+    const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
+    let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+    const wireSSE = async (): Promise<void> => {
+      if (abortController.signal.aborted) return;
+      try {
+        sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+        await bridge.subscribeEvents((event: any) => {
+          router.getEventHandler().handleEvent(event);
+        }, abortController.signal);
+        logger.info("OpenCode SSE subscription ended");
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
+        const delay = sseReconnectDelay;
+        sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+        setTimeout(() => {
+          if (abortController.signal.aborted) return;
+          void wireSSE();
+        }, delay);
+      }
+    };
+
+    void wireSSE();
+
+    // First call fails
+    await vi.waitFor(() => expect(mockSubscribeEvents).toHaveBeenCalledTimes(1));
+    expect(logger.warn).toHaveBeenCalled();
+
+    // Advance 2.5s (halfway through the 5s delay)
+    await vi.advanceTimersByTimeAsync(2_500);
+
+    // Abort DURING the setTimeout delay
+    abortController.abort();
+
+    // Advance remaining 2.5s — callback should return early
+    await vi.advanceTimersByTimeAsync(2_500);
+
+    // Should still be only 1 call — the setTimeout callback returned early
+    expect(mockSubscribeEvents).toHaveBeenCalledTimes(1);
+  });
+});

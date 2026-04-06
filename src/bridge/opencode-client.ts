@@ -16,6 +16,14 @@ export type { CircuitState } from "./circuit-breaker.js";
 
 export type { OpenCodeEvent, Part, TextPart, SupervisorOptions };
 
+export interface PromptOptions {
+  readonly agent?: string;
+  readonly model?: { readonly providerID: string; readonly modelID: string };
+  readonly system?: string;
+  readonly tools?: Record<string, boolean>;
+  readonly noReply?: boolean;
+}
+
 export interface SessionInfo {
   readonly id: string;
   readonly title: string;
@@ -177,7 +185,7 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs = 120_000,
     pollMs = 2_000,
-    agent = "chat",
+    options: PromptOptions = {},
   ): Promise<string> {
     const allowed = await this.supervisor.waitForCircuit();
     if (!allowed) return "";
@@ -185,7 +193,7 @@ export class OpenCodeBridge {
     this.inFlightCount++;
     metrics.queueDepth.set(this.inFlightCount);
     try {
-      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs, agent);
+      const result = await this._sendAndWaitInternal(sessionId, text, timeoutMs, pollMs, options);
       this.supervisor.circuitBreaker.onSuccess();
       return result;
     } catch (err) {
@@ -204,16 +212,21 @@ export class OpenCodeBridge {
     text: string,
     timeoutMs: number,
     pollMs: number,
-    agent = "chat",
+    options: PromptOptions = {},
   ): Promise<string> {
     const before = await this.listMessages(sessionId);
     const knownCount = before.length;
 
     const url = `${this.getBaseUrl()}/session/${sessionId}/prompt_async`;
-    const body = JSON.stringify({
-      agent,
+    const promptBody: Record<string, unknown> = {
+      agent: options.agent ?? "chat",
       parts: [{ type: "text", text }],
-    });
+    };
+    if (options.model)   promptBody.model   = options.model;
+    if (options.system)  promptBody.system  = options.system;
+    if (options.tools)   promptBody.tools   = options.tools;
+    if (options.noReply) promptBody.noReply  = options.noReply;
+    const body = JSON.stringify(promptBody);
     this.logger.info({ url, body: body.substring(0, 200) }, "prompt_async via fetch");
     const res = await fetch(url, {
       method: "POST",

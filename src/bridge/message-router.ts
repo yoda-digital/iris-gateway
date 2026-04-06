@@ -5,7 +5,7 @@ import type { Logger } from "../logging/logger.js";
 import type { ChannelAccountConfig } from "../config/types.js";
 import { chunkText, PLATFORM_LIMITS } from "../utils/text-chunker.js";
 import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-gating.js";
-import type { OpenCodeBridge, Permission } from "./opencode-client.js";
+import type { OpenCodeBridge, Permission, PromptOptions } from "./opencode-client.js";
 import type { PolicyEngine } from "../governance/policy.js";
 import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
@@ -247,7 +247,12 @@ export class MessageRouter {
     try {
       const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
       const agent = this.selectAgent(messageText, msg.channelId);
-      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs, undefined, agent);
+      const channelModel = this.channelConfigs[msg.channelId]?.model;
+      const promptOptions: PromptOptions = {
+        agent,
+        ...(channelModel ? { model: channelModel } : {}),
+      };
+      response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs, undefined, promptOptions);
     } catch (err) {
       cb.onFailure();
       recordError(msg.channelId, "bridge_error");

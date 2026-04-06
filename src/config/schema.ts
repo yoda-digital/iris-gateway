@@ -32,6 +32,10 @@ const channelAccountSchema = z.object({
   sendAndWaitTimeoutMs: z.number().positive().optional(),
   defaultAgent: z.enum(["chat", "build", "plan", "explore"]).optional(),
   notifyOnCompaction: z.boolean().optional(),
+  model: z.object({
+    providerID: z.string().min(1),
+    modelID: z.string().min(1),
+  }).optional(),
 });
 
 const gatewaySchema = z.object({

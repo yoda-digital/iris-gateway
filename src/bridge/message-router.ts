@@ -12,12 +12,14 @@ import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
 import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
+import { PendingPermissions } from "./pending-permissions.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
 
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
   private readonly turnGrouper: TurnGrouper;
+  private readonly pendingPermissions: PendingPermissions;
   private readonly activeCoalescers = new Map<string, StreamCoalescer>();
   private readonly outboundQueue: MessageQueue;
 
@@ -35,6 +37,13 @@ export class MessageRouter {
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
+    });
+
+    this.pendingPermissions = new PendingPermissions((key, permission) => {
+      this.logger.warn({ key, permissionId: permission.id, sessionId: permission.sessionID }, "Pruning stale permission — auto-rejecting");
+      this.bridge.approvePermission(permission.sessionID, permission.id, "reject").catch((err) => {
+        this.logger.error({ err, permissionId: permission.id }, "Failed to auto-reject stale permission");
+      });
     });
 
     this.eventHandler = new EventHandler();
@@ -96,6 +105,7 @@ export class MessageRouter {
 
   dispose(): void {
     this.turnGrouper.dispose();
+    this.pendingPermissions.dispose();
     this.eventHandler.dispose();
   }
 
@@ -152,6 +162,40 @@ export class MessageRouter {
       }
       return;
     }
+
+    // Handle /perm command for permission approval/rejection
+    const permMatch = msg.text?.trim().toLowerCase().match(/^\/perm\s+(approve|reject|allow|deny)$/);
+    if (permMatch) {
+      const action = permMatch[1];
+      const pending = this.pendingPermissions.get(msg.channelId, msg.chatId);
+
+      if (!pending) {
+        log.info("  4 ▸ Command       /perm → no pending permission");
+        if (adapter) {
+          await adapter.sendText({ to: msg.chatId, text: "No pending permission request.", replyToId: msg.id });
+        }
+        return;
+      }
+
+      const response = (action === "approve" || action === "allow") ? "once" : "reject";
+      log.info({ permissionId: pending.id, sessionId: pending.sessionID, response }, "  4 ▸ Command       /perm → resolving permission");
+
+      try {
+        await this.bridge.approvePermission(pending.sessionID, pending.id, response);
+        this.pendingPermissions.delete(msg.channelId, msg.chatId);
+        if (adapter) {
+          const resultText = response === "once" ? "Permission approved." : "Permission rejected.";
+          await adapter.sendText({ to: msg.chatId, text: resultText, replyToId: msg.id });
+        }
+      } catch (err) {
+        log.error({ err, permissionId: pending.id }, "Failed to resolve permission");
+        if (adapter) {
+          await adapter.sendText({ to: msg.chatId, text: "Failed to process permission response.", replyToId: msg.id });
+        }
+      }
+      return;
+    }
+
     log.info("  4 ▸ Commands      ○ not a command");
 
     if (this.templateEngine) {
@@ -375,17 +419,19 @@ export class MessageRouter {
       const adapter = this.registry.get(pending.channelId);
       try {
         if (adapter) {
-          const msg = `AI is requesting a permission: *${permission.title || permission.type}*\nPlease review and respond.`;
+          const msg = `AI is requesting a permission: *${permission.title || permission.type}*\n\nRespond with:\n• \`/perm approve\` or \`/perm allow\` to grant\n• \`/perm reject\` or \`/perm deny\` to decline`;
           await adapter.sendText({ to: pending.chatId, text: msg });
+          // Store permission for later resolution via /perm command
+          this.pendingPermissions.set(pending.channelId, pending.chatId, permission);
+          this.logger.info({ permissionId: permission.id, sessionId, type: permission.type }, "Permission stored, awaiting user response via /perm");
+          return;
         }
-      } finally {
-        // No response handler implemented — reject to prevent session deadlock.
-        // Using finally ensures approvePermission is always called even if sendText throws.
-        await this.bridge.approvePermission(sessionId, permission.id, "reject");
+      } catch (err) {
+        this.logger.error({ err, sessionId, permissionId: permission.id }, "Failed to notify user about permission");
       }
-      return;
     }
 
+    // No pending context or notification failed — reject to prevent session deadlock
     await this.bridge.approvePermission(sessionId, permission.id, "reject");
   }
 

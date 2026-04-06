@@ -95,6 +95,255 @@ export interface GatewayContext {
 const SSE_RECONNECT_DELAY_MS = 5_000;
 const SSE_MAX_RECONNECT_DELAY_MS = 30_000;
 
+interface CoreSubsystems {
+  vaultDb: VaultDB;
+  vaultStore: VaultStore;
+  vaultSearch: VaultSearch;
+  usageTracker: UsageTracker;
+  signalStore: SignalStore | null;
+  profileEnricher: ProfileEnricher | null;
+  governanceEngine: GovernanceEngine;
+  policyEngine: PolicyEngine;
+}
+
+function buildCoreSubsystems(
+  config: IrisConfig,
+  stateDir: string,
+  logger: Logger,
+): CoreSubsystems {
+  const vaultDb = new VaultDB(stateDir);
+  const vaultStore = new VaultStore(vaultDb);
+  const vaultSearch = new VaultSearch(vaultDb);
+  const usageTracker = new UsageTracker(vaultDb);
+
+  let signalStore: SignalStore | null = null;
+  let profileEnricher: ProfileEnricher | null = null;
+  if (config.onboarding?.enabled) {
+    signalStore = new SignalStore(vaultDb);
+    profileEnricher = new ProfileEnricher(signalStore, vaultStore, logger);
+    logger.info("Onboarding enricher initialized");
+  }
+
+  const governanceEngine = new GovernanceEngine(
+    config.governance ?? { enabled: false, rules: [], directives: [] },
+  );
+
+  const policyEngine = new PolicyEngine(
+    config.policy ?? { enabled: false, tools: { allowed: [], denied: [] }, permissions: { bash: "deny", edit: "deny", read: "deny" }, agents: { allowedModes: ["subagent"], maxSteps: 0, requireDescription: true, defaultTools: ["vault_search", "skill"], allowPrimaryCreation: false }, skills: { restricted: [], requireTriggers: false }, enforcement: { blockUnknownTools: true, auditPolicyViolations: true } },
+  );
+  if (policyEngine.enabled) logger.info("Master policy engine enabled");
+
+  return {
+    vaultDb, vaultStore, vaultSearch, usageTracker,
+    signalStore, profileEnricher, governanceEngine, policyEngine,
+  };
+}
+
+interface CliToolsResult {
+  cliExecutor: CliExecutor | null;
+  cliRegistry: CliToolRegistry | null;
+}
+
+async function buildCliTools(
+  config: IrisConfig,
+  stateDir: string,
+  logger: Logger,
+): Promise<CliToolsResult> {
+  if (!config.cli?.enabled) {
+    return { cliExecutor: null, cliRegistry: null };
+  }
+
+  const cliRegistry = new CliToolRegistry(config.cli.tools);
+  const cliExecutor = new CliExecutor({
+    allowedBinaries: config.cli.sandbox.allowedBinaries,
+    timeout: config.cli.timeout,
+    logger,
+  });
+
+  const probeResults = await Promise.all(
+    cliRegistry.listTools().map(async (toolName) => {
+      const def = cliRegistry!.getToolDef(toolName)!;
+      const result = await cliExecutor!.probe(def.binary, def.healthCheck);
+      return { toolName, binary: def.binary, ...result };
+    })
+  );
+
+  const unavailable = probeResults.filter((r) => !r.available);
+  if (unavailable.length > 0) {
+    for (const r of unavailable) {
+      logger.warn(
+        { tool: r.toolName, binary: r.binary, reason: r.reason },
+        "CLI tool unavailable — removed from manifest"
+      );
+    }
+    cliRegistry.removeTools(unavailable.map((r) => r.toolName));
+  }
+
+  const manifestPath = join(stateDir, "cli-tools.json");
+  writeFileSync(manifestPath, JSON.stringify(cliRegistry.getManifest(), null, 2));
+  logger.info(
+    { tools: cliRegistry.listTools(), unavailable: unavailable.length },
+    "CLI tool registry initialized"
+  );
+
+  return { cliExecutor, cliRegistry };
+}
+
+function buildAutoReply(
+  config: IrisConfig,
+  logger: Logger,
+): TemplateEngine | null {
+  if (!config.autoReply?.enabled || config.autoReply.templates.length === 0) {
+    return null;
+  }
+
+  const templates: AutoReplyTemplate[] = config.autoReply.templates.map((t) => ({
+    id: t.id,
+    trigger: t.trigger as AutoReplyTemplate["trigger"],
+    response: t.response,
+    priority: t.priority,
+    cooldown: t.cooldown,
+    once: t.once,
+    channels: t.channels,
+    chatTypes: t.chatTypes,
+    forwardToAi: t.forwardToAi,
+  }));
+
+  const engine = new TemplateEngine(templates);
+  logger.info({ count: templates.length }, "Auto-reply templates loaded");
+  return engine;
+}
+
+async function buildCanvasServer(
+  config: IrisConfig,
+  registry: ChannelRegistry,
+  logger: Logger,
+): Promise<CanvasServer | null> {
+  if (!config.canvas?.enabled) {
+    return null;
+  }
+
+  const canvasServer = new CanvasServer({
+    port: config.canvas.port,
+    hostname: config.canvas.hostname,
+    logger,
+    onMessage: (sessionId, text) => {
+      const webchatAdapter = registry.get("webchat");
+      if (webchatAdapter) {
+        webchatAdapter.events.emit("message", {
+          id: `wc-${Date.now()}`,
+          channelId: "webchat",
+          senderId: `webchat:${sessionId}`,
+          senderName: "Web User",
+          chatId: sessionId,
+          chatType: "dm" as const,
+          text,
+          timestamp: Date.now(),
+          raw: null,
+        });
+      }
+    },
+  });
+
+  await canvasServer.start();
+  logger.info({ port: config.canvas.port }, "Canvas server started");
+  return canvasServer;
+}
+
+async function startPluginServices(
+  pluginRegistry: IrisPluginRegistry,
+  config: IrisConfig,
+  logger: Logger,
+  stateDir: string,
+  abortController: AbortController,
+): Promise<void> {
+  for (const [name, service] of pluginRegistry.services) {
+    try {
+      await service.start({ config, logger, stateDir, signal: abortController.signal });
+      logger.info({ service: name }, "Plugin service started");
+    } catch (err) {
+      logger.error({ err, service: name }, "Failed to start plugin service");
+    }
+  }
+}
+
+interface StartEnginesParams {
+  config: IrisConfig;
+  logger: Logger;
+  intentStore: IntentStore | null;
+  bridge: OpenCodeBridge;
+  router: MessageRouter;
+  sessionMap: SessionMap;
+  vaultStore: VaultStore;
+  registry: ChannelRegistry;
+  coordinator: InstanceCoordinator;
+  heartbeatStore: HeartbeatStore | null;
+  toolServer: ToolServer;
+  vaultDb: VaultDB;
+  profileEnricher: ProfileEnricher | null;
+  signalStore: SignalStore | null;
+}
+
+interface StartEnginesResult {
+  pulseEngine: PulseEngine | null;
+  heartbeatEngine: HeartbeatEngine | null;
+}
+
+function startEngines(params: StartEnginesParams): StartEnginesResult {
+  const pulseEngine = startPulseEngine(
+    params.config, params.logger, params.intentStore, params.bridge,
+    params.router, params.sessionMap, params.vaultStore, params.registry, params.coordinator
+  );
+
+  const heartbeatEngine = startHeartbeatEngine(
+    params.config, params.logger, params.heartbeatStore, params.toolServer,
+    params.bridge, params.registry, params.vaultDb, params.sessionMap
+  );
+
+  if (params.config.onboarding?.enabled && params.profileEnricher && params.signalStore) {
+    const consolidateTimer = setInterval(() => {
+      params.logger.debug("Running signal consolidation");
+    }, params.config.onboarding.enricher.consolidateIntervalMs);
+    consolidateTimer.unref();
+  }
+
+  return { pulseEngine, heartbeatEngine };
+}
+
+export function wireSSESubscription(
+  bridge: OpenCodeBridge,
+  router: MessageRouter,
+  abortController: AbortController,
+  logger: Logger,
+): void {
+  let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+
+  const wireSSE = async (): Promise<void> => {
+    if (abortController.signal.aborted) return;
+    try {
+      sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
+      await bridge.subscribeEvents((event) => {
+        router.getEventHandler().handleEvent(event);
+      }, abortController.signal);
+      logger.info("OpenCode SSE subscription ended");
+    } catch (err) {
+      if (abortController.signal.aborted) return;
+      logger.warn(
+        { err, nextRetryMs: sseReconnectDelay },
+        `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`
+      );
+      const delay = sseReconnectDelay;
+      sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
+      setTimeout(() => {
+        if (abortController.signal.aborted) return;
+        void wireSSE();
+      }, delay);
+    }
+  };
+
+  void wireSSE();
+}
+
 export async function startGateway(configPath?: string): Promise<GatewayContext> {
   // 1. Load config
   const config = loadConfig(configPath);
@@ -141,33 +390,9 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   // 5. Security subsystem
   const { pairingStore, allowlistStore, rateLimiter, securityGate } = initSecurity(config, stateDir);
 
-  // 5.5 Vault
-  const vaultDb = new VaultDB(stateDir);
-  const vaultStore = new VaultStore(vaultDb);
-  const vaultSearch = new VaultSearch(vaultDb);
-
-  // 5.55 Usage tracker
-  const usageTracker = new UsageTracker(vaultDb);
-
-  // 5.55b Onboarding
-  let signalStore: SignalStore | null = null;
-  let profileEnricher: ProfileEnricher | null = null;
-  if (config.onboarding?.enabled) {
-    signalStore = new SignalStore(vaultDb);
-    profileEnricher = new ProfileEnricher(signalStore, vaultStore, logger);
-    logger.info("Onboarding enricher initialized");
-  }
-
-  // 5.6 Governance
-  const governanceEngine = new GovernanceEngine(
-    config.governance ?? { enabled: false, rules: [], directives: [] },
-  );
-
-  // 5.65 Master policy
-  const policyEngine = new PolicyEngine(
-    config.policy ?? { enabled: false, tools: { allowed: [], denied: [] }, permissions: { bash: "deny", edit: "deny", read: "deny" }, agents: { allowedModes: ["subagent"], maxSteps: 0, requireDescription: true, defaultTools: ["vault_search", "skill"], allowPrimaryCreation: false }, skills: { restricted: [], requireTriggers: false }, enforcement: { blockUnknownTools: true, auditPolicyViolations: true } },
-  );
-  if (policyEngine.enabled) logger.info("Master policy engine enabled");
+  // 5.5 Core subsystems (vault, usage, onboarding, governance, policy)
+  const { vaultDb, vaultStore, vaultSearch, usageTracker, signalStore, profileEnricher,
+    governanceEngine, policyEngine } = buildCoreSubsystems(config, stateDir, logger);
 
   // 5.7 Proactive system
   const { intentStore } = bootstrapProactive(config, logger, vaultDb);
@@ -184,32 +409,7 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     crossChannelResolver, trendDetector, healthGate, promptAssembler } = intel;
 
   // 5.77 CLI tools
-  let cliExecutor: CliExecutor | null = null;
-  let cliRegistry: CliToolRegistry | null = null;
-  if (config.cli?.enabled) {
-    cliRegistry = new CliToolRegistry(config.cli.tools);
-    cliExecutor = new CliExecutor({ allowedBinaries: config.cli.sandbox.allowedBinaries, timeout: config.cli.timeout, logger });
-
-    // Probe all tools in parallel (non-blocking, 2s timeout per check)
-    const probeResults = await Promise.all(
-      cliRegistry.listTools().map(async (toolName) => {
-        const def = cliRegistry!.getToolDef(toolName)!;
-        const result = await cliExecutor!.probe(def.binary, def.healthCheck);
-        return { toolName, binary: def.binary, ...result };
-      })
-    );
-    const unavailable = probeResults.filter((r) => !r.available);
-    if (unavailable.length > 0) {
-      for (const r of unavailable) {
-        logger.warn({ tool: r.toolName, binary: r.binary, reason: r.reason }, "CLI tool unavailable — removed from manifest");
-      }
-      cliRegistry.removeTools(unavailable.map((r) => r.toolName));
-    }
-
-    const manifestPath = join(stateDir, "cli-tools.json");
-    writeFileSync(manifestPath, JSON.stringify(cliRegistry.getManifest(), null, 2));
-    logger.info({ tools: cliRegistry.listTools(), unavailable: unavailable.length }, "CLI tool registry initialized");
-  }
+  const { cliExecutor, cliRegistry } = await buildCliTools(config, stateDir, logger);
 
   // 5.8 Load plugins
   const pluginRegistry = await new PluginLoader(logger).loadAll(config, stateDir);
@@ -222,53 +422,13 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   const messageCache = new MessageCache();
 
   // 7.5 Auto-reply template engine
-  let templateEngine: TemplateEngine | null = null;
-  if (config.autoReply?.enabled && config.autoReply.templates.length > 0) {
-    const templates: AutoReplyTemplate[] = config.autoReply.templates.map((t) => ({
-      id: t.id,
-      trigger: t.trigger as AutoReplyTemplate["trigger"],
-      response: t.response,
-      priority: t.priority,
-      cooldown: t.cooldown,
-      once: t.once,
-      channels: t.channels,
-      chatTypes: t.chatTypes,
-      forwardToAi: t.forwardToAi,
-    }));
-    templateEngine = new TemplateEngine(templates);
-    logger.info({ count: templates.length }, "Auto-reply templates loaded");
-  }
+  const templateEngine = buildAutoReply(config, logger);
 
   // 8. Message router
   const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, policyEngine, profileEnricher, vaultStore);
 
   // 8.5 Canvas server
-  let canvasServer: CanvasServer | null = null;
-  if (config.canvas?.enabled) {
-    canvasServer = new CanvasServer({
-      port: config.canvas.port,
-      hostname: config.canvas.hostname,
-      logger,
-      onMessage: (sessionId, text) => {
-        const webchatAdapter = registry.get("webchat");
-        if (webchatAdapter) {
-          webchatAdapter.events.emit("message", {
-            id: `wc-${Date.now()}`,
-            channelId: "webchat",
-            senderId: `webchat:${sessionId}`,
-            senderName: "Web User",
-            chatId: sessionId,
-            chatType: "dm" as const,
-            text,
-            timestamp: Date.now(),
-            raw: null,
-          });
-        }
-      },
-    });
-    await canvasServer.start();
-    logger.info({ port: config.canvas.port }, "Canvas server started");
-  }
+  const canvasServer = await buildCanvasServer(config, registry, logger);
 
   // 9. Tool server
   const toolServer = new ToolServer({
@@ -299,52 +459,22 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
   });
 
   // 12.5 Plugin services
-  for (const [name, service] of pluginRegistry.services) {
-    try {
-      await service.start({ config, logger, stateDir, signal: abortController.signal });
-      logger.info({ service: name }, "Plugin service started");
-    } catch (err) {
-      logger.error({ err, service: name }, "Failed to start plugin service");
-    }
-  }
+  await startPluginServices(pluginRegistry, config, logger, stateDir, abortController);
 
-  // 12.6 Proactive pulse engine
-  pulseEngine = startPulseEngine(config, logger, intentStore, bridge, router, sessionMap, vaultStore, registry, coordinator);
-
-  // 12.7 Heartbeat engine
-  heartbeatEngine = startHeartbeatEngine(config, logger, heartbeatStore, toolServer, bridge, registry, vaultDb, sessionMap);
-
-  // 12.8 Onboarding consolidation timer
-  if (config.onboarding?.enabled && profileEnricher && signalStore) {
-    const consolidateTimer = setInterval(() => { logger.debug("Running signal consolidation"); }, config.onboarding.enricher.consolidateIntervalMs);
-    consolidateTimer.unref();
-  }
+  // 12.6-12.8 Start engines (proactive, heartbeat, onboarding)
+  const engines = startEngines({
+    config, logger, intentStore, bridge, router, sessionMap, vaultStore,
+    registry, coordinator, heartbeatStore, toolServer, vaultDb,
+    profileEnricher, signalStore,
+  });
+  pulseEngine = engines.pulseEngine;
+  heartbeatEngine = engines.heartbeatEngine;
 
   // Emit gateway.ready hook
   await pluginRegistry.hookBus.emit("gateway.ready", undefined as never);
 
   // 13. Wire SSE subscription (with exponential backoff auto-reconnect)
-  let sseReconnectDelay = SSE_RECONNECT_DELAY_MS;
-  const wireSSE = async (): Promise<void> => {
-    if (abortController.signal.aborted) return;
-    try {
-      sseReconnectDelay = SSE_RECONNECT_DELAY_MS; // reset on successful connection
-      await bridge.subscribeEvents((event) => {
-        router.getEventHandler().handleEvent(event);
-      }, abortController.signal);
-      logger.info("OpenCode SSE subscription ended");
-    } catch (err) {
-      if (abortController.signal.aborted) return;
-      logger.warn({ err, nextRetryMs: sseReconnectDelay }, `SSE subscription dropped — reconnecting in ${sseReconnectDelay}ms`);
-      const delay = sseReconnectDelay;
-      sseReconnectDelay = Math.min(sseReconnectDelay * 2, SSE_MAX_RECONNECT_DELAY_MS);
-      setTimeout(() => {
-        if (abortController.signal.aborted) return;
-        void wireSSE();
-      }, delay);
-    }
-  };
-  void wireSSE();
+  wireSSESubscription(bridge, router, abortController, logger);
 
   // 14. Graceful shutdown
   registerShutdownHandlers({

@@ -14,6 +14,7 @@ import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
+import type { CompactionNotifier } from "./compaction-notifier.js";
 
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
@@ -32,6 +33,7 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly compactionNotifier?: CompactionNotifier | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -79,11 +81,12 @@ export class MessageRouter {
       const pending = this.turnGrouper.get(sessionId);
       if (!pending) return;
       const channelConfig = this.channelConfigs[pending.channelId];
-      if (!channelConfig?.notifyOnCompaction) return;
-      this.registry.get(pending.channelId)?.sendText({
-        to: pending.chatId,
-        text: "Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
-      })?.catch((err) => this.logger.warn({ err, sessionId }, "Failed to send compaction notification"));
+      const notifyConfig = { enabled: channelConfig?.notifyOnCompaction ?? false };
+      if (this.compactionNotifier) {
+        this.compactionNotifier.notify(sessionId, pending.channelId, pending.chatId, notifyConfig).catch((err) =>
+          this.logger.warn({ err, sessionId }, "Compaction notifier failed"),
+        );
+      }
     });
 
     this.outboundQueue = new MessageQueue(logger);

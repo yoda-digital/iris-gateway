@@ -17,6 +17,7 @@ import { PluginLoader } from "../plugins/loader.js";
 import { TemplateEngine } from "../auto-reply/engine.js";
 import type { AutoReplyTemplate } from "../auto-reply/types.js";
 import { UsageTracker } from "../usage/tracker.js";
+import { CompactionNotifier } from "../bridge/compaction-notifier.js";
 import type { IntentStore } from "../proactive/store.js";
 import type { PulseEngine } from "../proactive/engine.js";
 import type { PluginRegistry as IrisPluginRegistry } from "../plugins/registry.js";
@@ -239,8 +240,11 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     logger.info({ count: templates.length }, "Auto-reply templates loaded");
   }
 
+  // 7.75 Compaction notifier
+  const compactionNotifier = new CompactionNotifier(sessionMap, registry, intelligenceStore, logger);
+
   // 8. Message router
-  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, policyEngine, profileEnricher, vaultStore);
+  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, policyEngine, profileEnricher, vaultStore, compactionNotifier);
 
   // 8.5 Canvas server
   let canvasServer: CanvasServer | null = null;

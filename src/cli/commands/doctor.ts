@@ -2,6 +2,7 @@ import { Command } from "clipanion";
 import { loadConfig } from "../../config/loader.js";
 import { getConfigPath, getStateDir } from "../../config/paths.js";
 import { accessSync, constants, mkdirSync } from "node:fs";
+import { detectOpenCode } from "../../utils/opencode-detect.js";
 
 export class DoctorCommand extends Command {
   static override paths = [["doctor"]];
@@ -43,7 +44,20 @@ export class DoctorCommand extends Command {
       allPassed = false;
     }
 
-    // Check 3: OpenCode reachable
+    // Check 3: OpenCode CLI available
+    const ocInfo = detectOpenCode();
+    if (ocInfo) {
+      this.context.stdout.write(
+        `[PASS] OpenCode CLI found (${ocInfo.path}, version ${ocInfo.version})\n`,
+      );
+    } else {
+      this.context.stdout.write(
+        `[WARN] OpenCode CLI not found in PATH — install with: npm install -g opencode-ai\n`,
+      );
+      // Note: This is a warning, not a failure, since iris can technically run without opencode
+    }
+
+    // Check 4: OpenCode reachable
     let config;
     try {
       config = loadConfig();
@@ -75,7 +89,7 @@ export class DoctorCommand extends Command {
         allPassed = false;
       }
 
-      // Check 4: Channels configured
+      // Check 5: Channels configured
       const channelEntries = Object.entries(config.channels);
       const enabledChannels = channelEntries.filter(
         ([, ch]) => ch.enabled,

@@ -519,3 +519,66 @@ describe("InitCommand: config structure", () => {
   });
 });
 
+describe("InitCommand: --install-opencode flag and IRIS_INSTALL_OPENCODE env", () => {
+  let tempDir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "iris-init-autoinstall-"));
+    cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tempDir);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+  });
+
+  afterEach(() => {
+    cwdSpy.mockRestore();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    delete process.env.IRIS_INSTALL_OPENCODE;
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("auto-installs opencode when IRIS_INSTALL_OPENCODE=1 without prompting confirm", async () => {
+    process.env.IRIS_INSTALL_OPENCODE = "1";
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["whatsapp"]);
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+    // No p.confirm mock — should NOT be called
+
+    const cp = await getChildProcess();
+    (cp.execSync as ReturnType<typeof vi.fn>).mockReturnValue("");
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    const exitCode = await cmd.execute();
+
+    expect(exitCode).toBe(0);
+    expect(cp.execSync).toHaveBeenCalledWith("npm install -g opencode-ai", { stdio: "pipe" });
+    expect(p.confirm).not.toHaveBeenCalled();
+  });
+
+  it("auto-installs opencode when --install-opencode flag is set", async () => {
+    const clack = await getClack();
+    const p = clack as Record<string, ReturnType<typeof vi.fn>>;
+
+    p.multiselect.mockResolvedValueOnce(["whatsapp"]);
+    p.text.mockResolvedValueOnce("openrouter/arcee-ai/arcee-spotlight:free");
+
+    const cp = await getChildProcess();
+    (cp.execSync as ReturnType<typeof vi.fn>).mockReturnValue("");
+
+    const { InitCommand } = await import("../../src/cli/commands/init.js");
+    const cmd = new InitCommand();
+    cmd.installOpencode = true;
+    const exitCode = await cmd.execute();
+
+    expect(exitCode).toBe(0);
+    expect(cp.execSync).toHaveBeenCalledWith("npm install -g opencode-ai", { stdio: "pipe" });
+    expect(p.confirm).not.toHaveBeenCalled();
+  });
+});
+

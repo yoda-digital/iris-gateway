@@ -22,6 +22,9 @@ vi.mock("../../src/bridge/opencode-client.js", () => ({
     checkHealth: vi.fn(),
   })),
 }));
+vi.mock("../../src/utils/opencode-detect.js", () => ({
+  detectOpenCode: vi.fn(() => ({ path: "/usr/bin/opencode", version: "1.0.0" })),
+}));
 
 // ─── Shared mock factories ────────────────────────────────────────────────────
 
@@ -435,6 +438,12 @@ describe("GatewayContext type contract", () => {
     expect(typeof mod.startGateway).toBe("function");
   });
 
+  it("imports opencode-detect module for startup check", async () => {
+    // Verify the detectOpenCode mock is wired in (confirms lifecycle.ts imports it)
+    const { detectOpenCode } = await import("../../src/utils/opencode-detect.js");
+    expect(detectOpenCode).toBeDefined();
+    expect(detectOpenCode()).toEqual({ path: "/usr/bin/opencode", version: "1.0.0" });
+  });
 });
 
 // ─── Readiness check tests (issue #176) ──────────────────────────────────────

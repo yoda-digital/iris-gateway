@@ -53,6 +53,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { syncModelsToOpenCode } from "../config/model-sync.js";
 import { waitForOpenCodeReady } from "./readiness.js";
 import { printStartupSummary } from "./startup-summary.js";
+import { detectOpenCode } from "../utils/opencode-detect.js";
 
 export interface GatewayContext {
   config: IrisConfig;
@@ -105,6 +106,16 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
 
   // 3. Ensure state directory
   const stateDir = ensureDir(getStateDir());
+
+  // 3.5 OpenCode CLI presence check (informational — gateway still starts without it)
+  const ocInfo = detectOpenCode();
+  if (ocInfo) {
+    logger.info({ path: ocInfo.path, version: ocInfo.version }, "OpenCode CLI detected");
+  } else {
+    logger.warn(
+      "OpenCode CLI not found in PATH — install with: npm install -g opencode-ai"
+    );
+  }
 
   // 4. Sync iris.config.json models → opencode.json (before bridge starts)
   await syncModelsToOpenCode(config, config.opencode, logger);

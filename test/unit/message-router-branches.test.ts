@@ -92,7 +92,7 @@ function makeEnv(opts: EnvOptions = {}) {
   );
 
   const registry = new ChannelRegistry();
-  const adapter = new MockAdapter();
+  const adapter = new MockAdapter("mock", "Mock Channel", { edit: opts.channelConfigs?.mock?.streaming?.editInPlace ?? false });
   if (opts.withAdapter !== false) registry.register(adapter);
 
   const logger = pino({ level: "silent" });
@@ -387,6 +387,146 @@ describe("MessageRouter — streaming coalescer path", () => {
       ).resolves.toBeUndefined();
       // Typing was sent, meaning processing reached step 8
       expect(adapter.calls.filter(c => c.method === "sendTyping").length).toBe(1);
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
+  it("editInPlace: true — captures messageId on first chunk, calls editMessage on subsequent chunks", async () => {
+    const channelConfigs = {
+      mock: {
+        streaming: {
+          enabled: true,
+          minChars: 20,
+          maxChars: 100,
+          idleMs: 50,
+          breakOn: "paragraph" as const,
+          editInPlace: true,
+        },
+      },
+    };
+    const { tempDir, bridge, router, adapter } = makeEnv({ channelConfigs });
+    try {
+      // Mock sendAndWait to not return immediately (simulates streaming mode)
+      let resolveWait: (() => void) | null = null;
+      const waitPromise = new Promise<string>((resolve) => {
+        resolveWait = () => resolve("");
+      });
+      vi.spyOn(bridge, "sendAndWait").mockReturnValue(waitPromise);
+
+      const handlePromise = router.handleInbound(makeInboundMessage({ channelId: "mock", text: "stream with edits" }));
+
+      // Wait for session creation and coalescer setup
+      await new Promise(r => setTimeout(r, 10));
+
+      const eh = router.getEventHandler();
+      const sessionId = [...bridge.sessions.keys()][0]!;
+
+      // First chunk — should trigger sendText (isEdit = false)
+      (eh.events as any).emit("partial", sessionId, "This is the first chunk of text that exceeds minimum threshold. ");
+      await new Promise(r => setTimeout(r, 100)); // Wait for idle timer + flush
+
+      // Verify sendText was called for the first chunk
+      const sendTextCalls = adapter.calls.filter(c => c.method === "sendText");
+      expect(sendTextCalls.length).toBe(1);
+      const firstSend = sendTextCalls[0]!.args[0] as any;
+      expect(firstSend.text).toContain("This is the first chunk");
+
+      // Second chunk — should trigger editMessage (isEdit = true)
+      (eh.events as any).emit("partial", sessionId, "And here is more text. ");
+      await new Promise(r => setTimeout(r, 100));
+
+      // Verify editMessage was called with the captured messageId
+      const editCalls = adapter.calls.filter(c => c.method === "editMessage");
+      expect(editCalls.length).toBeGreaterThanOrEqual(1);
+      const firstEdit = editCalls[0]!.args[0] as any;
+      expect(firstEdit.messageId).toBe("mock-1"); // The messageId from first sendText
+      expect(firstEdit.text).toContain("This is the first chunk");
+      expect(firstEdit.text).toContain("And here is more text");
+
+      // End streaming
+      (eh.events as any).emit("response", sessionId, "");
+      resolveWait?.();
+      await handlePromise;
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+
+  it("editInPlace: true — skips edit when sentMessageId is null (first chunk not yet landed)", async () => {
+    const channelConfigs = {
+      mock: {
+        streaming: {
+          enabled: true,
+          minChars: 20,
+          maxChars: 100,
+          idleMs: 50,
+          breakOn: "paragraph" as const,
+          editInPlace: true,
+        },
+      },
+    };
+    const { tempDir, bridge, router, adapter } = makeEnv({ channelConfigs });
+    try {
+      // Mock sendAndWait to not return immediately
+      let resolveWait: (() => void) | null = null;
+      const waitPromise = new Promise<string>((resolve) => {
+        resolveWait = () => resolve("");
+      });
+      vi.spyOn(bridge, "sendAndWait").mockReturnValue(waitPromise);
+
+      // Make sendText return a promise that doesn't resolve immediately
+      let resolveSendText: ((value: { messageId: string }) => void) | null = null;
+      const sendTextPromise = new Promise<{ messageId: string }>((resolve) => {
+        resolveSendText = resolve;
+      });
+      vi.spyOn(adapter, "sendText").mockImplementation(async (params) => {
+        adapter.calls.push({ method: "sendText", args: [params] });
+        return sendTextPromise;
+      });
+
+      const handlePromise = router.handleInbound(makeInboundMessage({ channelId: "mock", text: "delayed send" }));
+
+      await new Promise(r => setTimeout(r, 10));
+
+      const eh = router.getEventHandler();
+      const sessionId = [...bridge.sessions.keys()][0]!;
+
+      // First chunk — triggers sendText but doesn't resolve yet
+      (eh.events as any).emit("partial", sessionId, "First chunk that will take time to send. ");
+      await new Promise(r => setTimeout(r, 100));
+
+      // Verify sendText was called
+      expect(adapter.calls.filter(c => c.method === "sendText").length).toBe(1);
+
+      // Second chunk arrives BEFORE sendText resolves — should skip edit
+      (eh.events as any).emit("partial", sessionId, "Second chunk arrives early. ");
+      await new Promise(r => setTimeout(r, 100));
+
+      // No editMessage should be called since sentMessageId is still null
+      const editCalls = adapter.calls.filter(c => c.method === "editMessage");
+      expect(editCalls.length).toBe(0);
+
+      // Now resolve the sendText promise
+      resolveSendText?.({ messageId: "mock-delayed" });
+      await new Promise(r => setTimeout(r, 10));
+
+      // Third chunk — now sentMessageId is set, should call editMessage
+      (eh.events as any).emit("partial", sessionId, "Third chunk after resolve. ");
+      await new Promise(r => setTimeout(r, 100));
+
+      // Now editMessage should be called
+      const editCallsAfter = adapter.calls.filter(c => c.method === "editMessage");
+      expect(editCallsAfter.length).toBeGreaterThanOrEqual(1);
+      const edit = editCallsAfter[0]!.args[0] as any;
+      expect(edit.messageId).toBe("mock-delayed");
+
+      // End streaming
+      (eh.events as any).emit("response", sessionId, "");
+      resolveWait?.();
+      await handlePromise;
     } finally {
       router.dispose();
       cleanup(tempDir);

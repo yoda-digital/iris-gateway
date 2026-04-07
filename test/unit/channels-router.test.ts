@@ -447,6 +447,7 @@ describe("POST /tool/channel-action — success paths", () => {
     const adapter = new MockAdapter("tg", "Telegram");
     const sendReaction = vi.fn().mockResolvedValue(undefined);
     (adapter as any).sendReaction = sendReaction;
+    (adapter.capabilities as any).reaction = true;
     registry.register(adapter);
     const app = makeApp({ registry, logger });
     const res = await post(app, "/tool/channel-action", {
@@ -463,7 +464,7 @@ describe("POST /tool/channel-action — success paths", () => {
   });
 
   it("edit action — calls editMessage and returns { ok: true }", async () => {
-    const adapter = new MockAdapter("tg", "Telegram");
+    const adapter = new MockAdapter("tg", "Telegram", { edit: true });
     const editMessage = vi.fn().mockResolvedValue(undefined);
     (adapter as any).editMessage = editMessage;
     registry.register(adapter);
@@ -485,6 +486,7 @@ describe("POST /tool/channel-action — success paths", () => {
     const adapter = new MockAdapter("tg", "Telegram");
     const deleteMessage = vi.fn().mockResolvedValue(undefined);
     (adapter as any).deleteMessage = deleteMessage;
+    (adapter.capabilities as any).delete = true;
     registry.register(adapter);
     const app = makeApp({ registry, logger });
     const res = await post(app, "/tool/channel-action", {

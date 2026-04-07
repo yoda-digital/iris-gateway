@@ -95,22 +95,22 @@ export function channelsRouter(deps: ChannelsDeps): Hono {
     try {
       switch (body.action) {
         case "typing":
-          if (!adapter.sendTyping) return c.json({ error: "Channel does not support typing" }, 400);
+          if (!adapter.capabilities.typing || !adapter.sendTyping) return c.json({ error: "Channel does not support typing" }, 400);
           await adapter.sendTyping({ to: body.chatId });
           return c.json({ ok: true });
         case "react":
           if (!body.messageId || !body.emoji) return c.json({ error: "react requires messageId and emoji" }, 400);
-          if (!adapter.sendReaction) return c.json({ error: "Channel does not support reactions" }, 400);
+          if (!adapter.capabilities.reaction || !adapter.sendReaction) return c.json({ error: "Channel does not support reactions" }, 400);
           await adapter.sendReaction({ messageId: body.messageId, emoji: body.emoji, chatId: body.chatId });
           return c.json({ ok: true });
         case "edit":
           if (!body.messageId || !body.text) return c.json({ error: "edit requires messageId and text" }, 400);
-          if (!adapter.editMessage) return c.json({ error: "Channel does not support edit" }, 400);
+          if (!adapter.capabilities.edit || !adapter.editMessage) return c.json({ error: "Channel does not support edit" }, 400);
           await adapter.editMessage({ messageId: body.messageId, text: body.text, chatId: body.chatId });
           return c.json({ ok: true });
         case "delete":
           if (!body.messageId) return c.json({ error: "delete requires messageId" }, 400);
-          if (!adapter.deleteMessage) return c.json({ error: "Channel does not support delete" }, 400);
+          if (!adapter.capabilities.delete || !adapter.deleteMessage) return c.json({ error: "Channel does not support delete" }, 400);
           await adapter.deleteMessage({ messageId: body.messageId, chatId: body.chatId });
           return c.json({ ok: true });
       }

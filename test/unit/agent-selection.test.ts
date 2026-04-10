@@ -94,3 +94,60 @@ describe("selectAgent() — intent-based routing", () => {
     expect(agent).toBe("build"); // from auto-routing
   });
 });
+
+describe("selectAgent() — multilingual routing", () => {
+  it("routes Romanian build intent with Romanian target noun to build", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("rezolva fișierul auth.ts", "telegram")).toBe("build");
+  });
+
+  it("routes Romanian build intent without diacritics to build", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("rezolva eroarea din auth.ts", "telegram")).toBe("build");
+  });
+
+  it("falls back to chat for Russian build intent", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("исправь ошибку в auth.ts", "telegram")).toBe("chat");
+  });
+
+  it("routes Romanian plan intent to plan", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("planifică arhitectura pentru noul API", "telegram")).toBe("plan");
+  });
+
+  it("falls back to chat for Russian plan intent", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("спроектируй архитектуру для нового API", "telegram")).toBe("chat");
+  });
+
+  it("routes Romanian explore intent without diacritics to explore", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("unde se afla function sendMessage", "telegram")).toBe("explore");
+  });
+
+  it("falls back to chat for Russian explore intent", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("где находится функция sendMessage", "telegram")).toBe("chat");
+  });
+
+  it("routes short English 'fix auth.ts' to build via filename detection", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("fix auth.ts", "telegram")).toBe("build");
+  });
+
+  it("routes short English 'fix sendMessage' to build via camelCase detection", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("fix sendMessage", "telegram")).toBe("build");
+  });
+
+  it("routes non-English general chat to chat", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("bună ziua, ce mai faci?", "telegram")).toBe("chat");
+  });
+
+  it("routes Russian general chat to chat", () => {
+    const router = makeRouter();
+    expect((router as any).selectAgent("привет, как дела?", "telegram")).toBe("chat");
+  });
+});

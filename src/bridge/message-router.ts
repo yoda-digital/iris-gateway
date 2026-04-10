@@ -328,17 +328,35 @@ export class MessageRouter {
     const t = text.toLowerCase();
 
     // Coding execution — needs real tools
-    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
+    // EN: fix, implement, write, create, refactor, delete, rename, move, update
+    // RO: rezolva, implementeaza, creeaza, scrie, refactorizeaza, sterge, redenumeste, muta, actualizeaza
+    // RU: исправь, реализуй, напиши, создай, рефактори, удали, переименуй, перемести, обнови
+    const buildVerbs = /\b(fix|implement|write|create|refactor|delete|rename|move|update|rezolv[aă]|implementeaz[aă]|creeaz[aă]|scrie|refactorizeaz[aă]|[sș]terge|redenume[sș]te|mut[aă]|actualizeaz[aă]|исправь|реализуй|напиши|создай|рефактори|удали|переименуй|перемести|обнови)\b/;
+    const buildTargets = /\b(file|function|class|component|test|bug|issue|error|fișier|funcți[eai]|clas[aă]|component[aă]|eroare|problemă|файл|функци[яюей]|класс|компонент|тест|баг|ошибк[аиу])\b/;
+    if (buildVerbs.test(t) && buildTargets.test(t)) {
+      return "build";
+    }
+    // Short build commands — verb alone is enough (e.g. "fix auth", "rezolva auth.ts")
+    if (buildVerbs.test(t) && /\.\w{1,5}\b|\b[a-zA-Z][\w-]*[A-Z]\w*\b/.test(text)) {
+      // Matches filenames (auth.ts) or camelCase identifiers (sendMessage)
       return "build";
     }
 
     // Architecture and planning
-    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
+    // EN: plan, design, architect, how should, what's the best way, structure, approach
+    // RO: planifica, proiecteaza, arhitectura, cum ar trebui, structura
+    // RU: спланируй, спроектируй, архитектура, как лучше, структура
+    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach|planific[aă]|proiecteaz[aă]|arhitectur[aă]|cum ar trebui|structur[aă]|спланируй|спроектируй|архитектур[аыу]|как лучше|структур[аыу])\b/.test(t)) {
       return "plan";
     }
 
     // Codebase investigation
-    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
+    // EN: explore, understand, find, where is, what does, explain, navigate, show me, locate
+    // RO: exploreaza, explica, cauta, gaseste, unde este, unde se afla, arata-mi, navigheaza
+    // RU: исследуй, объясни, найди, где находится, покажи
+    const exploreVerbs = /\b(explore|understand|find|where is|what does|explain|navigate|show me|locate|exploreaz[aă]|explic[aă]|caut[aă]|g[aă]se[sș]te|unde este|unde se afl[aă]|arat[aă].mi|navigheaz[aă]|исследуй|объясни|найди|где находится|покажи)\b/;
+    const exploreTargets = /\b(codebase|repo|code|file|function|module|class|cod|fișier|funcți[eai]|modul|clas[aă]|код|файл|функци[яюей]|модуль|класс)\b/;
+    if (exploreVerbs.test(t) && exploreTargets.test(t)) {
       return "explore";
     }
 

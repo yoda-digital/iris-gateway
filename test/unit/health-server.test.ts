@@ -33,7 +33,6 @@ const fakeAdapter = {
 
 describe("HealthServer", () => {
   let server: HealthServer;
-  let port: number;
   let registry: ReturnType<typeof mockRegistry>;
   let bridge: ReturnType<typeof mockBridge>;
   let base: string;
@@ -41,10 +40,10 @@ describe("HealthServer", () => {
   beforeEach(async () => {
     registry = mockRegistry();
     bridge = mockBridge();
-    port = 19900 + Math.floor(Math.random() * 100);
-    server = new HealthServer(registry, bridge, port, "127.0.0.1");
+    server = new HealthServer(registry, bridge, 0, "127.0.0.1");
     await server.start();
-    base = `http://127.0.0.1:${port}`;
+    const addr = server.address()!;
+    base = `http://127.0.0.1:${addr.port}`;
   });
 
   afterEach(async () => {

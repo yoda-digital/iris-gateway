@@ -114,11 +114,21 @@ export class HealthServer {
       port: this.port,
       hostname: this.hostname,
     });
+    await new Promise<void>((resolve, reject) => {
+      this.server!.on("listening", resolve);
+      this.server!.on("error", reject);
+    });
+  }
+
+  address(): import("net").AddressInfo | null {
+    const addr = this.server?.address() ?? null;
+    if (addr && typeof addr === "object") return addr;
+    return null;
   }
 
   async stop(): Promise<void> {
     if (this.server) {
-      this.server.close();
+      await new Promise<void>((resolve) => this.server!.close(() => resolve()));
       this.server = null;
     }
   }

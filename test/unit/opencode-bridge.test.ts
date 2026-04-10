@@ -105,14 +105,9 @@ describe("OpenCodeBridge", () => {
     });
   });
 
-  /* ── getQueueSize / isAvailable ───────────────────────────────── */
+  /* ── getInFlightCount / getPendingQueueSize / isAvailable ──────── */
 
-  describe("getQueueSize / getInFlightCount / getPendingQueueSize / isAvailable", () => {
-    it("getQueueSize returns 0 initially (backwards compat)", () => {
-      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
-      expect(bridge.getQueueSize()).toBe(0);
-    });
-
+  describe("getInFlightCount / getPendingQueueSize / isAvailable", () => {
     it("getInFlightCount returns 0 initially", () => {
       const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
       expect(bridge.getInFlightCount()).toBe(0);

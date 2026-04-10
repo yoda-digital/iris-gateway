@@ -54,10 +54,6 @@ export class MockOpenCodeBridge {
     return true;
   }
 
-  getQueueSize(): number {
-    return 0;
-  }
-
   async deleteSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
   }

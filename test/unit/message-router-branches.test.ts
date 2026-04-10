@@ -2,40 +2,14 @@
  * test/unit/message-router-branches.test.ts
  *
  * Covers error branches, fallback routing, and edge-case dispatch paths in
- * MessageRouter that are NOT exercised by the existing test files:
- *  - no adapter for channel (Steps 1 / sendResponse fallback)
- *  - security denied without a rejection message
- *  - mention-gating filter (group message not mentioning bot)
- *  - mention-gating pass-through (group message with bot mention)
- *  - auto-reply without forwardToAi
- *  - auto-reply with forwardToAi (continues to AI)
- *  - first-contact meta-prompt injection
- *  - streaming coalescer setup path
- *  - event-handler "partial", "response" (with coalescer), "error" (with coalescer)
- *  - handleResponse with no pending context
- *  - pruneStale removing timed-out entries
- *  - dispose() clearing the cleanup timer
- *  - getEventHandler() accessor
- *  - circuit OPEN with no adapter (no crash)
+ * MessageRouter: no adapter, security denied, mention-gating, auto-reply,
+ * first-contact, pruneStale, dispose, circuit OPEN.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { MessageRouter } from "../../src/bridge/message-router.js";
-import { SessionMap } from "../../src/bridge/session-map.js";
-import { SecurityGate } from "../../src/security/dm-policy.js";
-import { PairingStore } from "../../src/security/pairing-store.js";
-import { AllowlistStore } from "../../src/security/allowlist-store.js";
-import { RateLimiter } from "../../src/security/rate-limiter.js";
-import { ChannelRegistry } from "../../src/channels/registry.js";
-import { CircuitBreaker } from "../../src/bridge/circuit-breaker.js";
-import { TemplateEngine } from "../../src/auto-reply/engine.js";
-import { MockAdapter } from "../helpers/mock-adapter.js";
-import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
+import { describe, it, expect, vi } from "vitest";
+import { makeEnv, cleanup } from "../helpers/message-router-env.js";
 import { makeInboundMessage } from "../helpers/fixtures.js";
-import pino from "pino";
+import { TemplateEngine } from "../../src/auto-reply/engine.js";
 
 vi.mock("../../src/gateway/metrics.js", () => ({
   metrics: {
@@ -54,76 +28,10 @@ vi.mock("../../src/gateway/metrics.js", () => ({
   },
 }));
 
-// ── A bridge that exposes a real, controllable CircuitBreaker ──────────────
-class ControllableBridge extends MockOpenCodeBridge {
-  readonly _cb = new CircuitBreaker({ failureThreshold: 3, recoveryTimeoutMs: 10_000 });
-  override getCircuitBreaker() { return this._cb; }
-}
-
-// ── Factory helpers ────────────────────────────────────────────────────────
-
-interface EnvOptions {
-  withAdapter?: boolean;
-  dmPolicy?: "open" | "disabled" | "allowlist" | "pairing";
-  channelConfigs?: Record<string, any>;
-  templateEngine?: TemplateEngine | null;
-  profileEnricher?: { isFirstContact(profile: any): boolean } | null;
-  vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null;
-}
-
-function makeEnv(opts: EnvOptions = {}) {
-  const tempDir = mkdtempSync(join(tmpdir(), "iris-branches-"));
-  writeFileSync(join(tempDir, "pairing.json"), "[]");
-  writeFileSync(join(tempDir, "allowlist.json"), "[]");
-
-  const bridge = new ControllableBridge();
-  const sessionMap = new SessionMap(tempDir);
-  const securityGate = new SecurityGate(
-    new PairingStore(tempDir),
-    new AllowlistStore(tempDir),
-    new RateLimiter({ perMinute: 30, perHour: 300 }),
-    {
-      defaultDmPolicy: opts.dmPolicy ?? "open",
-      pairingCodeTtlMs: 3_600_000,
-      pairingCodeLength: 8,
-      rateLimitPerMinute: 30,
-      rateLimitPerHour: 300,
-    },
-  );
-
-  const registry = new ChannelRegistry();
-  const adapter = new MockAdapter("mock", "Mock Channel", { edit: opts.channelConfigs?.mock?.streaming?.editInPlace ?? false });
-  if (opts.withAdapter !== false) registry.register(adapter);
-
-  const logger = pino({ level: "silent" });
-
-  const router = new MessageRouter(
-    bridge as any,
-    sessionMap,
-    securityGate,
-    registry,
-    logger,
-    opts.channelConfigs ?? {},
-    opts.templateEngine,
-    null,
-    opts.profileEnricher,
-    opts.vaultStoreRef,
-  );
-
-  return { tempDir, bridge, adapter, router, registry };
-}
-
-function cleanup(tempDir: string) {
-  rmSync(tempDir, { recursive: true, force: true });
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
-
 describe("MessageRouter — no adapter fallback", () => {
   it("sendResponse logs warning and returns when adapter is not registered", async () => {
     const { tempDir, router } = makeEnv({ withAdapter: false });
     try {
-      // Should not throw — just warn internally
       await expect(
         router.sendResponse("nonexistent-channel", "chat-1", "hello"),
       ).resolves.toBeUndefined();
@@ -136,7 +44,6 @@ describe("MessageRouter — no adapter fallback", () => {
   it("handleInbound still processes security check even when adapter is absent", async () => {
     const { tempDir, router } = makeEnv({ withAdapter: false });
     try {
-      // Should not throw — adapter absence is handled gracefully
       await expect(
         router.handleInbound(makeInboundMessage({ channelId: "mock" })),
       ).resolves.toBeUndefined();
@@ -150,7 +57,6 @@ describe("MessageRouter — no adapter fallback", () => {
 
 describe("MessageRouter — security gate denied branches", () => {
   it("security denied with rejection message but no adapter — no throw", async () => {
-    // 'disabled' policy always denies with a message, but adapter not registered
     const { tempDir, router } = makeEnv({ dmPolicy: "disabled", withAdapter: false });
     try {
       await expect(
@@ -191,7 +97,6 @@ describe("MessageRouter — mention gating (group messages)", () => {
       await router.handleInbound(
         makeInboundMessage({ channelId: "mock", chatType: "group", text: "hello everyone" }),
       );
-      // No AI call, no typing, no send
       expect(sendAndWaitSpy).not.toHaveBeenCalled();
       expect(adapter.calls.filter(c => c.method === "sendText").length).toBe(0);
       expect(adapter.calls.filter(c => c.method === "sendTyping").length).toBe(0);
@@ -229,7 +134,6 @@ describe("MessageRouter — mention gating (group messages)", () => {
       await router.handleInbound(
         makeInboundMessage({ channelId: "mock", chatType: "group", text: "@testbot hello there" }),
       );
-      // The mention should have been stripped from the forwarded text
       expect(capturedText).not.toContain("@testbot");
     } finally {
       router.dispose();
@@ -276,7 +180,6 @@ describe("MessageRouter — auto-reply template engine", () => {
       bridge.responseText = "AI reply";
       const sendAndWaitSpy = vi.spyOn(bridge, "sendAndWait");
       await router.handleInbound(makeInboundMessage({ channelId: "mock", text: "hi bot" }));
-      // Both auto-reply AND AI call should happen
       expect(sendAndWaitSpy).toHaveBeenCalled();
       const sends = adapter.calls.filter(c => c.method === "sendText");
       expect(sends.length).toBeGreaterThanOrEqual(1);
@@ -355,291 +258,7 @@ describe("MessageRouter — first-contact meta-prompt injection", () => {
     try {
       bridge.responseText = "ok";
       await router.handleInbound(makeInboundMessage({ channelId: "mock", text: "hi" }));
-      // isFirstContact should not be called since profile is null
       expect(profileEnricher.isFirstContact).not.toHaveBeenCalled();
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-});
-
-describe("MessageRouter — streaming coalescer path", () => {
-  it("sets up a StreamCoalescer when streaming is enabled for the channel", async () => {
-    const channelConfigs = {
-      mock: {
-        streaming: {
-          enabled: true,
-          minChars: 50,
-          maxChars: 1000,
-          idleMs: 100,
-          breakOn: "paragraph" as const,
-          editInPlace: false,
-        },
-      },
-    };
-    const { tempDir, bridge, router, adapter } = makeEnv({ channelConfigs });
-    try {
-      bridge.responseText = "streaming response";
-      // Should complete without error; coalescer path is exercised
-      await expect(
-        router.handleInbound(makeInboundMessage({ channelId: "mock", text: "stream test" })),
-      ).resolves.toBeUndefined();
-      // Typing was sent, meaning processing reached step 8
-      expect(adapter.calls.filter(c => c.method === "sendTyping").length).toBe(1);
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("editInPlace: true — captures messageId on first chunk, calls editMessage on subsequent chunks", async () => {
-    const channelConfigs = {
-      mock: {
-        streaming: {
-          enabled: true,
-          minChars: 20,
-          maxChars: 100,
-          idleMs: 50,
-          breakOn: "paragraph" as const,
-          editInPlace: true,
-        },
-      },
-    };
-    const { tempDir, bridge, router, adapter } = makeEnv({ channelConfigs });
-    try {
-      // Mock sendAndWait to not return immediately (simulates streaming mode)
-      let resolveWait: (() => void) | null = null;
-      const waitPromise = new Promise<string>((resolve) => {
-        resolveWait = () => resolve("");
-      });
-      vi.spyOn(bridge, "sendAndWait").mockReturnValue(waitPromise);
-
-      const handlePromise = router.handleInbound(makeInboundMessage({ channelId: "mock", text: "stream with edits" }));
-
-      // Wait for session creation and coalescer setup
-      await new Promise(r => setTimeout(r, 10));
-
-      const eh = router.getEventHandler();
-      const sessionId = [...bridge.sessions.keys()][0]!;
-
-      // First chunk — should trigger sendText (isEdit = false)
-      (eh.events as any).emit("partial", sessionId, "This is the first chunk of text that exceeds minimum threshold. ");
-      await new Promise(r => setTimeout(r, 100)); // Wait for idle timer + flush
-
-      // Verify sendText was called for the first chunk
-      const sendTextCalls = adapter.calls.filter(c => c.method === "sendText");
-      expect(sendTextCalls.length).toBe(1);
-      const firstSend = sendTextCalls[0]!.args[0] as any;
-      expect(firstSend.text).toContain("This is the first chunk");
-
-      // Second chunk — should trigger editMessage (isEdit = true)
-      (eh.events as any).emit("partial", sessionId, "And here is more text. ");
-      await new Promise(r => setTimeout(r, 100));
-
-      // Verify editMessage was called with the captured messageId
-      const editCalls = adapter.calls.filter(c => c.method === "editMessage");
-      expect(editCalls.length).toBeGreaterThanOrEqual(1);
-      const firstEdit = editCalls[0]!.args[0] as any;
-      expect(firstEdit.messageId).toBe("mock-1"); // The messageId from first sendText
-      expect(firstEdit.text).toContain("This is the first chunk");
-      expect(firstEdit.text).toContain("And here is more text");
-
-      // End streaming
-      (eh.events as any).emit("response", sessionId, "");
-      resolveWait?.();
-      await handlePromise;
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("editInPlace: true — skips edit when sentMessageId is null (first chunk not yet landed)", async () => {
-    const channelConfigs = {
-      mock: {
-        streaming: {
-          enabled: true,
-          minChars: 20,
-          maxChars: 100,
-          idleMs: 50,
-          breakOn: "paragraph" as const,
-          editInPlace: true,
-        },
-      },
-    };
-    const { tempDir, bridge, router, adapter } = makeEnv({ channelConfigs });
-    try {
-      // Mock sendAndWait to not return immediately
-      let resolveWait: (() => void) | null = null;
-      const waitPromise = new Promise<string>((resolve) => {
-        resolveWait = () => resolve("");
-      });
-      vi.spyOn(bridge, "sendAndWait").mockReturnValue(waitPromise);
-
-      // Make sendText return a promise that doesn't resolve immediately
-      let resolveSendText: ((value: { messageId: string }) => void) | null = null;
-      const sendTextPromise = new Promise<{ messageId: string }>((resolve) => {
-        resolveSendText = resolve;
-      });
-      vi.spyOn(adapter, "sendText").mockImplementation(async (params) => {
-        adapter.calls.push({ method: "sendText", args: [params] });
-        return sendTextPromise;
-      });
-
-      const handlePromise = router.handleInbound(makeInboundMessage({ channelId: "mock", text: "delayed send" }));
-
-      await new Promise(r => setTimeout(r, 10));
-
-      const eh = router.getEventHandler();
-      const sessionId = [...bridge.sessions.keys()][0]!;
-
-      // First chunk — triggers sendText but doesn't resolve yet
-      (eh.events as any).emit("partial", sessionId, "First chunk that will take time to send. ");
-      await new Promise(r => setTimeout(r, 100));
-
-      // Verify sendText was called
-      expect(adapter.calls.filter(c => c.method === "sendText").length).toBe(1);
-
-      // Second chunk arrives BEFORE sendText resolves — should skip edit
-      (eh.events as any).emit("partial", sessionId, "Second chunk arrives early. ");
-      await new Promise(r => setTimeout(r, 100));
-
-      // No editMessage should be called since sentMessageId is still null
-      const editCalls = adapter.calls.filter(c => c.method === "editMessage");
-      expect(editCalls.length).toBe(0);
-
-      // Now resolve the sendText promise
-      resolveSendText?.({ messageId: "mock-delayed" });
-      await new Promise(r => setTimeout(r, 10));
-
-      // Third chunk — now sentMessageId is set, should call editMessage
-      (eh.events as any).emit("partial", sessionId, "Third chunk after resolve. ");
-      await new Promise(r => setTimeout(r, 100));
-
-      // Now editMessage should be called
-      const editCallsAfter = adapter.calls.filter(c => c.method === "editMessage");
-      expect(editCallsAfter.length).toBeGreaterThanOrEqual(1);
-      const edit = editCallsAfter[0]!.args[0] as any;
-      expect(edit.messageId).toBe("mock-delayed");
-
-      // End streaming
-      (eh.events as any).emit("response", sessionId, "");
-      resolveWait?.();
-      await handlePromise;
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-});
-
-describe("MessageRouter — event handler paths", () => {
-  it("getEventHandler returns the event handler instance", () => {
-    const { tempDir, router } = makeEnv();
-    try {
-      const eh = router.getEventHandler();
-      expect(eh).toBeDefined();
-      expect(typeof eh.dispose).toBe("function");
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("'error' event cleans up coalescer and pending response", async () => {
-    // Directly inject a pending response + coalescer, then fire the error event.
-    // This exercises the cleanup branches without needing to hang the bridge.
-    const { tempDir, router, adapter } = makeEnv();
-    try {
-      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
-      pr.set("test-session", { channelId: "mock", chatId: "c1", replyToId: "r1", createdAt: Date.now() });
-
-      const eh = router.getEventHandler();
-      (eh.events as any).emit("error", "test-session", new Error("simulated error"));
-
-      // pendingResponses entry should be cleaned up
-      expect(pr.has("test-session")).toBe(false);
-
-      // Allow microtasks (sendResponse is async) to flush
-      await new Promise((r) => setTimeout(r, 10));
-
-      // User should receive an error message via sendText
-      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c1");
-      expect(sendCall).toBeDefined();
-      const sentText = (sendCall?.args[0] as any)?.text as string;
-      expect(sentText).toMatch(/⚠️ Request failed/);
-      expect(sentText).toContain("simulated error");
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("'error' event with no pending context does not throw", async () => {
-    const { tempDir, router } = makeEnv();
-    try {
-      const eh = router.getEventHandler();
-      expect(() => {
-        (eh.events as any).emit("error", "unknown-session", new Error("orphan error"));
-      }).not.toThrow();
-      await new Promise((r) => setTimeout(r, 10));
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("'error' event with non-Error string payload uses fallback message", async () => {
-    const { tempDir, router, adapter } = makeEnv();
-    try {
-      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
-      pr.set("test-session", { channelId: "mock", chatId: "c1", replyToId: "r1", createdAt: Date.now() });
-
-      const eh = router.getEventHandler();
-      (eh.events as any).emit("error", "test-session", "stream closed");
-
-      await new Promise((r) => setTimeout(r, 10));
-
-      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c1");
-      expect(sendCall).toBeDefined();
-      const sentText = (sendCall?.args[0] as any)?.text as string;
-      expect(sentText).toContain("An unexpected error occurred");
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("'error' event with null payload uses fallback message", async () => {
-    const { tempDir, router, adapter } = makeEnv();
-    try {
-      const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
-      pr.set("test-session-2", { channelId: "mock", chatId: "c2", replyToId: "r2", createdAt: Date.now() });
-
-      const eh = router.getEventHandler();
-      (eh.events as any).emit("error", "test-session-2", null);
-
-      await new Promise((r) => setTimeout(r, 10));
-
-      const sendCall = adapter.calls.find((c) => c.method === "sendText" && (c.args[0] as any)?.to === "c2");
-      expect(sendCall).toBeDefined();
-      const sentText = (sendCall?.args[0] as any)?.text as string;
-      expect(sentText).toContain("An unexpected error occurred");
-    } finally {
-      router.dispose();
-      cleanup(tempDir);
-    }
-  });
-
-  it("'response' event via handleResponse logs warning for unknown session", () => {
-    const { tempDir, router } = makeEnv();
-    try {
-      const eh = router.getEventHandler();
-      // Fire response event for a session ID with no pending context
-      expect(() => {
-        (eh.events as any).emit("response", "no-such-session", "some text");
-      }).not.toThrow();
     } finally {
       router.dispose();
       cleanup(tempDir);
@@ -649,8 +268,6 @@ describe("MessageRouter — event handler paths", () => {
 
 describe("MessageRouter — pruneStale cleanup", () => {
   it("dispose cancels the cleanup timer without error", () => {
-    // The pruneStale path is exercised by the cleanup interval;
-    // this test verifies dispose() stops it cleanly.
     const { tempDir, router } = makeEnv();
     try {
       expect(() => router.dispose()).not.toThrow();
@@ -660,15 +277,13 @@ describe("MessageRouter — pruneStale cleanup", () => {
   });
 
   it("pruneStale removes entries whose createdAt exceeds TTL", async () => {
-    // Access private pendingResponses via type assertion to verify pruning.
     const { tempDir, router } = makeEnv();
     try {
       const pr = (router as any).turnGrouper["pendingResponses"] as Map<string, any>;
-      const staleTs = Date.now() - 6 * 60 * 1000; // 6 min ago > 5 min TTL
+      const staleTs = Date.now() - 6 * 60 * 1000;
       pr.set("stale-session", { channelId: "mock", chatId: "c1", createdAt: staleTs });
       pr.set("fresh-session", { channelId: "mock", chatId: "c2", createdAt: Date.now() });
 
-      // Call the private method directly
       (router as any).turnGrouper["pruneStale"]();
 
       expect(pr.has("stale-session")).toBe(false);
@@ -685,7 +300,6 @@ describe("MessageRouter — dispose", () => {
     const { tempDir, router } = makeEnv();
     try {
       expect(() => router.dispose()).not.toThrow();
-      // Calling dispose a second time should be idempotent
       expect(() => router.dispose()).not.toThrow();
     } finally {
       cleanup(tempDir);

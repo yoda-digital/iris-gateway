@@ -3,6 +3,7 @@ import { getStateDir, ensureDir } from "../config/paths.js";
 import type { IrisConfig } from "../config/types.js";
 import { createLogger, type Logger } from "../logging/logger.js";
 import { OpenCodeBridge } from "../bridge/opencode-client.js";
+import { CompactionNotifier } from "../bridge/compaction-notifier.js";
 import { SessionMap } from "../bridge/session-map.js";
 import { MessageRouter } from "../bridge/message-router.js";
 import { ToolServer } from "../bridge/tool-server.js";
@@ -239,8 +240,23 @@ export async function startGateway(configPath?: string): Promise<GatewayContext>
     logger.info({ count: templates.length }, "Auto-reply templates loaded");
   }
 
+  // 7.6 Compaction notifier
+  const compactionNotifier = new CompactionNotifier(sessionMap, registry, logger, intelligenceStore);
+
   // 8. Message router
-  const router = new MessageRouter(bridge, sessionMap, securityGate, registry, logger, config.channels, templateEngine, policyEngine, profileEnricher, vaultStore);
+  const router = new MessageRouter(
+    bridge,
+    sessionMap,
+    securityGate,
+    registry,
+    logger,
+    config.channels,
+    templateEngine,
+    policyEngine,
+    profileEnricher,
+    vaultStore,
+    compactionNotifier,
+  );
 
   // 8.5 Canvas server
   let canvasServer: CanvasServer | null = null;

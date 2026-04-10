@@ -18,7 +18,9 @@ vi.mock("../../src/logging/logger.js", () => ({ createLogger: vi.fn() }));
 vi.mock("../../src/bridge/opencode-client.js", () => ({ OpenCodeBridge: vi.fn() }));
 vi.mock("../../src/bridge/session-map.js", () => ({ SessionMap: vi.fn(() => ({})) }));
 vi.mock("../../src/bridge/message-router.js", () => ({
-  MessageRouter: vi.fn(() => ({})),
+  MessageRouter: vi.fn(() => ({
+    getEventHandler: vi.fn(() => ({})),
+  })),
 }));
 vi.mock("../../src/bridge/tool-server.js", () => ({
   ToolServer: vi.fn(() => ({

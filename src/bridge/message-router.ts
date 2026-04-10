@@ -15,6 +15,12 @@ import { TurnGrouper } from "./turn-grouper.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
 
+export interface MessageRouterConfig {
+  readonly channelConfigs?: Record<string, ChannelAccountConfig>;
+  readonly templateEngine?: TemplateEngine | null;
+  readonly policyEngine?: PolicyEngine | null;
+}
+
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
   private readonly turnGrouper: TurnGrouper;

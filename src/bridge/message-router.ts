@@ -2,10 +2,10 @@ import type { InboundMessage } from "../channels/adapter.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { SecurityGate, SecurityCheckResult } from "../security/dm-policy.js";
 import type { Logger } from "../logging/logger.js";
-import type { ChannelAccountConfig } from "../config/types.js";
+import type { ChannelAccountConfig, OpenCodeConfig } from "../config/types.js";
 import { chunkText, PLATFORM_LIMITS } from "../utils/text-chunker.js";
 import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-gating.js";
-import type { OpenCodeBridge, Permission } from "./opencode-client.js";
+import type { OpenCodeBridge, Permission, SessionDiff } from "./opencode-client.js";
 import type { PolicyEngine } from "../governance/policy.js";
 import type { SessionMap } from "./session-map.js";
 import { EventHandler } from "./event-handler.js";
@@ -14,6 +14,21 @@ import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
+
+function formatDiffSummary(diff: SessionDiff): string {
+  const files = diff.files ?? [];
+  const lines = [
+    "────────────────────────────",
+    `📝 Changes made: ${files.length} file${files.length === 1 ? "" : "s"}`,
+  ];
+  for (const file of files.slice(0, 5)) {
+    lines.push(`  +${file.additions} / -${file.deletions}  ${file.path}`);
+  }
+  if (files.length > 5) {
+    lines.push(`  … and ${files.length - 5} more`);
+  }
+  return lines.join("\n");
+}
 
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
@@ -32,6 +47,7 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly opencodeConfig?: Pick<OpenCodeConfig, "reportDiff"> | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -248,6 +264,16 @@ export class MessageRouter {
       const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
       const agent = this.selectAgent(messageText, msg.channelId);
       response = await this.bridge.sendAndWait(entry.openCodeSessionId, messageText, sendTimeoutMs, undefined, agent);
+      if (this.opencodeConfig?.reportDiff && agent !== "chat" && response) {
+        try {
+          const diff = await this.bridge.getSessionDiff(entry.openCodeSessionId);
+          if (diff?.files?.length) {
+            response = `${response}\n\n${formatDiffSummary(diff)}`;
+          }
+        } catch {
+          // Diff reporting is best-effort and must not affect delivery.
+        }
+      }
     } catch (err) {
       cb.onFailure();
       recordError(msg.channelId, "bridge_error");

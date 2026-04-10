@@ -29,6 +29,16 @@ export interface Permission {
   readonly title: string;
 }
 
+export interface SessionDiffFile {
+  readonly path: string;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
+export interface SessionDiff {
+  readonly files: SessionDiffFile[];
+}
+
 export class OpenCodeBridge {
   private client: OpencodeClient | null = null;
   private serverHandle: { url: string; close(): void } | null = null;
@@ -403,6 +413,18 @@ export class OpenCodeBridge {
       text = this.stripThinking(text);
       return { role, text, hasParts: parts.length > 0 };
     });
+  }
+
+  async getSessionDiff(sessionId: string): Promise<SessionDiff | null> {
+    try {
+      const response = await this.getClient().session.diff({
+        path: { id: sessionId },
+        throwOnError: true,
+      });
+      return (response.data as SessionDiff | null | undefined) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async deleteSession(sessionId: string): Promise<void> {

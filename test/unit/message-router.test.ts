@@ -73,6 +73,21 @@ describe("MessageRouter", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
+  function makeOpenSecurityGate(): SecurityGate {
+    return new SecurityGate(
+      new PairingStore(tempDir),
+      new AllowlistStore(tempDir),
+      new RateLimiter({ perMinute: 30, perHour: 300 }),
+      {
+        defaultDmPolicy: "open",
+        pairingCodeTtlMs: 3_600_000,
+        pairingCodeLength: 8,
+        rateLimitPerMinute: 30,
+        rateLimitPerHour: 300,
+      },
+    );
+  }
+
   it("routes inbound message through pipeline", async () => {
     const msg = makeInboundMessage({ channelId: "mock" });
     await router.handleInbound(msg);
@@ -268,6 +283,73 @@ describe("MessageRouter", () => {
     } finally {
       routerNoAdapter.dispose();
     }
+  });
+
+  it("appends a capped diff summary when reportDiff is enabled for a non-chat agent", async () => {
+    bridge.responseText = "Implemented the fix.";
+    bridge.sessionDiff = {
+      files: [
+        { path: "src/a.ts", additions: 12, deletions: 4 },
+        { path: "src/b.ts", additions: 45, deletions: 0 },
+        { path: "src/c.ts", additions: 2, deletions: 2 },
+        { path: "src/d.ts", additions: 1, deletions: 1 },
+        { path: "src/e.ts", additions: 5, deletions: 3 },
+        { path: "src/f.ts", additions: 8, deletions: 6 },
+      ],
+    };
+
+    const routerWithDiff = new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      makeOpenSecurityGate(),
+      registry,
+      pino({ level: "silent" }),
+      { mock: { type: "telegram", enabled: true, defaultAgent: "build" } },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { reportDiff: true },
+    );
+
+    await routerWithDiff.handleInbound(makeInboundMessage({ channelId: "mock" }));
+
+    const sendCalls = adapter.calls.filter((c) => c.method === "sendText");
+    expect(sendCalls).toHaveLength(1);
+    const text = (sendCalls[0]!.args[0] as any).text as string;
+    expect(text).toContain("Implemented the fix.");
+    expect(text).toContain("📝 Changes made: 6 files");
+    expect(text).toContain("+12 / -4  src/a.ts");
+    expect(text).toContain("+5 / -3  src/e.ts");
+    expect(text).toContain("… and 1 more");
+    expect(text).not.toContain("src/f.ts");
+  });
+
+  it("does not append a diff summary for chat responses even when reportDiff is enabled", async () => {
+    bridge.responseText = "Hello from chat.";
+    bridge.sessionDiff = {
+      files: [{ path: "src/a.ts", additions: 1, deletions: 0 }],
+    };
+
+    const routerWithDiff = new MessageRouter(
+      bridge as any,
+      new SessionMap(tempDir),
+      makeOpenSecurityGate(),
+      registry,
+      pino({ level: "silent" }),
+      { mock: { type: "telegram", enabled: true, defaultAgent: "chat" } },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { reportDiff: true },
+    );
+
+    await routerWithDiff.handleInbound(makeInboundMessage({ channelId: "mock" }));
+
+    const sendCalls = adapter.calls.filter((c) => c.method === "sendText");
+    expect(sendCalls).toHaveLength(1);
+    expect((sendCalls[0]!.args[0] as any).text).toBe("Hello from chat.");
   });
 })
 

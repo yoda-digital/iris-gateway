@@ -34,6 +34,7 @@ describe("irisConfigSchema — top-level defaults", () => {
     expect(cfg.opencode.port).toBe(4096);
     expect(cfg.opencode.autoSpawn).toBe(true);
     expect(cfg.opencode.hostname).toBe("127.0.0.1");
+    expect(cfg.opencode.reportDiff).toBe(false);
   });
 
   it("logging defaults: level=info", () => {
@@ -107,6 +108,11 @@ describe("irisConfigSchema — valid full configs", () => {
     });
     expect(cfg.cron).toHaveLength(1);
     expect(cfg.cron![0].name).toBe("daily-briefing");
+  });
+
+  it("accepts opencode.reportDiff=true", () => {
+    const cfg = parseConfig({ opencode: { reportDiff: true } });
+    expect(cfg.opencode.reportDiff).toBe(true);
   });
 });
 

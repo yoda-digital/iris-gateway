@@ -41,6 +41,7 @@ function makeMockClient(messages: Array<{ role: string; text: string; hasParts: 
         })),
       }),
       create: vi.fn(),
+      diff: vi.fn(),
       prompt: vi.fn(),
       abort: vi.fn(),
       delete: vi.fn(),
@@ -545,6 +546,39 @@ describe("OpenCodeBridge", () => {
       (bridge as any).client = null;
 
       await expect(bridge.listSessions()).rejects.toThrow("OpenCode bridge not started");
+    });
+  });
+
+  /* ── getSessionDiff ──────────────────────────────────────────── */
+
+  describe("getSessionDiff", () => {
+    it("returns diff data when session.diff succeeds", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const diffFn = vi.fn().mockResolvedValue({
+        data: {
+          files: [{ path: "src/a.ts", additions: 12, deletions: 4 }],
+        },
+      });
+      const client = { session: { diff: diffFn } };
+      injectClient(bridge, client);
+
+      const diff = await bridge.getSessionDiff("s1");
+
+      expect(diffFn).toHaveBeenCalledWith({
+        path: { id: "s1" },
+        throwOnError: true,
+      });
+      expect(diff).toEqual({
+        files: [{ path: "src/a.ts", additions: 12, deletions: 4 }],
+      });
+    });
+
+    it("returns null when session.diff throws", async () => {
+      const bridge = new OpenCodeBridge(makeConfig(), makeLogger());
+      const client = { session: { diff: vi.fn().mockRejectedValue(new Error("boom")) } };
+      injectClient(bridge, client);
+
+      await expect(bridge.getSessionDiff("s1")).resolves.toBeNull();
     });
   });
 

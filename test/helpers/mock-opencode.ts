@@ -1,5 +1,6 @@
 import type {
   OpenCodeEvent,
+  SessionDiff,
   SessionInfo,
 } from "../../src/bridge/opencode-client.js";
 
@@ -7,6 +8,7 @@ export class MockOpenCodeBridge {
   readonly sessions = new Map<string, SessionInfo>();
   private sessionCounter = 0;
   public responseText = "Hello from mock OpenCode!";
+  public sessionDiff: SessionDiff | null = null;
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {}
@@ -31,6 +33,10 @@ export class MockOpenCodeBridge {
   }
 
   async sendMessageAsync(_sessionId: string, _text: string): Promise<void> {}
+
+  async getSessionDiff(_sessionId: string): Promise<SessionDiff | null> {
+    return this.sessionDiff;
+  }
 
   async subscribeEvents(
     _onEvent: (event: OpenCodeEvent) => void,

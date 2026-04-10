@@ -148,7 +148,10 @@ async function wireAllMocks() {
   vi.mocked(createLogger).mockReturnValue(logger as any);
   vi.mocked(OpenCodeBridge).mockImplementation(() => bridge as any);
   vi.mocked(SessionMap).mockImplementation(() => ({ dispose: vi.fn() } as any));
-  vi.mocked(MessageRouter).mockImplementation(() => ({ dispose: vi.fn() } as any));
+  vi.mocked(MessageRouter).mockImplementation(() => ({
+    dispose: vi.fn(),
+    getEventHandler: vi.fn().mockReturnValue({ handleEvent: vi.fn() }),
+  } as any));
   vi.mocked(ToolServer).mockImplementation(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),

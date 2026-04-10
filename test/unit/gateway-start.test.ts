@@ -269,7 +269,10 @@ beforeEach(() => {
   vi.mocked(createLogger).mockReturnValue(logger as any);
   vi.mocked(OpenCodeBridge).mockImplementation(() => bridge as any);
   vi.mocked(SessionMap).mockImplementation(() => ({}) as any);
-  vi.mocked(MessageRouter).mockImplementation(() => ({ dispose: vi.fn() }) as any);
+  vi.mocked(MessageRouter).mockImplementation(() => ({
+    dispose: vi.fn(),
+    getEventHandler: vi.fn(() => ({})),
+  }) as any);
   vi.mocked(ToolServer).mockImplementation(() => makeToolServer() as any);
   vi.mocked(ChannelRegistry).mockImplementation(() => ({ register: vi.fn(), get: vi.fn(), list: vi.fn().mockReturnValue([]) }) as any);
   vi.mocked(MessageCache).mockImplementation(() => ({ dispose: vi.fn() }) as any);

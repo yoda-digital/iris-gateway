@@ -8,6 +8,7 @@ import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-
 import type { OpenCodeBridge, Permission, PromptOptions } from "./opencode-client.js";
 import type { PolicyEngine } from "../governance/policy.js";
 import type { SessionMap } from "./session-map.js";
+import type { CompactionNotifier } from "./compaction-notifier.js";
 import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
 import { StreamCoalescer } from "./stream-coalescer.js";
@@ -32,6 +33,7 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly compactionNotifier?: CompactionNotifier | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -80,10 +82,17 @@ export class MessageRouter {
       if (!pending) return;
       const channelConfig = this.channelConfigs[pending.channelId];
       if (!channelConfig?.notifyOnCompaction) return;
-      this.registry.get(pending.channelId)?.sendText({
-        to: pending.chatId,
-        text: "Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
-      })?.catch((err) => this.logger.warn({ err, sessionId }, "Failed to send compaction notification"));
+
+      if (this.compactionNotifier) {
+        this.compactionNotifier.notify(sessionId).catch((err) =>
+          this.logger.warn({ err, sessionId }, "Compaction notifier error"),
+        );
+      } else {
+        this.registry.get(pending.channelId)?.sendText({
+          to: pending.chatId,
+          text: "Note: conversation context was compressed to fit model limits. Early context may no longer be fully available.",
+        })?.catch((err) => this.logger.warn({ err, sessionId }, "Failed to send compaction notification"));
+      }
     });
 
     this.outboundQueue = new MessageQueue(logger);

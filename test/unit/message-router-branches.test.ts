@@ -35,6 +35,7 @@ import { TemplateEngine } from "../../src/auto-reply/engine.js";
 import { MockAdapter } from "../helpers/mock-adapter.js";
 import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
 import { makeInboundMessage } from "../helpers/fixtures.js";
+import type { CompactionNotifier } from "../../src/bridge/compaction-notifier.js";
 import pino from "pino";
 
 vi.mock("../../src/gateway/metrics.js", () => ({
@@ -69,6 +70,7 @@ interface EnvOptions {
   templateEngine?: TemplateEngine | null;
   profileEnricher?: { isFirstContact(profile: any): boolean } | null;
   vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null;
+  compactionNotifier?: CompactionNotifier | null;
 }
 
 function makeEnv(opts: EnvOptions = {}) {
@@ -108,6 +110,7 @@ function makeEnv(opts: EnvOptions = {}) {
     null,
     opts.profileEnricher,
     opts.vaultStoreRef,
+    opts.compactionNotifier,
   );
 
   return { tempDir, bridge, adapter, router, registry };
@@ -231,6 +234,32 @@ describe("MessageRouter — mention gating (group messages)", () => {
       );
       // The mention should have been stripped from the forwarded text
       expect(capturedText).not.toContain("@testbot");
+    } finally {
+      router.dispose();
+      cleanup(tempDir);
+    }
+  });
+});
+
+describe("MessageRouter — compaction notifier delegation", () => {
+  it("uses the injected compaction notifier instead of the static message", async () => {
+    const compactionNotifier = {
+      notify: vi.fn().mockResolvedValue(undefined),
+    } as unknown as CompactionNotifier;
+    const { tempDir, router, adapter } = makeEnv({
+      compactionNotifier,
+      channelConfigs: { mock: { type: "telegram", enabled: true, notifyOnCompaction: true } },
+    });
+
+    try {
+      const eventHandler = router.getEventHandler();
+      (router as any).turnGrouper.set("session-with-notifier", { channelId: "mock", chatId: "chat-12" });
+
+      eventHandler.handleEvent({ type: "session.compacted", properties: { sessionID: "session-with-notifier" } } as any);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(compactionNotifier.notify).toHaveBeenCalledWith("session-with-notifier");
+      expect(adapter.calls.filter((c) => c.method === "sendText")).toHaveLength(0);
     } finally {
       router.dispose();
       cleanup(tempDir);

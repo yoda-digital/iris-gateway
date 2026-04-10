@@ -12,6 +12,7 @@ import { ChannelRegistry } from "../../src/channels/registry.js";
 import { MockAdapter } from "../helpers/mock-adapter.js";
 import { MockOpenCodeBridge } from "../helpers/mock-opencode.js";
 import { makeInboundMessage } from "../helpers/fixtures.js";
+import type { CompactionNotifier } from "../../src/bridge/compaction-notifier.js";
 import type { Permission } from "../../src/bridge/opencode-client.js";
 import pino from "pino";
 
@@ -182,6 +183,7 @@ describe("MessageRouter", () => {
   function makeRouterWithConfig(
     channelConfigs: Record<string, unknown>,
     overrideRegistry?: ChannelRegistry,
+    compactionNotifier?: CompactionNotifier | null,
   ): MessageRouter {
     const ps = new PairingStore(tempDir);
     const als = new AllowlistStore(tempDir);
@@ -200,10 +202,15 @@ describe("MessageRouter", () => {
       overrideRegistry ?? registry,
       pino({ level: "silent" }),
       channelConfigs as unknown as Record<string, import("../../src/config/types.js").ChannelAccountConfig>,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      compactionNotifier,
     );
   }
 
-  it("sends compaction notification when notifyOnCompaction is true and session is pending", async () => {
+  it("sends static compaction notification when notifyOnCompaction is true and no notifier is provided", async () => {
     const notifyAdapter = new MockAdapter();
     const notifyRegistry = new ChannelRegistry();
     notifyRegistry.register(notifyAdapter);

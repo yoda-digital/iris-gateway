@@ -2,7 +2,7 @@ import type { InboundMessage } from "../channels/adapter.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { SecurityGate, SecurityCheckResult } from "../security/dm-policy.js";
 import type { Logger } from "../logging/logger.js";
-import type { ChannelAccountConfig } from "../config/types.js";
+import type { ChannelAccountConfig, OpenCodeConfig } from "../config/types.js";
 import { chunkText, PLATFORM_LIMITS } from "../utils/text-chunker.js";
 import { shouldProcessGroupMessage, stripBotMention } from "../channels/mention-gating.js";
 import type { OpenCodeBridge, Permission, PromptOptions } from "./opencode-client.js";
@@ -14,6 +14,7 @@ import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
+import { formatDiffSummary } from "./diff-summary.js";
 
 export class MessageRouter {
   private readonly eventHandler: EventHandler;
@@ -32,6 +33,7 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly openCodeConfig?: Pick<OpenCodeConfig, "reportDiff"> | null,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -244,9 +246,12 @@ export class MessageRouter {
     log.info("  9 ▸ Bridge        → prompt_async to OpenCode");
 
     let response: string | null = null;
+    let agent = "chat";
     try {
       const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
-      const agent = this.selectAgent(messageText, msg.channelId);
+      agent = this.selectAgent(messageText, msg.channelId);
+      const pendingEntry = this.turnGrouper.get(entry.openCodeSessionId);
+      if (pendingEntry) pendingEntry.agent = agent;
       const channelModel = this.channelConfigs[msg.channelId]?.model;
       const promptOptions: PromptOptions = {
         agent,
@@ -284,6 +289,7 @@ export class MessageRouter {
       log.info(`──── DONE ──── ${elapsed}ms total (SSE-delivered) ────`);
     } else if (response) {
       cb.onSuccess();
+      response = await this.tryAppendDiffSummary(entry.openCodeSessionId, agent, response);
       const responsePreview = `"${response.substring(0, 80)}${response.length > 80 ? "…" : ""}"`;
       log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);
       log.info(` 11 ▸ Deliver       → ${msg.channelId} ${responsePreview}`);
@@ -394,6 +400,24 @@ export class MessageRouter {
     await this.bridge.approvePermission(sessionId, permission.id, "reject");
   }
 
+  private async tryAppendDiffSummary(
+    sessionId: string,
+    agent: string,
+    response: string,
+  ): Promise<string> {
+    if (!this.openCodeConfig?.reportDiff) return response;
+    if (agent === "chat") return response;
+    try {
+      const diff = await this.bridge.getSessionDiff(sessionId);
+      if (diff && diff.files.length > 0) {
+        return response + "\n\n" + formatDiffSummary(diff);
+      }
+    } catch {
+      // Non-critical: keep delivering the assistant response if diff lookup fails.
+    }
+    return response;
+  }
+
   private handleResponse(sessionId: string, text: string): void {
     const pending = this.turnGrouper.get(sessionId);
     if (!pending) {
@@ -401,9 +425,12 @@ export class MessageRouter {
       return;
     }
     this.turnGrouper.delete(sessionId);
-    this.sendResponse(pending.channelId, pending.chatId, text, pending.replyToId).catch((err) => {
-      this.logger.error({ err, sessionId }, "Failed to send response");
-    });
+    const agent = pending.agent ?? "chat";
+    this.tryAppendDiffSummary(sessionId, agent, text)
+      .then((enriched) => this.sendResponse(pending.channelId, pending.chatId, enriched, pending.replyToId))
+      .catch((err) => {
+        this.logger.error({ err, sessionId }, "Failed to send response");
+      });
   }
 
 }

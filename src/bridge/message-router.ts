@@ -12,6 +12,7 @@ import { EventHandler } from "./event-handler.js";
 import { MessageQueue } from "./message-queue.js";
 import { StreamCoalescer } from "./stream-coalescer.js";
 import { TurnGrouper } from "./turn-grouper.js";
+import { formatDiffSummary } from "./diff-summary.js";
 import { recordReceived, recordSent, recordError, recordLatency } from "./router-metrics.js";
 import type { TemplateEngine } from "../auto-reply/engine.js";
 
@@ -32,6 +33,7 @@ export class MessageRouter {
     private readonly policyEngine?: PolicyEngine | null,
     private readonly profileEnricher?: { isFirstContact(profile: any): boolean } | null,
     private readonly vaultStoreRef?: { getProfile(senderId: string, channelId: string): any } | null,
+    private readonly reportDiff = false,
   ) {
     this.turnGrouper = new TurnGrouper((sessionId) => {
       this.logger.warn({ sessionId }, "Pruning stale pending response");
@@ -243,10 +245,10 @@ export class MessageRouter {
 
     log.info("  9 ▸ Bridge        → prompt_async to OpenCode");
 
+    const agent = this.selectAgent(messageText, msg.channelId);
     let response: string | null = null;
     try {
       const sendTimeoutMs = this.channelConfigs[msg.channelId]?.sendAndWaitTimeoutMs;
-      const agent = this.selectAgent(messageText, msg.channelId);
       const channelModel = this.channelConfigs[msg.channelId]?.model;
       const promptOptions: PromptOptions = {
         agent,
@@ -284,6 +286,16 @@ export class MessageRouter {
       log.info(`──── DONE ──── ${elapsed}ms total (SSE-delivered) ────`);
     } else if (response) {
       cb.onSuccess();
+      if (this.reportDiff && agent !== "chat") {
+        try {
+          const diff = await this.bridge.getSessionDiff(entry.openCodeSessionId);
+          if (diff && diff.files?.length > 0) {
+            response = response + "\n\n" + formatDiffSummary(diff);
+          }
+        } catch {
+          // Non-critical: deliver the original response if diff lookup fails.
+        }
+      }
       const responsePreview = `"${response.substring(0, 80)}${response.length > 80 ? "…" : ""}"`;
       log.info(` 10 ▸ Response      ✓ ${response.length}ch in ${elapsed}ms`);
       log.info(` 11 ▸ Deliver       → ${msg.channelId} ${responsePreview}`);

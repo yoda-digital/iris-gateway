@@ -1,12 +1,15 @@
 import type {
   OpenCodeEvent,
+  PromptOptions,
   SessionInfo,
 } from "../../src/bridge/opencode-client.js";
+import type { SessionDiff } from "../../src/bridge/diff-summary.js";
 
 export class MockOpenCodeBridge {
   readonly sessions = new Map<string, SessionInfo>();
   private sessionCounter = 0;
   public responseText = "Hello from mock OpenCode!";
+  public mockDiff: SessionDiff | null = null;
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {}
@@ -26,8 +29,12 @@ export class MockOpenCodeBridge {
     return this.responseText;
   }
 
-  async sendAndWait(_sessionId: string, _text: string, _timeoutMs?: number, _pollMs?: number, _agent?: string): Promise<string> {
+  async sendAndWait(_sessionId: string, _text: string, _timeoutMs?: number, _pollMs?: number, _options?: PromptOptions): Promise<string> {
     return this.responseText;
+  }
+
+  async getSessionDiff(_sessionId: string): Promise<SessionDiff | null> {
+    return this.mockDiff;
   }
 
   async sendMessageAsync(_sessionId: string, _text: string): Promise<void> {}

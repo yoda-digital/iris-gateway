@@ -11,6 +11,7 @@ import type { OpenCodeConfig } from "../config/types.js";
 import type { Logger } from "../logging/logger.js";
 import { CircuitBreaker } from "./circuit-breaker.js";
 import { BridgeSupervisor, type SupervisorOptions } from "./supervisor.js";
+import type { SessionDiff } from "./diff-summary.js";
 export { CircuitBreaker };
 export type { CircuitState } from "./circuit-breaker.js";
 
@@ -423,6 +424,28 @@ export class OpenCodeBridge {
       path: { id: sessionId },
       throwOnError: true,
     });
+  }
+
+  async getSessionDiff(sessionId: string): Promise<SessionDiff | null> {
+    try {
+      const client = this.getClient();
+      const sessionClient = client.session as typeof client.session & {
+        diff?: (args: { path: { id: string }; throwOnError: true }) => Promise<{ data?: unknown }>;
+      };
+      if (typeof sessionClient.diff === "function") {
+        const response = await sessionClient.diff({
+          path: { id: sessionId },
+          throwOnError: true,
+        });
+        return (response.data as SessionDiff) ?? null;
+      }
+
+      const res = await fetch(`${this.getBaseUrl()}/session/${sessionId}/diff`);
+      if (!res.ok) return null;
+      return (await res.json()) as SessionDiff;
+    } catch {
+      return null;
+    }
   }
 
 }

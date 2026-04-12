@@ -94,3 +94,67 @@ describe("selectAgent() — intent-based routing", () => {
     expect(agent).toBe("build"); // from auto-routing
   });
 });
+
+describe("selectAgent() — multilingual routing", () => {
+  it("routes Romanian build intent to build", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("rezolvă eroarea din auth.ts", "telegram");
+    expect(agent).toBe("build");
+  });
+
+  it("routes Russian build intent to build", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("исправь ошибка в auth.ts", "telegram");
+    expect(agent).toBe("build");
+  });
+
+  it("routes Romanian explore intent to explore", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("unde se află cod sendMessage?", "telegram");
+    expect(agent).toBe("explore");
+  });
+
+  it("routes Russian explore intent to explore", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("где находится функция sendMessage?", "telegram");
+    expect(agent).toBe("explore");
+  });
+
+  it("routes Romanian plan intent to plan", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("planifică arhitectură pentru noul API", "telegram");
+    expect(agent).toBe("plan");
+  });
+
+  it("routes Russian plan intent to plan", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("спланируй структура для нового API", "telegram");
+    expect(agent).toBe("plan");
+  });
+
+  it("routes non-matching foreign language to chat", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("bună ziua, ce mai faci?", "telegram");
+    expect(agent).toBe("chat");
+  });
+});
+
+describe("selectAgent() — short commands", () => {
+  it("routes 'fix auth' to build (short command)", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("fix auth", "telegram");
+    expect(agent).toBe("build");
+  });
+
+  it("routes 'refactor utils' to build (short command)", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("refactor utils", "telegram");
+    expect(agent).toBe("build");
+  });
+
+  it("routes 'rezolvă auth.ts' to build (short Romanian command)", () => {
+    const router = makeRouter();
+    const agent = (router as any).selectAgent("rezolvă auth.ts", "telegram");
+    expect(agent).toBe("build");
+  });
+});

@@ -328,17 +328,34 @@ export class MessageRouter {
     const t = text.toLowerCase();
 
     // Coding execution — needs real tools
-    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
+    // EN: fix, implement, write, create, refactor, delete, rename, move, update
+    // RO: rezolvă, implementează, creează, scrie, refactorizează, șterge, redenumește, mută, actualizează
+    // RU: исправь, реализуй, напиши, создай, рефактори, удали, переименуй, перемести, обнови
+    const buildVerbs = /(?:^|[^\p{L}\p{N}_])(?:fix|implement|write|create|refactor|delete|rename|move|update|rezolvă|implementează|creează|scrie|refactorizează|șterge|redenumește|mută|actualizează|исправь|реализуй|напиши|создай|рефактори|удали|переименуй|перемести|обнови)(?=$|[^\p{L}\p{N}_])/u;
+    const buildNouns = /(?:^|[^\p{L}\p{N}_])(?:file|function|class|component|test|bug|issue|error|fișier|funcție|clasă|eroare|problemă|файл|функция|класс|компонент|тест|баг|ошибка)(?=$|[^\p{L}\p{N}_])/u;
+    if (buildVerbs.test(t) && buildNouns.test(t)) {
+      return "build";
+    }
+    // Short build commands: verb alone is enough for unambiguous build intent
+    if (/(?:^|[^\p{L}\p{N}_])(?:fix|refactor|implement|rezolvă|implementează|исправь|реализуй)(?=$|[^\p{L}\p{N}_])/u.test(t)) {
       return "build";
     }
 
     // Architecture and planning
-    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
+    // EN: plan, design, architect, how should, what's the best way, structure, approach
+    // RO: planifică, proiectează, arhitectură, cum ar trebui, structură, abordare
+    // RU: спланируй, спроектируй, архитектура, как лучше, структура, подход
+    if (/(?:^|[^\p{L}\p{N}_])(?:plan|design|architect|how should|what.?s the best way|structure|approach|planifică|proiectează|arhitectură|cum ar trebui|structură|abordare|спланируй|спроектируй|архитектура|как лучше|структура|подход)(?=$|[^\p{L}\p{N}_])/u.test(t)) {
       return "plan";
     }
 
     // Codebase investigation
-    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
+    // EN: explore, understand, find, where is, what does, explain, navigate, show me, locate
+    // RO: explorează, înțelege, găsește, unde este, unde se află, ce face, explică, arată-mi, caută
+    // RU: исследуй, найди, где находится, что делает, объясни, покажи
+    const exploreVerbs = /(?:^|[^\p{L}\p{N}_])(?:explore|understand|find|where is|what does|explain|navigate|show me|locate|explorează|înțelege|găsește|unde este|unde se află|ce face|explică|arată-mi|caută|исследуй|найди|где находится|что делает|объясни|покажи)(?=$|[^\p{L}\p{N}_])/u;
+    const exploreNouns = /(?:^|[^\p{L}\p{N}_])(?:codebase|repo|code|file|function|module|class|cod|fișier|funcție|modul|clasă|код|файл|функция|модуль|класс)(?=$|[^\p{L}\p{N}_])/u;
+    if (exploreVerbs.test(t) && exploreNouns.test(t)) {
       return "explore";
     }
 

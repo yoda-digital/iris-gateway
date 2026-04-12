@@ -11,6 +11,7 @@ export interface PendingResponse {
   chatId: string;
   replyToId?: string;
   createdAt: number;
+  agent?: string;
 }
 
 export class TurnGrouper {

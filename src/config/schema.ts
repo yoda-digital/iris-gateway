@@ -56,6 +56,7 @@ const openCodeSchema = z.object({
   hostname: z.string().default("127.0.0.1"),
   autoSpawn: z.boolean().default(true),
   projectDir: z.string().optional(),
+  reportDiff: z.boolean().default(false),
 });
 
 const cronJobSchema = z.object({

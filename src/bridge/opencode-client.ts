@@ -30,6 +30,16 @@ export interface SessionInfo {
   readonly createdAt: number;
 }
 
+export interface DiffFile {
+  readonly path: string;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
+export interface SessionDiff {
+  readonly files: DiffFile[];
+}
+
 export interface Permission {
   readonly id: string;
   readonly sessionID: string;
@@ -422,6 +432,54 @@ export class OpenCodeBridge {
     await this.getClient().session.delete({
       path: { id: sessionId },
       throwOnError: true,
+    });
+  }
+
+  async getSessionDiff(sessionId: string): Promise<SessionDiff | null> {
+    try {
+      const sessionClient = this.getClient().session as unknown as {
+        diff?: (args: { path: { id: string }; throwOnError: true }) => Promise<{ data?: unknown }>;
+      };
+      if (sessionClient.diff) {
+        const response = await sessionClient.diff({
+          path: { id: sessionId },
+          throwOnError: true,
+        });
+        const files = this.normalizeDiffFiles(response.data);
+        return files.length > 0 ? { files } : null;
+      }
+    } catch {
+      // Fall through to raw fetch below.
+    }
+
+    try {
+      const url = `${this.getBaseUrl()}/session/${sessionId}/diff`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json() as unknown;
+      const files = this.normalizeDiffFiles(data);
+      if (files.length === 0) return null;
+      return { files };
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeDiffFiles(data: unknown): DiffFile[] {
+    if (!data || typeof data !== "object") return [];
+    const files = (data as { files?: unknown }).files;
+    if (!Array.isArray(files)) return [];
+    return files.map((file) => {
+      const f = file as { path?: unknown; filename?: unknown; additions?: unknown; deletions?: unknown };
+      return {
+        path: typeof f.path === "string"
+          ? f.path
+          : typeof f.filename === "string"
+            ? f.filename
+            : "unknown",
+        additions: typeof f.additions === "number" ? f.additions : 0,
+        deletions: typeof f.deletions === "number" ? f.deletions : 0,
+      };
     });
   }
 

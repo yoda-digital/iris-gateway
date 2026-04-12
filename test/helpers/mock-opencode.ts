@@ -58,6 +58,10 @@ export class MockOpenCodeBridge {
     this.sessions.delete(sessionId);
   }
 
+  async getSessionDiff(_sessionId: string): Promise<any> {
+    return null;
+  }
+
   readonly permissionDecisions: Array<{ sessionId: string; permissionId: string; response: string }> = [];
 
   async approvePermission(sessionId: string, permissionId: string, response: "once" | "always" | "reject"): Promise<void> {

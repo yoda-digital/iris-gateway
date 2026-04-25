@@ -1,4 +1,4 @@
-import { Command } from "clipanion";
+import { Command, Option } from "clipanion";
 import * as p from "@clack/prompts";
 import { writeFile, readFile, access } from "node:fs/promises";
 import { execSync, spawnSync } from "node:child_process";
@@ -82,6 +82,10 @@ export class InitCommand extends Command {
   static override usage = Command.Usage({
     description: "Interactive setup wizard — get from zero to running in under 10 minutes",
     examples: [["Run the setup wizard", "iris init"]],
+  });
+
+  installOpencode = Option.Boolean("--install-opencode", false, {
+    description: "Auto-install OpenCode CLI without prompting (non-interactive)",
   });
 
   async execute(): Promise<number> {
@@ -227,13 +231,27 @@ export class InitCommand extends Command {
     if (ocPath) {
       p.note(`Detected at ${ocPath}`, "OpenCode CLI ✓");
     } else {
-      const installOc = await p.confirm({
-        message: "OpenCode CLI not found. Install it now? (npm i -g opencode-ai)",
-        initialValue: true,
-      });
-      if (p.isCancel(installOc)) { p.cancel("Setup cancelled."); return 1; }
+      const autoInstall =
+        this.installOpencode || process.env.IRIS_INSTALL_OPENCODE === "1";
 
-      if (installOc) {
+      const shouldInstall = autoInstall
+        ? true
+        : await (async () => {
+            const result = await p.confirm({
+              message:
+                "OpenCode CLI not found. Install it now? (npm i -g opencode-ai)",
+              initialValue: true,
+            });
+            if (p.isCancel(result)) {
+              p.cancel("Setup cancelled.");
+              return null;
+            }
+            return result;
+          })();
+
+      if (shouldInstall === null) return 1;
+
+      if (shouldInstall) {
         const spin = p.spinner();
         spin.start("Installing OpenCode CLI…");
         try {

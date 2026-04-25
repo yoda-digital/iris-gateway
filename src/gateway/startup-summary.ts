@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import type { IrisConfig } from "../config/types.js";
 import type { GovernanceEngine } from "../governance/engine.js";
+import { detectOpenCode } from "../utils/opencode-detect.js";
 
 /**
  * Prints a startup summary box to stdout after the gateway is fully ready.
@@ -16,6 +17,10 @@ export function printStartupSummary(config: IrisConfig, governanceEngine: Govern
     const securityMode = config.security?.defaultDmPolicy ?? "open";
     const governanceRules = governanceEngine.getRules().length;
 
+    // Check OpenCode CLI status
+    const ocInfo = detectOpenCode();
+    const ocCliStatus = ocInfo ? ocInfo.version : "not found";
+
     console.log("");
     console.log("  ┌─────────────────────────────────────────┐");
     console.log("  │             Gateway Ready                │");
@@ -25,6 +30,7 @@ export function printStartupSummary(config: IrisConfig, governanceEngine: Govern
     console.log(`  │  Channels:  ${channels.join(", ").padEnd(28)}│`);
     console.log(`  │  Security:  ${securityMode.padEnd(28)}│`);
     console.log(`  │  Rules:     ${String(governanceRules).padEnd(28)}│`);
+    console.log(`  │  CLI:       ${ocCliStatus.padEnd(28)}│`);
     console.log(`  │  OpenCode:  :${config.opencode.port}${"".padEnd(23)}│`);
     console.log(`  │  Tools:     :19877${"".padEnd(22)}│`);
     console.log(`  │  Health:    :19876${"".padEnd(22)}│`);

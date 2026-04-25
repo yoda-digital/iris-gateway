@@ -77,6 +77,24 @@ $ iris init
 
 Free model options: Arcee Spotlight, Arcee Trinity Large, Llama 3.3 70B, Mistral 7B — or enter any custom model string.
 
+### OpenCode CLI
+
+Iris requires the OpenCode CLI (`opencode-ai` package) as its AI backend. The setup wizard (`iris init`) will detect if it's installed and offer to install it automatically.
+
+**Manual installation:**
+```bash
+npm install -g opencode-ai
+```
+
+**Non-interactive install:**
+```bash
+iris init --install-opencode
+# or
+IRIS_INSTALL_OPENCODE=1 iris init
+```
+
+If OpenCode is not found at startup, Iris logs a warning but continues running. You can also run OpenCode externally on port 4096 and configure Iris to connect to it.
+
 ### Docker (even faster)
 
 ```bash

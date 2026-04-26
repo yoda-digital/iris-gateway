@@ -37,6 +37,7 @@ export class SlackAdapter implements ChannelAdapter {
   get isConnected(): boolean { return this._isConnected; }
 
   private app: App | null = null;
+  private displayNameCache = new Map<string, string>();
   private messageCache: MessageCache | null = null;
 
   setMessageCache(cache: MessageCache): void {
@@ -57,8 +58,12 @@ export class SlackAdapter implements ChannelAdapter {
       socketMode: true,
     });
 
-    this.app.message(async ({ message }) => {
-      const msg = normalizeSlackMessage(message as SlackMessageEvent);
+    this.app.message(async ({ message, client }) => {
+      const msg = await normalizeSlackMessage(
+        message as SlackMessageEvent,
+        client,
+        this.displayNameCache,
+      );
       if (msg) this.events.emit("message", msg);
     });
 

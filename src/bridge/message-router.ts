@@ -328,17 +328,62 @@ export class MessageRouter {
     const t = text.toLowerCase();
 
     // Coding execution — needs real tools
-    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.*\b(file|function|class|component|test|bug|issue|error)\b/.test(t)) {
+    // EN: fix, implement, write, create, refactor, delete, rename, move, update
+    // RO: rezolvă, implementează, creează, scrie, șterge, redenumește, mută, actualizează, repară
+    // RU: исправь, реализуй, напиши, создай, рефактори, удали, переименуй, перемести, обнови, почини
+    if (
+      /\b(fix|implement|write|create|refactor|delete|rename|move|update)\b/i.test(t) &&
+      /\b(file|function|class|component|test|bug|issue|error|code|module)\b/i.test(t)
+    ) {
+      return "build";
+    }
+    // Short imperative EN commands (e.g. "fix auth", "update utils.ts")
+    if (/\b(fix|implement|write|create|refactor|delete|rename|move|update)\b.+\.\w{1,4}$/i.test(t)) {
+      return "build";
+    }
+    // RO build intent
+    if (/(^|[^\p{L}\p{N}_])(rezolv[aă]|implementeaz[aă]|creeaz[aă]|scrie|[sș]terge|redenume[sș]te|mut[aă]|actualizeaz[aă]|repar[aă])(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
+      return "build";
+    }
+    // RU build intent
+    if (/(^|[^\p{L}\p{N}_])(исправь|реализуй|напиши|создай|рефактори|удали|переименуй|перемести|обнови|почини)(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
       return "build";
     }
 
     // Architecture and planning
-    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/.test(t)) {
+    // EN: plan, design, architect, how should, what's the best way, structure, approach
+    // RO: planifică, proiectează, arhitectură, cum ar trebui, structură
+    // RU: спланируй, спроектируй, архитектура, как лучше, структура
+    if (/\b(plan|design|architect|how should|what.?s the best way|structure|approach)\b/i.test(t)) {
+      return "plan";
+    }
+    if (/(^|[^\p{L}\p{N}_])(planific[aă]|proiecteaz[aă]|arhitectur[aă]|cum ar trebui|structur[aă])(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
+      return "plan";
+    }
+    if (/(^|[^\p{L}\p{N}_])(спланируй|спроектируй|архитектур[аы]|как лучше|структур[аы])(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
       return "plan";
     }
 
     // Codebase investigation
-    if (/\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b.*\b(codebase|repo|code|file|function|module|class)\b/.test(t)) {
+    // EN: explore, understand, find, where is, what does, explain, navigate, show me, locate
+    // RO: explorează, înțelege, găsește, unde este/se află, ce face, explică, arată-mi, caută
+    // RU: исследуй, найди, где находится, что делает, объясни, покажи, найти
+    if (
+      /\b(explore|understand|find|where is|what does|explain|navigate|show me|locate)\b/i.test(t) &&
+      /\b(codebase|repo|code|file|function|module|class)\b/i.test(t)
+    ) {
+      return "explore";
+    }
+    // Short explore EN (e.g. "where is sendMessage", "find the auth module")
+    if (/\b(where is|where.?s|locate|find)\b.+\b\w{2,}\b/i.test(t)) {
+      return "explore";
+    }
+    // RO explore intent
+    if (/(^|[^\p{L}\p{N}_])(exploreaz[aă]|[iî]n[tț]elege|g[aă]se[sș]te|unde (este|se afl[aă])|ce face|explic[aă]|arat[aă].mi|caut[aă])(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
+      return "explore";
+    }
+    // RU explore intent
+    if (/(^|[^\p{L}\p{N}_])(исследуй|найди|где находится|что делает|объясни|покажи|найти)(?=$|[^\p{L}\p{N}_])/iu.test(t)) {
       return "explore";
     }
 

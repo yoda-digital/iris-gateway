@@ -6,3 +6,8 @@ coverage/
 .iris/
 iris.config.json
 package-lock.json
+.serena/
+.claude/
+.codex/
+.gemini/
+.qwen/
